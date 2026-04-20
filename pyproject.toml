@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "owl"
+version = "0.1.0"
+description = "Attendance data pipeline: Extract → Transform (3NF) → Load (PostgreSQL) → Analyse"
+requires-python = ">=3.12"
+readme = "README.md"
+license = { text = "Proprietary" }
+
+dependencies = [
+    "python-dotenv>=1.0.1",
+    "pandas>=2.2.0",
+    "openpyxl>=3.1.2",
+    "sqlalchemy>=2.0.28",
+    "psycopg2-binary>=2.9.9",
+    "pydantic>=2.6.4",
+    "pydantic-settings>=2.2.1",
+    "scipy>=1.12.0",
+    "statsmodels>=0.14.1",
+    "numpy>=1.26.4",
+    "rich>=13.7.1",
+    "tenacity>=8.2.3",
+]
+
+[project.scripts]
+owl-init-db  = "scripts.init_db:init_db"
+owl-pipeline = "scripts.run_pipeline:main"
+
+# ── Tool configurations ────────────────────────────────────────────────────────
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short --cov=owl --cov-report=term-missing"
+
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "C4", "SIM"]
+ignore = ["E501"]   # Black handles line length
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+ignore_missing_imports = true
