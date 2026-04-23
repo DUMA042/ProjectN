@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 from owl.transform.sheets.nominal import NominalNormalizer
 from owl.transform.sheets.training import TrainingNormalizer
 from owl.transform.sheets.card_swipe import CardSwipeNormalizer
+from owl.transform.sheets.leave import LeaveNormalizer
 
 # Mapping of ReportType to the concrete Normalizer class.
 # Add entries here as new sheets are implemented.
@@ -21,4 +22,5 @@ NORMALIZER_REGISTRY: dict[ReportType, type[BaseNormalizer]] = {
     ReportType.NOMINAL: NominalNormalizer,
     ReportType.TRAINING: TrainingNormalizer,
     ReportType.CARD_SWIPE: CardSwipeNormalizer,
+    ReportType.LEAVE: LeaveNormalizer,
 }

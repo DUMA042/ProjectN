@@ -67,6 +67,21 @@ class Location(Base):
     location_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     location_name: Mapped[str] = mapped_column(String(128), unique=True)
 
+class Department(Base):
+    __tablename__ = "departments"
+    department_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    department_name: Mapped[str] = mapped_column(String(255), unique=True)
+
+class GradeLevel(Base):
+    __tablename__ = "grade_levels"
+    gl_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    gl_name: Mapped[str] = mapped_column(String(50), unique=True)
+
+class LeaveType(Base):
+    __tablename__ = "leave_types"
+    leave_type_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    leave_type_name: Mapped[str] = mapped_column(String(100), unique=True)
+
 
 # ── Core Entities ─────────────────────────────────────────────────────────────
 
@@ -81,6 +96,8 @@ class Employee(Base):
     
     unit_id: Mapped[Optional[int]] = mapped_column(ForeignKey("units.unit_id"))
     rank_id: Mapped[Optional[int]] = mapped_column(ForeignKey("ranks.rank_id"))
+    department_id: Mapped[Optional[int]] = mapped_column(ForeignKey("departments.department_id"))
+    gl_id: Mapped[Optional[int]] = mapped_column(ForeignKey("grade_levels.gl_id"))
     emp_type_id: Mapped[Optional[int]] = mapped_column(ForeignKey("employment_types.emp_type_id"))
     status_id: Mapped[Optional[int]] = mapped_column(ForeignKey("employee_statuses.status_id"))
     location_id: Mapped[Optional[int]] = mapped_column(ForeignKey("locations.location_id"))
@@ -107,11 +124,59 @@ class EmployeeTraining(Base):
 class EmployeeHistory(Base):
     __tablename__ = "employee_history"
     history_id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    id_no: Mapped[str] = mapped_column(ForeignKey("employees.id_no"), nullable=False, index=True)
+    id_no: Mapped[str] = mapped_column(String(64), ForeignKey("employees.id_no"), nullable=False, index=True)
     unit_id: Mapped[Optional[int]] = mapped_column(ForeignKey("units.unit_id"))
     rank_id: Mapped[Optional[int]] = mapped_column(ForeignKey("ranks.rank_id"))
     location_id: Mapped[Optional[int]] = mapped_column(ForeignKey("locations.location_id"))
     effective_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+class EmployeeLocationHistory(Base):
+    __tablename__ = "employee_location_history"
+    history_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    id_no: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("employees.id_no"))
+    location_id: Mapped[Optional[int]] = mapped_column(ForeignKey("locations.location_id"))
+    start_date: Mapped[date] = mapped_column(Date, nullable=False)
+    end_date: Mapped[Optional[date]] = mapped_column(Date)
+
+class EmployeeDepartmentHistory(Base):
+    __tablename__ = "employee_department_history"
+    history_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    id_no: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("employees.id_no"))
+    department_id: Mapped[Optional[int]] = mapped_column(ForeignKey("departments.department_id"))
+    start_date: Mapped[date] = mapped_column(Date, nullable=False)
+    end_date: Mapped[Optional[date]] = mapped_column(Date)
+
+class EmployeeGLHistory(Base):
+    __tablename__ = "employee_gl_history"
+    history_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    id_no: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("employees.id_no"))
+    gl_id: Mapped[Optional[int]] = mapped_column(ForeignKey("grade_levels.gl_id"))
+    start_date: Mapped[date] = mapped_column(Date, nullable=False)
+    end_date: Mapped[Optional[date]] = mapped_column(Date)
+
+class EmployeeUnitHistory(Base):
+    __tablename__ = "employee_unit_history"
+    history_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    id_no: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("employees.id_no"))
+    unit_id: Mapped[Optional[int]] = mapped_column(ForeignKey("units.unit_id"))
+    start_date: Mapped[date] = mapped_column(Date, nullable=False)
+    end_date: Mapped[Optional[date]] = mapped_column(Date)
+
+class EmployeeRankHistory(Base):
+    __tablename__ = "employee_rank_history"
+    history_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    id_no: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("employees.id_no"))
+    rank_id: Mapped[Optional[int]] = mapped_column(ForeignKey("ranks.rank_id"))
+    start_date: Mapped[date] = mapped_column(Date, nullable=False)
+    end_date: Mapped[Optional[date]] = mapped_column(Date)
+
+class EmployeeLeave(Base):
+    __tablename__ = "employee_leaves"
+    leave_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    id_no: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("employees.id_no"))
+    leave_type_id: Mapped[Optional[int]] = mapped_column(ForeignKey("leave_types.leave_type_id"))
+    start_date: Mapped[date] = mapped_column(Date, nullable=False)
+    end_date: Mapped[Optional[date]] = mapped_column(Date)
 
 
 # ── Quarantine Entities (Orphans) ─────────────────────────────────────────────

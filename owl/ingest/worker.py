@@ -69,15 +69,14 @@ class IngestionWorker:
         """Execute the pipeline for a single metadata record."""
         log.info(f"Processing[{record.id}]: {record.normalized_filename}")
         
-        # 1. Fetch Validation Context (Option A)
-        # We fetch all currently valid id_no from the employees table.
-        # This allows normalizers to identify and quarantine 'Orphan' records.
+        # 1. Fetch Validation Context
+        # We fetch all currently valid id_no from the employees table for orphan detection.
         valid_ids = set()
         with get_session() as session:
             from owl.load.models import Employee
             res = session.execute(select(Employee.id_no)).scalars().all()
             valid_ids = set(res)
-            log.debug(f"Process[{record.id}]: Loaded {len(valid_ids)} valid staff IDs for validation.")
+            log.debug(f"Process[{record.id}]: Loaded {len(valid_ids)} valid staff IDs.")
 
         # 2. Resolve normalizer
         r_type = ReportType(record.report_type)

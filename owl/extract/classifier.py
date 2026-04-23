@@ -31,6 +31,7 @@ class ReportType(Enum):
     NOMINAL = "Nominal"
     TRAINING = "Training"
     CARD_SWIPE = "CardSwipe"
+    LEAVE = "Leave"
     UNKNOWN = "Unknown"
 
 
@@ -62,6 +63,9 @@ FINGERPRINTS: dict[ReportType, set[str]] = {
     ReportType.CARD_SWIPE: {
         "card_swiping_time"
     },
+    ReportType.LEAVE: {
+        "leave_type", "start_date", "end_date"
+    },
 }
 
 # Mapping of Type -> Target Subdirectory
@@ -69,6 +73,7 @@ ROUTING_MAP: dict[ReportType, str] = {
     ReportType.NOMINAL: "Norminal_Folder",
     ReportType.TRAINING: "Training_Folder",
     ReportType.CARD_SWIPE: "card_Swiping_Folder",
+    ReportType.LEAVE: "Leave_Folder",
 }
 
 
