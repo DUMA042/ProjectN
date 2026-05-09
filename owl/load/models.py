@@ -121,15 +121,6 @@ class EmployeeTraining(Base):
     start_date: Mapped[date] = mapped_column(Date, nullable=False)
     end_date: Mapped[date] = mapped_column(Date, nullable=False)
 
-class EmployeeHistory(Base):
-    __tablename__ = "employee_history"
-    history_id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    id_no: Mapped[str] = mapped_column(String(64), ForeignKey("employees.id_no"), nullable=False, index=True)
-    unit_id: Mapped[Optional[int]] = mapped_column(ForeignKey("units.unit_id"))
-    rank_id: Mapped[Optional[int]] = mapped_column(ForeignKey("ranks.rank_id"))
-    location_id: Mapped[Optional[int]] = mapped_column(ForeignKey("locations.location_id"))
-    effective_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-
 class EmployeeLocationHistory(Base):
     __tablename__ = "employee_location_history"
     history_id: Mapped[int] = mapped_column(Integer, primary_key=True)

@@ -1,0 +1,1023 @@
+{
+  "units": {
+    "columns": [
+      {
+        "name": "unit_id",
+        "type": "INTEGER"
+      },
+      {
+        "name": "unit_name",
+        "type": "VARCHAR(255)"
+      }
+    ],
+    "pk": [
+      "unit_id"
+    ],
+    "fks": []
+  },
+  "ranks": {
+    "columns": [
+      {
+        "name": "rank_id",
+        "type": "INTEGER"
+      },
+      {
+        "name": "rank_name",
+        "type": "VARCHAR(255)"
+      }
+    ],
+    "pk": [
+      "rank_id"
+    ],
+    "fks": []
+  },
+  "employment_types": {
+    "columns": [
+      {
+        "name": "emp_type_id",
+        "type": "INTEGER"
+      },
+      {
+        "name": "emp_type_name",
+        "type": "VARCHAR(100)"
+      }
+    ],
+    "pk": [
+      "emp_type_id"
+    ],
+    "fks": []
+  },
+  "employee_statuses": {
+    "columns": [
+      {
+        "name": "status_id",
+        "type": "INTEGER"
+      },
+      {
+        "name": "status_name",
+        "type": "VARCHAR(100)"
+      }
+    ],
+    "pk": [
+      "status_id"
+    ],
+    "fks": []
+  },
+  "employees": {
+    "columns": [
+      {
+        "name": "id_no",
+        "type": "VARCHAR(64)"
+      },
+      {
+        "name": "serial_no",
+        "type": "INTEGER"
+      },
+      {
+        "name": "full_name",
+        "type": "VARCHAR(255)"
+      },
+      {
+        "name": "sex",
+        "type": "VARCHAR(10)"
+      },
+      {
+        "name": "unit_id",
+        "type": "INTEGER"
+      },
+      {
+        "name": "rank_id",
+        "type": "INTEGER"
+      },
+      {
+        "name": "emp_type_id",
+        "type": "INTEGER"
+      },
+      {
+        "name": "status_id",
+        "type": "INTEGER"
+      },
+      {
+        "name": "remark",
+        "type": "TEXT"
+      },
+      {
+        "name": "location_id",
+        "type": "INTEGER"
+      },
+      {
+        "name": "department_id",
+        "type": "INTEGER"
+      },
+      {
+        "name": "gl_id",
+        "type": "INTEGER"
+      }
+    ],
+    "pk": [
+      "id_no"
+    ],
+    "fks": [
+      {
+        "name": "employees_department_id_fkey",
+        "constrained_columns": [
+          "department_id"
+        ],
+        "referred_schema": null,
+        "referred_table": "departments",
+        "referred_columns": [
+          "department_id"
+        ],
+        "options": {},
+        "comment": null
+      },
+      {
+        "name": "employees_emp_type_id_fkey",
+        "constrained_columns": [
+          "emp_type_id"
+        ],
+        "referred_schema": null,
+        "referred_table": "employment_types",
+        "referred_columns": [
+          "emp_type_id"
+        ],
+        "options": {
+          "ondelete": "SET NULL"
+        },
+        "comment": null
+      },
+      {
+        "name": "employees_gl_id_fkey",
+        "constrained_columns": [
+          "gl_id"
+        ],
+        "referred_schema": null,
+        "referred_table": "grade_levels",
+        "referred_columns": [
+          "gl_id"
+        ],
+        "options": {},
+        "comment": null
+      },
+      {
+        "name": "employees_rank_id_fkey",
+        "constrained_columns": [
+          "rank_id"
+        ],
+        "referred_schema": null,
+        "referred_table": "ranks",
+        "referred_columns": [
+          "rank_id"
+        ],
+        "options": {
+          "ondelete": "SET NULL"
+        },
+        "comment": null
+      },
+      {
+        "name": "employees_status_id_fkey",
+        "constrained_columns": [
+          "status_id"
+        ],
+        "referred_schema": null,
+        "referred_table": "employee_statuses",
+        "referred_columns": [
+          "status_id"
+        ],
+        "options": {
+          "ondelete": "SET NULL"
+        },
+        "comment": null
+      },
+      {
+        "name": "employees_unit_id_fkey",
+        "constrained_columns": [
+          "unit_id"
+        ],
+        "referred_schema": null,
+        "referred_table": "units",
+        "referred_columns": [
+          "unit_id"
+        ],
+        "options": {
+          "ondelete": "SET NULL"
+        },
+        "comment": null
+      },
+      {
+        "name": "fk_employees_location",
+        "constrained_columns": [
+          "location_id"
+        ],
+        "referred_schema": null,
+        "referred_table": "locations",
+        "referred_columns": [
+          "location_id"
+        ],
+        "options": {},
+        "comment": null
+      }
+    ]
+  },
+  "employee_location_history": {
+    "columns": [
+      {
+        "name": "history_id",
+        "type": "INTEGER"
+      },
+      {
+        "name": "id_no",
+        "type": "VARCHAR(64)"
+      },
+      {
+        "name": "location_id",
+        "type": "INTEGER"
+      },
+      {
+        "name": "start_date",
+        "type": "DATE"
+      },
+      {
+        "name": "end_date",
+        "type": "DATE"
+      }
+    ],
+    "pk": [
+      "history_id"
+    ],
+    "fks": [
+      {
+        "name": "employee_location_history_id_no_fkey",
+        "constrained_columns": [
+          "id_no"
+        ],
+        "referred_schema": null,
+        "referred_table": "employees",
+        "referred_columns": [
+          "id_no"
+        ],
+        "options": {},
+        "comment": null
+      },
+      {
+        "name": "employee_location_history_location_id_fkey",
+        "constrained_columns": [
+          "location_id"
+        ],
+        "referred_schema": null,
+        "referred_table": "locations",
+        "referred_columns": [
+          "location_id"
+        ],
+        "options": {
+          "ondelete": "RESTRICT"
+        },
+        "comment": null
+      }
+    ]
+  },
+  "locations": {
+    "columns": [
+      {
+        "name": "location_id",
+        "type": "INTEGER"
+      },
+      {
+        "name": "location_name",
+        "type": "VARCHAR(100)"
+      }
+    ],
+    "pk": [
+      "location_id"
+    ],
+    "fks": []
+  },
+  "employee_department_history": {
+    "columns": [
+      {
+        "name": "history_id",
+        "type": "INTEGER"
+      },
+      {
+        "name": "id_no",
+        "type": "VARCHAR(64)"
+      },
+      {
+        "name": "department_id",
+        "type": "INTEGER"
+      },
+      {
+        "name": "start_date",
+        "type": "DATE"
+      },
+      {
+        "name": "end_date",
+        "type": "DATE"
+      }
+    ],
+    "pk": [
+      "history_id"
+    ],
+    "fks": [
+      {
+        "name": "employee_department_history_department_id_fkey",
+        "constrained_columns": [
+          "department_id"
+        ],
+        "referred_schema": null,
+        "referred_table": "departments",
+        "referred_columns": [
+          "department_id"
+        ],
+        "options": {
+          "ondelete": "RESTRICT"
+        },
+        "comment": null
+      },
+      {
+        "name": "employee_department_history_id_no_fkey",
+        "constrained_columns": [
+          "id_no"
+        ],
+        "referred_schema": null,
+        "referred_table": "employees",
+        "referred_columns": [
+          "id_no"
+        ],
+        "options": {},
+        "comment": null
+      }
+    ]
+  },
+  "departments": {
+    "columns": [
+      {
+        "name": "department_id",
+        "type": "INTEGER"
+      },
+      {
+        "name": "department_name",
+        "type": "VARCHAR(255)"
+      }
+    ],
+    "pk": [
+      "department_id"
+    ],
+    "fks": []
+  },
+  "employee_gl_history": {
+    "columns": [
+      {
+        "name": "history_id",
+        "type": "INTEGER"
+      },
+      {
+        "name": "id_no",
+        "type": "VARCHAR(64)"
+      },
+      {
+        "name": "gl_id",
+        "type": "INTEGER"
+      },
+      {
+        "name": "start_date",
+        "type": "DATE"
+      },
+      {
+        "name": "end_date",
+        "type": "DATE"
+      }
+    ],
+    "pk": [
+      "history_id"
+    ],
+    "fks": [
+      {
+        "name": "employee_gl_history_gl_id_fkey",
+        "constrained_columns": [
+          "gl_id"
+        ],
+        "referred_schema": null,
+        "referred_table": "grade_levels",
+        "referred_columns": [
+          "gl_id"
+        ],
+        "options": {
+          "ondelete": "RESTRICT"
+        },
+        "comment": null
+      },
+      {
+        "name": "employee_gl_history_id_no_fkey",
+        "constrained_columns": [
+          "id_no"
+        ],
+        "referred_schema": null,
+        "referred_table": "employees",
+        "referred_columns": [
+          "id_no"
+        ],
+        "options": {},
+        "comment": null
+      }
+    ]
+  },
+  "grade_levels": {
+    "columns": [
+      {
+        "name": "gl_id",
+        "type": "INTEGER"
+      },
+      {
+        "name": "gl_name",
+        "type": "VARCHAR(50)"
+      }
+    ],
+    "pk": [
+      "gl_id"
+    ],
+    "fks": []
+  },
+  "employee_trainings": {
+    "columns": [
+      {
+        "name": "training_id",
+        "type": "INTEGER"
+      },
+      {
+        "name": "id_no",
+        "type": "VARCHAR(64)"
+      },
+      {
+        "name": "venue_id",
+        "type": "INTEGER"
+      },
+      {
+        "name": "consultant_id",
+        "type": "INTEGER"
+      },
+      {
+        "name": "location_id",
+        "type": "INTEGER"
+      },
+      {
+        "name": "start_date",
+        "type": "DATE"
+      },
+      {
+        "name": "end_date",
+        "type": "DATE"
+      }
+    ],
+    "pk": [
+      "training_id"
+    ],
+    "fks": [
+      {
+        "name": "employee_trainings_consultant_id_fkey",
+        "constrained_columns": [
+          "consultant_id"
+        ],
+        "referred_schema": null,
+        "referred_table": "consultants",
+        "referred_columns": [
+          "consultant_id"
+        ],
+        "options": {
+          "ondelete": "RESTRICT"
+        },
+        "comment": null
+      },
+      {
+        "name": "employee_trainings_id_no_fkey",
+        "constrained_columns": [
+          "id_no"
+        ],
+        "referred_schema": null,
+        "referred_table": "employees",
+        "referred_columns": [
+          "id_no"
+        ],
+        "options": {},
+        "comment": null
+      },
+      {
+        "name": "employee_trainings_location_id_fkey",
+        "constrained_columns": [
+          "location_id"
+        ],
+        "referred_schema": null,
+        "referred_table": "locations",
+        "referred_columns": [
+          "location_id"
+        ],
+        "options": {
+          "ondelete": "SET NULL"
+        },
+        "comment": null
+      },
+      {
+        "name": "employee_trainings_venue_id_fkey",
+        "constrained_columns": [
+          "venue_id"
+        ],
+        "referred_schema": null,
+        "referred_table": "venues",
+        "referred_columns": [
+          "venue_id"
+        ],
+        "options": {
+          "ondelete": "RESTRICT"
+        },
+        "comment": null
+      }
+    ]
+  },
+  "venues": {
+    "columns": [
+      {
+        "name": "venue_id",
+        "type": "INTEGER"
+      },
+      {
+        "name": "venue_name",
+        "type": "VARCHAR(255)"
+      }
+    ],
+    "pk": [
+      "venue_id"
+    ],
+    "fks": []
+  },
+  "consultants": {
+    "columns": [
+      {
+        "name": "consultant_id",
+        "type": "INTEGER"
+      },
+      {
+        "name": "consultant_name",
+        "type": "VARCHAR(255)"
+      }
+    ],
+    "pk": [
+      "consultant_id"
+    ],
+    "fks": []
+  },
+  "quarantine_card_swipes": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "INTEGER"
+      },
+      {
+        "name": "id_no",
+        "type": "VARCHAR(64)"
+      },
+      {
+        "name": "location_name",
+        "type": "VARCHAR(128)"
+      },
+      {
+        "name": "swipe_time",
+        "type": "TIMESTAMP"
+      },
+      {
+        "name": "quarantined_at",
+        "type": "TIMESTAMP"
+      },
+      {
+        "name": "employee_name",
+        "type": "VARCHAR(255)"
+      }
+    ],
+    "pk": [
+      "id"
+    ],
+    "fks": []
+  },
+  "quarantine_trainings": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "INTEGER"
+      },
+      {
+        "name": "id_no",
+        "type": "VARCHAR(64)"
+      },
+      {
+        "name": "venue_name",
+        "type": "VARCHAR(255)"
+      },
+      {
+        "name": "consultant_name",
+        "type": "VARCHAR(255)"
+      },
+      {
+        "name": "start_date",
+        "type": "DATE"
+      },
+      {
+        "name": "end_date",
+        "type": "DATE"
+      },
+      {
+        "name": "quarantined_at",
+        "type": "TIMESTAMP"
+      }
+    ],
+    "pk": [
+      "id"
+    ],
+    "fks": []
+  },
+  "employee_unit_history": {
+    "columns": [
+      {
+        "name": "history_id",
+        "type": "INTEGER"
+      },
+      {
+        "name": "id_no",
+        "type": "VARCHAR(64)"
+      },
+      {
+        "name": "unit_id",
+        "type": "INTEGER"
+      },
+      {
+        "name": "start_date",
+        "type": "DATE"
+      },
+      {
+        "name": "end_date",
+        "type": "DATE"
+      }
+    ],
+    "pk": [
+      "history_id"
+    ],
+    "fks": [
+      {
+        "name": "employee_unit_history_id_no_fkey",
+        "constrained_columns": [
+          "id_no"
+        ],
+        "referred_schema": null,
+        "referred_table": "employees",
+        "referred_columns": [
+          "id_no"
+        ],
+        "options": {},
+        "comment": null
+      },
+      {
+        "name": "employee_unit_history_unit_id_fkey",
+        "constrained_columns": [
+          "unit_id"
+        ],
+        "referred_schema": null,
+        "referred_table": "units",
+        "referred_columns": [
+          "unit_id"
+        ],
+        "options": {},
+        "comment": null
+      }
+    ]
+  },
+  "employee_rank_history": {
+    "columns": [
+      {
+        "name": "history_id",
+        "type": "INTEGER"
+      },
+      {
+        "name": "id_no",
+        "type": "VARCHAR(64)"
+      },
+      {
+        "name": "rank_id",
+        "type": "INTEGER"
+      },
+      {
+        "name": "start_date",
+        "type": "DATE"
+      },
+      {
+        "name": "end_date",
+        "type": "DATE"
+      }
+    ],
+    "pk": [
+      "history_id"
+    ],
+    "fks": [
+      {
+        "name": "employee_rank_history_id_no_fkey",
+        "constrained_columns": [
+          "id_no"
+        ],
+        "referred_schema": null,
+        "referred_table": "employees",
+        "referred_columns": [
+          "id_no"
+        ],
+        "options": {},
+        "comment": null
+      },
+      {
+        "name": "employee_rank_history_rank_id_fkey",
+        "constrained_columns": [
+          "rank_id"
+        ],
+        "referred_schema": null,
+        "referred_table": "ranks",
+        "referred_columns": [
+          "rank_id"
+        ],
+        "options": {},
+        "comment": null
+      }
+    ]
+  },
+  "leave_applications": {
+    "columns": [
+      {
+        "name": "application_id",
+        "type": "INTEGER"
+      },
+      {
+        "name": "id_no",
+        "type": "VARCHAR(64)"
+      },
+      {
+        "name": "proposed_leave_date",
+        "type": "DATE"
+      },
+      {
+        "name": "proposed_leave_date_raw",
+        "type": "VARCHAR(255)"
+      },
+      {
+        "name": "resumption_date",
+        "type": "DATE"
+      },
+      {
+        "name": "forfeiture",
+        "type": "VARCHAR(255)"
+      },
+      {
+        "name": "issuance_date",
+        "type": "DATE"
+      },
+      {
+        "name": "issuance_date_raw",
+        "type": "VARCHAR(255)"
+      },
+      {
+        "name": "remark",
+        "type": "TEXT"
+      },
+      {
+        "name": "created_at",
+        "type": "TIMESTAMP"
+      }
+    ],
+    "pk": [
+      "application_id"
+    ],
+    "fks": [
+      {
+        "name": "leave_applications_id_no_fkey",
+        "constrained_columns": [
+          "id_no"
+        ],
+        "referred_schema": null,
+        "referred_table": "employees",
+        "referred_columns": [
+          "id_no"
+        ],
+        "options": {},
+        "comment": null
+      }
+    ]
+  },
+  "leave_records": {
+    "columns": [
+      {
+        "name": "record_id",
+        "type": "INTEGER"
+      },
+      {
+        "name": "application_id",
+        "type": "INTEGER"
+      },
+      {
+        "name": "id_no",
+        "type": "VARCHAR(64)"
+      },
+      {
+        "name": "leave_type_id",
+        "type": "INTEGER"
+      },
+      {
+        "name": "start_date",
+        "type": "DATE"
+      },
+      {
+        "name": "end_date",
+        "type": "DATE"
+      }
+    ],
+    "pk": [
+      "record_id"
+    ],
+    "fks": [
+      {
+        "name": "leave_records_application_id_fkey",
+        "constrained_columns": [
+          "application_id"
+        ],
+        "referred_schema": null,
+        "referred_table": "leave_applications",
+        "referred_columns": [
+          "application_id"
+        ],
+        "options": {
+          "ondelete": "CASCADE"
+        },
+        "comment": null
+      },
+      {
+        "name": "leave_records_id_no_fkey",
+        "constrained_columns": [
+          "id_no"
+        ],
+        "referred_schema": null,
+        "referred_table": "employees",
+        "referred_columns": [
+          "id_no"
+        ],
+        "options": {},
+        "comment": null
+      },
+      {
+        "name": "leave_records_leave_type_id_fkey",
+        "constrained_columns": [
+          "leave_type_id"
+        ],
+        "referred_schema": null,
+        "referred_table": "leave_types",
+        "referred_columns": [
+          "leave_type_id"
+        ],
+        "options": {},
+        "comment": null
+      }
+    ]
+  },
+  "leave_types": {
+    "columns": [
+      {
+        "name": "leave_type_id",
+        "type": "INTEGER"
+      },
+      {
+        "name": "leave_type_name",
+        "type": "VARCHAR(100)"
+      }
+    ],
+    "pk": [
+      "leave_type_id"
+    ],
+    "fks": []
+  },
+  "file_ingestion_meta": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "UUID"
+      },
+      {
+        "name": "original_filename",
+        "type": "TEXT"
+      },
+      {
+        "name": "normalized_filename",
+        "type": "TEXT"
+      },
+      {
+        "name": "department",
+        "type": "TEXT"
+      },
+      {
+        "name": "report_type",
+        "type": "TEXT"
+      },
+      {
+        "name": "period",
+        "type": "DATE"
+      },
+      {
+        "name": "version",
+        "type": "INTEGER"
+      },
+      {
+        "name": "file_path",
+        "type": "TEXT"
+      },
+      {
+        "name": "checksum_sha256",
+        "type": "TEXT"
+      },
+      {
+        "name": "file_size_bytes",
+        "type": "BIGINT"
+      },
+      {
+        "name": "status",
+        "type": "TEXT"
+      },
+      {
+        "name": "error_context",
+        "type": "JSONB"
+      },
+      {
+        "name": "detected_at",
+        "type": "TIMESTAMP"
+      },
+      {
+        "name": "processed_at",
+        "type": "TIMESTAMP"
+      },
+      {
+        "name": "created_at",
+        "type": "TIMESTAMP"
+      },
+      {
+        "name": "updated_at",
+        "type": "TIMESTAMP"
+      }
+    ],
+    "pk": [
+      "id"
+    ],
+    "fks": []
+  },
+  "employee_card_swipes": {
+    "columns": [
+      {
+        "name": "swipe_id",
+        "type": "INTEGER"
+      },
+      {
+        "name": "id_no",
+        "type": "VARCHAR(64)"
+      },
+      {
+        "name": "location_id",
+        "type": "INTEGER"
+      },
+      {
+        "name": "swipe_time",
+        "type": "TIMESTAMP"
+      }
+    ],
+    "pk": [
+      "swipe_id"
+    ],
+    "fks": [
+      {
+        "name": "employee_card_swipes_id_no_fkey",
+        "constrained_columns": [
+          "id_no"
+        ],
+        "referred_schema": null,
+        "referred_table": "employees",
+        "referred_columns": [
+          "id_no"
+        ],
+        "options": {},
+        "comment": null
+      },
+      {
+        "name": "employee_card_swipes_location_id_fkey",
+        "constrained_columns": [
+          "location_id"
+        ],
+        "referred_schema": null,
+        "referred_table": "locations",
+        "referred_columns": [
+          "location_id"
+        ],
+        "options": {
+          "ondelete": "SET NULL"
+        },
+        "comment": null
+      }
+    ]
+  }
+}

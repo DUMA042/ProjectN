@@ -64,7 +64,7 @@ FINGERPRINTS: dict[ReportType, set[str]] = {
         "card_swiping_time"
     },
     ReportType.LEAVE: {
-        "leave_type", "start_date", "end_date"
+        "staff_id", "proposed_leave_date", "resumption_date"
     },
 }
 
