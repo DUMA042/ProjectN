@@ -1,7 +1,7 @@
 """
 owl.pipeline
 ~~~~~~~~~~~~
-Top-level orchestrator — ties Extract → Transform → Load → Analyse together.
+Top-level orchestrator — ties Extract → Transform → Validate → Load → Analyse together.
 
 Design
 ------
@@ -28,6 +28,7 @@ from owl.extract.excel_reader import ExcelReader
 from owl.load.database import get_session, verify_connection
 from owl.load.loader import DataLoader
 from owl.logger import get_logger
+from owl.transform.validators import validate_dataframe
 
 if TYPE_CHECKING:
     from owl.transform.normalizer import BaseNormalizer
@@ -93,6 +94,7 @@ class Pipeline:
             "source_file": str(self._source_file),
             "ingestion_id": self._ingestion_id,
             "status": "completed",
+            "validation_results": {},
             "load_results": {}
         }
 
@@ -100,8 +102,23 @@ class Pipeline:
             verify_connection()
             frames = self._extract()
             entities = self._transform(frames)
+            entities, validation_errors = self._validate(entities)
             load_reports = self._load(entities)
             
+            # Populate validation results in the summary
+            total_rejected = sum(len(errs) for errs in validation_errors.values())
+            summary["validation_results"] = {
+                "total_rejected": total_rejected,
+                "errors_by_table": {
+                    table: [
+                        {"row": e["row_index"], "field": e["field"], "message": e["message"]}
+                        for e in errs
+                    ]
+                    for table, errs in validation_errors.items()
+                    if errs
+                }
+            }
+
             summary["load_results"] = {
                 table: {
                     "success": report.success_count,
@@ -155,6 +172,40 @@ class Pipeline:
         log.info(f"Produced {len(combined_entities)} entity table(s).")
         return combined_entities
 
+    def _validate(self, entities: dict) -> tuple[dict, dict]:
+        """Layer 2.5 — Validate: check every row against Pydantic contracts.
+
+        Parameters
+        ----------
+        entities:
+            Dict of {table_name: DataFrame} from the normalizer.
+
+        Returns
+        -------
+        tuple[dict, dict]
+            - Cleaned entities dict (bad rows removed).
+            - Dict of {table_name: [error_dicts]} for audit logging.
+        """
+        if not entities:
+            return entities, {}
+
+        log.info("Layer 2.5 — Validate: checking data against Pydantic contracts.")
+        validated_entities = {}
+        all_errors: dict[str, list] = {}
+
+        for table_name, df in entities.items():
+            valid_df, errors = validate_dataframe(table_name, df)
+            validated_entities[table_name] = valid_df
+            all_errors[table_name] = errors
+
+        total_rejected = sum(len(errs) for errs in all_errors.values())
+        if total_rejected:
+            log.warning(f"Validation complete: {total_rejected} total row(s) rejected across all tables.")
+        else:
+            log.info("Validation complete: all rows passed.")
+
+        return validated_entities, all_errors
+
     def _load(self, entities) -> dict[str, Any]:
         """Layer 3 (Load): persist normalised entities to PostgreSQL."""
         if not entities:
@@ -168,4 +219,3 @@ class Pipeline:
             for table, report in results.items():
                 log.info(f"  {table}: {report.success_count} row(s) upserted, {len(report.failed_rows)} row(s) failed.")
             return results
-

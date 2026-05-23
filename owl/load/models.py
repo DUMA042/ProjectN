@@ -90,18 +90,19 @@ class Employee(Base):
     __tablename__ = "employees"
 
     id_no: Mapped[str] = mapped_column(String(64), primary_key=True)
-    serial_no: Mapped[int] = mapped_column(Integer, nullable=False, unique=True, info={"label": "S/N"})
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
     sex: Mapped[Optional[str]] = mapped_column(String(20))
-    
-    unit_id: Mapped[Optional[int]] = mapped_column(ForeignKey("units.unit_id"))
+
     rank_id: Mapped[Optional[int]] = mapped_column(ForeignKey("ranks.rank_id"))
     department_id: Mapped[Optional[int]] = mapped_column(ForeignKey("departments.department_id"))
     gl_id: Mapped[Optional[int]] = mapped_column(ForeignKey("grade_levels.gl_id"))
     emp_type_id: Mapped[Optional[int]] = mapped_column(ForeignKey("employment_types.emp_type_id"))
     status_id: Mapped[Optional[int]] = mapped_column(ForeignKey("employee_statuses.status_id"))
     location_id: Mapped[Optional[int]] = mapped_column(ForeignKey("locations.location_id"))
-    
+
+    geographical_zone: Mapped[Optional[str]] = mapped_column(String(100))
+    date_of_last_deployment: Mapped[Optional[date]] = mapped_column(Date)
+    phone_number: Mapped[Optional[str]] = mapped_column(String(30))
     remark: Mapped[Optional[str]] = mapped_column(Text)
 
 class EmployeeCardSwipe(Base):
@@ -145,14 +146,6 @@ class EmployeeGLHistory(Base):
     start_date: Mapped[date] = mapped_column(Date, nullable=False)
     end_date: Mapped[Optional[date]] = mapped_column(Date)
 
-class EmployeeUnitHistory(Base):
-    __tablename__ = "employee_unit_history"
-    history_id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    id_no: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("employees.id_no"))
-    unit_id: Mapped[Optional[int]] = mapped_column(ForeignKey("units.unit_id"))
-    start_date: Mapped[date] = mapped_column(Date, nullable=False)
-    end_date: Mapped[Optional[date]] = mapped_column(Date)
-
 class EmployeeRankHistory(Base):
     __tablename__ = "employee_rank_history"
     history_id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -161,13 +154,29 @@ class EmployeeRankHistory(Base):
     start_date: Mapped[date] = mapped_column(Date, nullable=False)
     end_date: Mapped[Optional[date]] = mapped_column(Date)
 
-class EmployeeLeave(Base):
-    __tablename__ = "employee_leaves"
-    leave_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+class LeaveApplication(Base):
+    __tablename__ = "leave_applications"
+    application_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    id_no: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("employees.id_no"))
+    proposed_leave_date: Mapped[Optional[date]] = mapped_column(Date)
+    proposed_leave_date_raw: Mapped[Optional[str]] = mapped_column(String(255))
+    resumption_date: Mapped[Optional[date]] = mapped_column(Date)
+    forfeiture: Mapped[Optional[str]] = mapped_column(String(255))
+    issuance_date: Mapped[Optional[date]] = mapped_column(Date)
+    issuance_date_raw: Mapped[Optional[str]] = mapped_column(String(255))
+    remark: Mapped[Optional[str]] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+class LeaveRecord(Base):
+    __tablename__ = "leave_records"
+    record_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    application_id: Mapped[Optional[int]] = mapped_column(ForeignKey("leave_applications.application_id", ondelete="CASCADE"))
     id_no: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("employees.id_no"))
     leave_type_id: Mapped[Optional[int]] = mapped_column(ForeignKey("leave_types.leave_type_id"))
-    start_date: Mapped[date] = mapped_column(Date, nullable=False)
+    start_date: Mapped[Optional[date]] = mapped_column(Date)
+    start_date_raw: Mapped[Optional[str]] = mapped_column(String(255))
     end_date: Mapped[Optional[date]] = mapped_column(Date)
+    end_date_raw: Mapped[Optional[str]] = mapped_column(String(255))
 
 
 # ── Quarantine Entities (Orphans) ─────────────────────────────────────────────
@@ -216,3 +225,70 @@ class FileIngestionMeta(Base):
     processed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+# ── Kanban Board Entities ─────────────────────────────────────────────────────
+
+class KanbanBoard(Base):
+    __tablename__ = "kanban_boards"
+    board_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    board_name: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text)
+    department_id: Mapped[Optional[int]] = mapped_column(ForeignKey("departments.department_id", ondelete="SET NULL"))
+    is_archived: Mapped[bool] = mapped_column(server_default="false", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+class KanbanColumn(Base):
+    __tablename__ = "kanban_columns"
+    column_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    board_id: Mapped[int] = mapped_column(ForeignKey("kanban_boards.board_id", ondelete="CASCADE"), nullable=False)
+    column_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    position: Mapped[int] = mapped_column(Integer, server_default="0", nullable=False)
+    color: Mapped[Optional[str]] = mapped_column(String(7))
+    is_done_column: Mapped[bool] = mapped_column(server_default="false", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+class KanbanLabel(Base):
+    __tablename__ = "kanban_labels"
+    label_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    label_name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    color: Mapped[Optional[str]] = mapped_column(String(7))
+
+class KanbanTask(Base):
+    __tablename__ = "kanban_tasks"
+    task_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    board_id: Mapped[int] = mapped_column(ForeignKey("kanban_boards.board_id", ondelete="CASCADE"), nullable=False)
+    column_id: Mapped[int] = mapped_column(ForeignKey("kanban_columns.column_id"), nullable=False)
+    title: Mapped[str] = mapped_column(String(500), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text)
+    priority: Mapped[str] = mapped_column(String(20), server_default="medium", nullable=False)
+    due_date: Mapped[Optional[date]] = mapped_column(Date)
+    position: Mapped[int] = mapped_column(Integer, server_default="0", nullable=False)
+    is_archived: Mapped[bool] = mapped_column(server_default="false", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+class KanbanTaskAssignee(Base):
+    __tablename__ = "kanban_task_assignees"
+    assignment_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    task_id: Mapped[int] = mapped_column(ForeignKey("kanban_tasks.task_id", ondelete="CASCADE"), nullable=False)
+    id_no: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("employees.id_no", ondelete="SET NULL"))
+    assigned_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    assigned_by: Mapped[Optional[str]] = mapped_column(String(64))
+
+class KanbanTaskLabel(Base):
+    __tablename__ = "kanban_task_labels"
+    task_id: Mapped[int] = mapped_column(ForeignKey("kanban_tasks.task_id", ondelete="CASCADE"), primary_key=True)
+    label_id: Mapped[int] = mapped_column(ForeignKey("kanban_labels.label_id", ondelete="CASCADE"), primary_key=True)
+
+class KanbanTaskHistory(Base):
+    __tablename__ = "kanban_task_history"
+    history_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    task_id: Mapped[int] = mapped_column(ForeignKey("kanban_tasks.task_id", ondelete="CASCADE"), nullable=False)
+    from_column_id: Mapped[Optional[int]] = mapped_column(ForeignKey("kanban_columns.column_id"))
+    to_column_id: Mapped[int] = mapped_column(ForeignKey("kanban_columns.column_id"), nullable=False)
+    moved_by: Mapped[Optional[str]] = mapped_column(String(64))
+    moved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    duration_in_previous: Mapped[Optional[str]] = mapped_column(String(255)) # Store interval as string representation for ORM compatibility

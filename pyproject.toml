@@ -23,6 +23,7 @@ dependencies = [
     "numpy>=1.26.4",
     "rich>=13.7.1",
     "tenacity>=8.2.3",
+    "holidays>=0.45.0",
 ]
 
 [project.scripts]

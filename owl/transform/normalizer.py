@@ -29,6 +29,7 @@ encapsulates this cleanly.
 from __future__ import annotations
 
 import uuid
+import hashlib
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any
@@ -45,28 +46,21 @@ NormalizedEntities = dict[str, pd.DataFrame]
 
 # ── Surrogate key utilities ───────────────────────────────────────────────────
 
-def generate_surrogate_key() -> str:
-    """Return a new UUID4 surrogate key string."""
-    return str(uuid.uuid4())
+def generate_surrogate_key(natural_key_str: str) -> int:
+    """Generate a deterministic 32-bit integer surrogate key from a string."""
+    return int(hashlib.md5(natural_key_str.encode("utf-8")).hexdigest(), 16) % (2**31 - 1)
 
 
 def assign_surrogate_keys(df: pd.DataFrame, id_column: str = "id") -> pd.DataFrame:
-    """Prepend a UUID surrogate key column to *df*.
-
-    Parameters
-    ----------
-    df:
-        The entity DataFrame (already deduplicated).
-    id_column:
-        Name of the new key column (default: ``"id"``).
-
-    Returns
-    -------
-    pd.DataFrame
-        DataFrame with *id_column* inserted at position 0.
-    """
+    """Prepend a deterministic integer surrogate key column to *df*."""
     df = df.copy()
-    df.insert(0, id_column, [generate_surrogate_key() for _ in range(len(df))])
+    keys = []
+    for _, row in df.iterrows():
+        # Combine all row values into a single string for hashing
+        row_str = "|".join(str(val) for val in row.values)
+        keys.append(generate_surrogate_key(row_str))
+    
+    df.insert(0, id_column, keys)
     return df
 
 

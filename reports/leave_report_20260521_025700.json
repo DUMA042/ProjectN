@@ -1,0 +1,54 @@
+{
+    "total_rows_read": 76,
+    "total_leave_entries_attempted": 42,
+    "total_leave_entries_inserted": 78,
+    "warnings": [
+        {
+            "type": "CALCULATION_ERROR",
+            "message": "Row 2: Could not calculate duration - 'datetime.date' object has no attribute 'date'",
+            "staff_id": "2644"
+        },
+        {
+            "type": "CALCULATION_ERROR",
+            "message": "Row 5: Could not calculate duration - 'datetime.date' object has no attribute 'date'",
+            "staff_id": "2965"
+        },
+        {
+            "type": "CALCULATION_ERROR",
+            "message": "Row 15: Could not calculate duration - 'datetime.date' object has no attribute 'date'",
+            "staff_id": "1030"
+        },
+        {
+            "type": "CALCULATION_ERROR",
+            "message": "Row 19: Could not calculate duration - 'datetime.date' object has no attribute 'date'",
+            "staff_id": "3015"
+        },
+        {
+            "type": "CALCULATION_ERROR",
+            "message": "Row 20: Could not calculate duration - 'datetime.date' object has no attribute 'date'",
+            "staff_id": "3018"
+        },
+        {
+            "type": "CALCULATION_ERROR",
+            "message": "Row 43: Could not calculate duration - 'datetime.date' object has no attribute 'date'",
+            "staff_id": "2827"
+        },
+        {
+            "type": "CALCULATION_ERROR",
+            "message": "Row 46: Could not calculate duration - 'datetime.date' object has no attribute 'date'",
+            "staff_id": "2761"
+        },
+        {
+            "type": "CALCULATION_ERROR",
+            "message": "Row 49: Could not calculate duration - 'datetime.date' object has no attribute 'date'",
+            "staff_id": "2908"
+        },
+        {
+            "type": "CALCULATION_ERROR",
+            "message": "Row 57: Could not calculate duration - 'datetime.date' object has no attribute 'date'",
+            "staff_id": "2724"
+        }
+    ],
+    "failures": [],
+    "failed_staff_ids": []
+}

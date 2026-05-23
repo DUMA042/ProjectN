@@ -1,7 +1,7 @@
 """
 scripts/migrate_nominal.py
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
-Direct migration script to process all Excel files in the Norminal_Folder.
+Direct migration script to process all Excel files in the Nominal_Folder.
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ import pandas as pd
 log = get_logger(__name__)
 
 def main() -> None:
-    target_dir = settings.nest_dir / "Norminal_Folder"
+    target_dir = settings.nest_dir / "Nominal_Folder"
     
     if not target_dir.exists():
         log.error(f"Target directory does not exist: {target_dir}")

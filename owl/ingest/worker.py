@@ -68,9 +68,27 @@ class IngestionWorker:
     def _process_record(self, record: FileIngestionMeta) -> None:
         """Execute the pipeline for a single metadata record."""
         log.info(f"Processing[{record.id}]: {record.normalized_filename}")
-        
-        # 1. Fetch Validation Context
-        # We fetch all currently valid id_no from the employees table for orphan detection.
+
+        r_type = ReportType(record.report_type)
+
+        # ── Nominal Roll: dedicated processor with history tracking ──────────
+        if r_type == ReportType.NOMINAL:
+            from owl.nominal.processor import NominalProcessor
+            processor = NominalProcessor(file_path=record.file_path)
+            summary = processor.process()
+            self._mark_completed(record.id, {"load_results": summary})
+            return
+
+        # ── Leave Processing: dedicated multi-header position-based processor ──
+        if r_type == ReportType.LEAVE:
+            from owl.leave.processor import LeaveProcessor
+            processor = LeaveProcessor(file_path=record.file_path)
+            summary = processor.process()
+            self._mark_completed(record.id, {"load_results": summary})
+            return
+
+        # ── All other report types: generic Pipeline ─────────────────────────
+        # Fetch valid id_no set for orphan detection in card swipes / training
         valid_ids = set()
         with get_session() as session:
             from owl.load.models import Employee
@@ -78,24 +96,17 @@ class IngestionWorker:
             valid_ids = set(res)
             log.debug(f"Process[{record.id}]: Loaded {len(valid_ids)} valid staff IDs.")
 
-        # 2. Resolve normalizer
-        r_type = ReportType(record.report_type)
         normalizer_class = NORMALIZER_REGISTRY.get(r_type)
-        
         if normalizer_class is None:
-             log.warning(f"No normalizer registered for type '{r_type.value}'.")
+            log.warning(f"No normalizer registered for type '{r_type.value}'.")
 
-        # 3. Run Pipeline with Context
         pipeline = Pipeline(
             source_file=record.file_path,
             normalizer_class=normalizer_class,
             ingestion_id=str(record.id),
             context={"valid_ids": valid_ids}
         )
-        
         results = pipeline.run()
-        
-        # 3. Update Status and Meta
         self._mark_completed(record.id, results)
 
     def _mark_completed(self, ingestion_id: str, results: dict) -> None:

@@ -1,7 +1,7 @@
 import pandas as pd
 import sys
 
-file_path = r'C:\Users\HP\Desktop\AttendanceN\nest\Norminal_Folder\Norminal_Sheet.xlsx'
+file_path = r'C:\Users\HP\Desktop\AttendanceN\nest\Nominal_Folder\Norminal_Sheet.xlsx'
 
 try:
     # Read with header=2 because the first two rows are titles/blank

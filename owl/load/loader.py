@@ -85,6 +85,12 @@ class DataLoader:
         table = model_class.__table__
         pk_cols = [col.name for col in table.primary_key.columns]
 
+        # Remove PKs that are None across all records to allow auto-increment
+        for pk in pk_cols:
+            if all(r.get(pk) is None for r in records):
+                for r in records:
+                    r.pop(pk, None)
+
         # 1. Attempt Bulk Operation
         try:
             self._execute_upsert(table, pk_cols, records)
@@ -117,7 +123,7 @@ class DataLoader:
         update_cols = {
             col.name: stmt.excluded[col.name]
             for col in table.columns
-            if col.name not in pk_cols and col.name != "serial_no"
+            if col.name not in pk_cols
         }
         stmt = stmt.on_conflict_do_update(
             index_elements=pk_cols,

@@ -9,7 +9,7 @@ DB_USER = "postgres"
 DB_PASSWORD = "1234"
 DB_HOST = "localhost"
 DB_PORT = "5433"
-EXCEL_PATH = r"C:\Users\HP\Desktop\AttendanceN\nest\Norminal_Folder\Norminal_Sheet.xlsx"
+EXCEL_PATH = r"C:\Users\HP\Desktop\AttendanceN\nest\Nominal_Folder\Norminal_Sheet.xlsx"
 
 def get_connection():
     conn = psycopg2.connect(dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, port=DB_PORT)

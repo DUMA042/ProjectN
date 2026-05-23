@@ -1,3 +1,6 @@
+# HISTORICAL SETUP SCRIPT — DO NOT RE-RUN AGAINST PRODUCTION.
+# Use scripts/migrate_nominal_schema.py for schema migrations.
+
 import psycopg2
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 import sys
@@ -6,7 +9,7 @@ DB_NAME = "flowdb"
 DB_USER = "postgres"
 DB_PASSWORD = "1234"
 DB_HOST = "localhost"
-DB_PORT = "5433"  # Trying 5433 since v17 is likely on 5432
+DB_PORT = "5433"
 
 SCHEMA_DDL = """
 -- Create Lookup Tables
@@ -18,11 +21,6 @@ CREATE TABLE IF NOT EXISTS locations (
 CREATE TABLE IF NOT EXISTS departments (
     department_id SERIAL PRIMARY KEY,
     department_name VARCHAR(255) UNIQUE NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS units (
-    unit_id SERIAL PRIMARY KEY,
-    unit_name VARCHAR(255) UNIQUE NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS grade_levels (
@@ -45,16 +43,17 @@ CREATE TABLE IF NOT EXISTS employee_statuses (
     status_name VARCHAR(100) UNIQUE NOT NULL
 );
 
--- Create Main Table
+-- Create Main Table (serial_no and unit_id removed)
 CREATE TABLE IF NOT EXISTS employees (
     id_no VARCHAR(50) PRIMARY KEY,
-    serial_no SERIAL UNIQUE NOT NULL,
     full_name VARCHAR(255) NOT NULL,
     sex VARCHAR(10),
-    unit_id INTEGER REFERENCES units(unit_id) ON DELETE SET NULL,
     rank_id INTEGER REFERENCES ranks(rank_id) ON DELETE SET NULL,
     emp_type_id INTEGER REFERENCES employment_types(emp_type_id) ON DELETE SET NULL,
     status_id INTEGER REFERENCES employee_statuses(status_id) ON DELETE SET NULL,
+    geographical_zone VARCHAR(100),
+    date_of_last_deployment DATE,
+    phone_number VARCHAR(30),
     remark TEXT
 );
 
@@ -85,8 +84,6 @@ CREATE TABLE IF NOT EXISTS employee_gl_history (
 
 -- Create Indexes
 CREATE INDEX IF NOT EXISTS idx_employees_status ON employees(status_id);
-CREATE INDEX IF NOT EXISTS idx_employees_serial_no ON employees(serial_no);
-
 CREATE INDEX IF NOT EXISTS idx_loc_hist_id ON employee_location_history(id_no);
 CREATE INDEX IF NOT EXISTS idx_dept_hist_id ON employee_department_history(id_no);
 CREATE INDEX IF NOT EXISTS idx_gl_hist_id ON employee_gl_history(id_no);

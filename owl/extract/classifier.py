@@ -63,14 +63,12 @@ FINGERPRINTS: dict[ReportType, set[str]] = {
     ReportType.CARD_SWIPE: {
         "card_swiping_time"
     },
-    ReportType.LEAVE: {
-        "staff_id", "proposed_leave_date", "resumption_date"
-    },
+    # LEAVE fingerprint removed because we use strict positional validation for Leave files
 }
 
 # Mapping of Type -> Target Subdirectory
 ROUTING_MAP: dict[ReportType, str] = {
-    ReportType.NOMINAL: "Norminal_Folder",
+    ReportType.NOMINAL: "Nominal_Folder",
     ReportType.TRAINING: "Training_Folder",
     ReportType.CARD_SWIPE: "card_Swiping_Folder",
     ReportType.LEAVE: "Leave_Folder",
@@ -94,7 +92,8 @@ class StructuralClassifier:
         """Identify the report type based on column overlap.
         Includes a 'search' fallback if the first row doesn't match.
         """
-        # 1. Try immediate match (already normalised df from ExcelReader)
+        # We cannot use this method for LEAVE files anymore, as it relies on normalized column names
+        # which destroys duplicate columns. This is now only for generic types.
         for r_type, required_cols in FINGERPRINTS.items():
             if required_cols.issubset(self._columns):
                 log.info(f"Structural match found on primary headers: {r_type.name}")
@@ -104,9 +103,45 @@ class StructuralClassifier:
         return ReportType.UNKNOWN
 
     @classmethod
+    def validate_leave_file(cls, df_raw: pd.DataFrame) -> int | None:
+        """Strict positional validation for Leave files (multi-header).
+        Returns the index of the major header row (Row 0) if valid, else None.
+        """
+        for i in range(min(5, max(0, len(df_raw) - 1))):
+            try:
+                # Row 1 (Major Headers)
+                r1 = df_raw.iloc[i]
+                # Row 2 (Sub Headers)
+                r2 = df_raw.iloc[i + 1]
+                
+                # Check signatures (with minor leniency for whitespace)
+                def check(val, expected) -> bool:
+                    return str(val).strip().upper().replace(" ", "") == str(expected).upper().replace(" ", "")
+
+                if (
+                    check(r1[8], "PRE-RETIREMENTLEAVE") and
+                    check(r1[10], "CASUALBEFOREANNUAL") and
+                    check(r1[22], "COMPASSIONATELEAVE") and
+                    check(r1[24], "PATERNITYLEAVE") and
+                    check(r2[2], "STAFFID") and
+                    check(r2[6], "PROPOSEDLEAVEDATE") and
+                    check(r2[7], "RESUMPTIONDATE")
+                ):
+                    return i
+            except (IndexError, KeyError):
+                continue
+        return None
+
+    @classmethod
     def find_best_header_row(cls, df_raw: pd.DataFrame) -> tuple[ReportType, int] | None:
         """Scan a raw (unstacked) DataFrame to find the row that looks most like headers."""
-        # Check first 10 rows
+        # 1. First, explicitly check for Leave file (strict positional multi-header)
+        leave_header_idx = cls.validate_leave_file(df_raw)
+        if leave_header_idx is not None:
+            log.info(f"Found explicit multi-header signatures for LEAVE on row index {leave_header_idx}")
+            return ReportType.LEAVE, leave_header_idx
+
+        # 2. Check other types (first 10 rows)
         for i in range(min(10, len(df_raw))):
             row_values = []
             for x in df_raw.iloc[i].dropna():

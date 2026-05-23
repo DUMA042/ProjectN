@@ -26,7 +26,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from sqlalchemy import select
+from sqlalchemy import select, null
 
 from owl.config import settings
 from owl.extract.classifier import classify_file, ROUTING_MAP, ReportType, StructuralClassifier
@@ -236,7 +236,10 @@ class IngestionManager:
                     file_path=str(dest),
                     checksum_sha256="N/A",
                     status="quarantined",
-                    error_context={"reason": reason}
+                    error_context={"reason": reason},
+                    version=1,
+                    file_size_bytes=0,
+                    period=null()
                 )
                 session.add(ingestion)
         except Exception:

@@ -15,3 +15,4 @@ numpy>=1.26.4
 # ── Utilities ─────────────────────────────────────────────────────────────────
 rich>=13.7.1          # Pretty terminal output / logging
 tenacity>=8.2.3       # Retry logic for DB connections
+holidays>=0.45.0      # Public holidays calculation

@@ -1,0 +1,28 @@
+{
+    "total_rows_read": 76,
+    "leave_entries_attempted": 42,
+    "leave_entries_inserted": 30,
+    "warnings": [],
+    "errors": [
+        "Row 2 fatal error: '<' not supported between instances of 'list' and 'int'",
+        "Row 5 fatal error: '<' not supported between instances of 'list' and 'int'",
+        "Row 15 fatal error: '<' not supported between instances of 'list' and 'int'",
+        "Row 19 fatal error: '<' not supported between instances of 'list' and 'int'",
+        "Row 20 fatal error: '<' not supported between instances of 'list' and 'int'",
+        "Row 43 fatal error: '<' not supported between instances of 'list' and 'int'",
+        "Row 46 fatal error: '<' not supported between instances of 'list' and 'int'",
+        "Row 49 fatal error: '<' not supported between instances of 'list' and 'int'",
+        "Row 57 fatal error: '<' not supported between instances of 'list' and 'int'"
+    ],
+    "failed_staff_ids": [
+        "2644",
+        "2965",
+        "1030",
+        "3015",
+        "3018",
+        "2827",
+        "2761",
+        "2908",
+        "2724"
+    ]
+}
