@@ -25,14 +25,14 @@ log = get_logger(__name__)
 
 # Required leave types for lookup
 REQUIRED_LEAVE_TYPES = [
-    "Pre-Retirement Leave",
-    "Annual Leave",
-    "Casual After Annual Leave",
-    "Compassionate Leave",
-    "Paternity Leave",
-    "Maternity Leave",
-    "Sick Leave",
-    "Exam Leave",
+    "PRE-RETIREMENT LEAVE",
+    "ANNUAL",
+    "CASUAL AFTER ANNUAL",
+    "COMPASSIONATE",
+    "PATERNITY",
+    "MATERNITY",
+    "SICK",
+    "EXAM",
 ]
 
 
@@ -201,19 +201,19 @@ class LeaveProcessor:
             })
 
         # Pre-Retirement Leave
-        extract_leave(8, 9, "Pre-Retirement Leave")
+        extract_leave(8, 9, "PRE-RETIREMENT LEAVE")
         # Casual Before Annual -> Annual Leave
-        extract_leave(11, 12, "Annual Leave")
+        extract_leave(11, 12, "ANNUAL")
         # Casual After Annual
-        extract_leave(14, 15, "Casual After Annual Leave")
+        extract_leave(14, 15, "CASUAL AFTER ANNUAL")
         # Compassionate Leave
-        extract_leave(22, 23, "Compassionate Leave")
+        extract_leave(22, 23, "COMPASSIONATE")
         # Paternity Leave
-        extract_leave(25, 26, "Paternity Leave")
+        extract_leave(25, 26, "PATERNITY")
         # Sick Leave
-        extract_leave(29, 30, "Sick Leave")
+        extract_leave(29, 30, "SICK")
         # Exam Leave
-        extract_leave(32, 33, "Exam Leave")
+        extract_leave(32, 33, "EXAM")
 
         # Standalone Start/End Date (Cols 19 & 20) -> Annual or Maternity
         s_start_d, s_start_r = self._parse_date_cell(row[19])
@@ -243,9 +243,9 @@ class LeaveProcessor:
                     duration = np.busday_count(start_np, end_np, holidays=holidays_np)
                     
                     if duration <= 30:
-                        type_name = "Annual Leave"
+                        type_name = "ANNUAL"
                     else:
-                        type_name = "Maternity Leave"
+                        type_name = "MATERNITY"
                         
                     leave_entries_to_insert.append({
                         "type_id": self._get_type_id(type_name),
@@ -279,12 +279,31 @@ class LeaveProcessor:
                     start_date=prop_date,
                     start_date_raw=prop_raw,
                     end_date=resum_date,
-                    end_date_raw=resum_raw
+                    end_date_raw=resum_raw,
+                    planned_start_date=prop_date,
+                    planned_start_date_raw=prop_raw,
+                    planned_end_date=resum_date,
+                    planned_end_date_raw=resum_raw
                 )
                 session.add(rec)
                 self.summary["total_leave_entries_inserted"] += 1
         else:
+            # Find the entry with the latest start_date
+            latest_entry = None
+            latest_date = None
+            
             for entry in leave_entries_to_insert:
+                if entry["start_d"]:
+                    if latest_date is None or entry["start_d"] > latest_date:
+                        latest_date = entry["start_d"]
+                        latest_entry = entry
+            
+            # If no valid start dates found, fallback to the first entry
+            if latest_entry is None and leave_entries_to_insert:
+                latest_entry = leave_entries_to_insert[0]
+
+            for entry in leave_entries_to_insert:
+                is_latest = (entry is latest_entry)
                 rec = LeaveRecord(
                     application_id=app.application_id,
                     id_no=staff_id,
@@ -292,7 +311,11 @@ class LeaveProcessor:
                     start_date=entry["start_d"],
                     start_date_raw=entry["start_r"],
                     end_date=entry["end_d"],
-                    end_date_raw=entry["end_r"]
+                    end_date_raw=entry["end_r"],
+                    planned_start_date=prop_date if is_latest else None,
+                    planned_start_date_raw=prop_raw if is_latest else None,
+                    planned_end_date=resum_date if is_latest else None,
+                    planned_end_date_raw=resum_raw if is_latest else None
                 )
                 session.add(rec)
                 self.summary["total_leave_entries_inserted"] += 1

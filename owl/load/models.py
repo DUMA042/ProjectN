@@ -177,6 +177,10 @@ class LeaveRecord(Base):
     start_date_raw: Mapped[Optional[str]] = mapped_column(String(255))
     end_date: Mapped[Optional[date]] = mapped_column(Date)
     end_date_raw: Mapped[Optional[str]] = mapped_column(String(255))
+    planned_start_date: Mapped[Optional[date]] = mapped_column(Date)
+    planned_start_date_raw: Mapped[Optional[str]] = mapped_column(String(255))
+    planned_end_date: Mapped[Optional[date]] = mapped_column(Date)
+    planned_end_date_raw: Mapped[Optional[str]] = mapped_column(String(255))
 
 
 # ── Quarantine Entities (Orphans) ─────────────────────────────────────────────
