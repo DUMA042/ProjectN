@@ -104,33 +104,52 @@ class StructuralClassifier:
 
     @classmethod
     def validate_leave_file(cls, df_raw: pd.DataFrame) -> int | None:
-        """Strict positional validation for Leave files (multi-header).
-        Returns the index of the major header row (Row 0) if valid, else None.
+        """Assume Excel Row 1 = Major Header, Row 2 = Sub-Header.
+        
+        Returns 0 (pandas index) if the file has at least 3 rows.
+        Signature validation is kept for logging but won't block ingestion.
+        
+        NOTE: Uses .iloc[] for positional access to be compatible with pandas 3.0+
         """
-        for i in range(min(5, max(0, len(df_raw) - 1))):
-            try:
-                # Row 1 (Major Headers)
-                r1 = df_raw.iloc[i]
-                # Row 2 (Sub Headers)
-                r2 = df_raw.iloc[i + 1]
-                
-                # Check signatures (with minor leniency for whitespace)
-                def check(val, expected) -> bool:
-                    return str(val).strip().upper().replace(" ", "") == str(expected).upper().replace(" ", "")
+        # Excel Row 1 = df.iloc[0], Excel Row 2 = df.iloc[1], Excel Row 3 = df.iloc[2]
+        if len(df_raw) < 3:
+            log.warning("Leave file has fewer than 3 rows. Cannot process.")
+            return None
 
-                if (
-                    check(r1[8], "PRE-RETIREMENTLEAVE") and
-                    check(r1[10], "CASUALBEFOREANNUAL") and
-                    check(r1[22], "COMPASSIONATELEAVE") and
-                    check(r1[24], "PATERNITYLEAVE") and
-                    check(r2[2], "STAFFID") and
-                    check(r2[6], "PROPOSEDLEAVEDATE") and
-                    check(r2[7], "RESUMPTIONDATE")
-                ):
-                    return i
-            except (IndexError, KeyError):
-                continue
-        return None
+        r1 = df_raw.iloc[0]  # Excel Row 1 (Major Header)
+        r2 = df_raw.iloc[1]  # Excel Row 2 (Sub-Header)
+
+        def check(val, expected) -> bool:
+            return str(val).strip().upper().replace(" ", "") == str(expected).upper().replace(" ", "")
+
+        # ✅ CRITICAL FIX: Use .iloc[] for positional access (pandas 3.0+ compatibility)
+        # In pandas 3.0+, series[int] is label-based lookup; .iloc[int] is positional
+        major_checks = [
+            check(r1.iloc[8], "PRE-RETIREMENTLEAVE"),
+            check(r1.iloc[10], "CASUALBEFOREANNUAL"),
+            check(r1.iloc[22], "COMPASSIONATELEAVE"),
+            check(r1.iloc[24], "PATERNITYLEAVE"),
+        ]
+        sub_checks = [
+            check(r2.iloc[2], "STAFFID"),
+            check(r2.iloc[6], "PROPOSEDLEAVEDATE"),
+            check(r2.iloc[7], "RESUMPTIONDATE"),
+        ]
+
+        if all(major_checks) and all(sub_checks):
+            log.info("Leave file validated: Excel Row 1 (Major) & Row 2 (Sub) match signatures.")
+        else:
+            log.warning(
+                "Leave file signature mismatch detected. "
+                "Proceeding anyway as requested (assuming Excel Row 1 = Major, Row 2 = Sub). "
+                "Check file template if data extraction fails later."
+            )
+            # Log actual values for debugging
+            log.debug(f"Row 1 values at signature cols: {r1.iloc[[8,10,22,24]].tolist()}")
+            log.debug(f"Row 2 values at signature cols: {r2.iloc[[2,6,7]].tolist()}")
+
+        # Always return 0 so ingestion continues
+        return 0
 
     @classmethod
     def find_best_header_row(cls, df_raw: pd.DataFrame) -> tuple[ReportType, int] | None:
@@ -157,8 +176,6 @@ class StructuralClassifier:
                     return r_type, i
         return None
 
-
-
     def extract_period(self) -> date | None:
         """Heuristically attempt to find a reference period (YYYYMM) in the data.
         
@@ -169,7 +186,6 @@ class StructuralClassifier:
         date_cols = self._df.select_dtypes(include=["datetime64", "datetime"]).columns
         if not date_cols.empty:
             # Get the first non-null date from the first date column
-            # (In production, we might want the mode of the dates)
             sample_date = self._df[date_cols[0]].dropna().iloc[0] if not self._df[date_cols[0]].empty else None
             if sample_date and isinstance(sample_date, (datetime, date)):
                 # Reset to 1st of the month
@@ -184,23 +200,12 @@ def classify_file(df: pd.DataFrame) -> IngestionMetadata:
     """High-level utility to classify a DataFrame and build metadata.
     Automatically handles "Floating Headers" by searching for the fingerprint row.
     """
-    # 1. Try immediate classification (header_row=0)
     classifier = StructuralClassifier(df)
     r_type = classifier.classify()
-    
-    # 2. If unknown, we might have floating headers.
-    # However, 'df' passed here is already processed with header_row=0.
-    # We should have access to the raw data or just trust the search 
-    # if it was integrated into the classifier.
-    
-    # Refinement: IngestionManager should be the one responsible for the 'retry'.
-    # But for now, we return UNKNOWN and let the caller decide.
-    
     period = classifier.extract_period()
     
     return IngestionMetadata(
         report_type=r_type,
         period=period,
-        version=1 # Initial version
+        version=1
     )
-

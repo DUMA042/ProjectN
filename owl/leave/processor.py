@@ -35,6 +35,33 @@ REQUIRED_LEAVE_TYPES = [
     "EXAM",
 ]
 
+# ── Shared Leave Signature Definitions ──────────────────────────────────────
+LEAVE_MAJOR_SIGNATURES = {
+    8: "PRE-RETIREMENTLEAVE",
+    10: "CASUALBEFOREANNUAL", 
+    22: "COMPASSIONATELEAVE",
+    24: "PATERNITYLEAVE",
+}
+
+LEAVE_SUB_SIGNATURES = {
+    2: "STAFFID",
+    6: "PROPOSEDLEAVEDATE",
+    7: "RESUMPTIONDATE",
+}
+
+def _check_leave_signatures(r1: pd.Series, r2: pd.Series) -> bool:
+    """Validate Leave file header signatures (shared between classifier and processor).
+    
+    NOTE: Uses .iloc[] for positional access to be compatible with pandas 3.0+
+    """
+    def check(val, expected) -> bool:
+        return str(val).strip().upper().replace(" ", "") == str(expected).upper().replace(" ", "")
+    
+    # ✅ FIX: Use .iloc[] for positional access (pandas 3.0+ compatibility)
+    major_ok = all(check(r1.iloc[col], val) for col, val in LEAVE_MAJOR_SIGNATURES.items())
+    sub_ok = all(check(r2.iloc[col], val) for col, val in LEAVE_SUB_SIGNATURES.items())
+    return major_ok and sub_ok
+
 
 class LeaveProcessor:
     """Processes Leave Excel files matching 0-indexed column signatures."""
@@ -58,20 +85,15 @@ class LeaveProcessor:
         """Load leave types from DB and ensure all required types exist."""
         with get_session() as session:
             db_types = session.query(LeaveType).all()
-            # Try to build dict with case-insensitive / space-insensitive matching if possible,
-            # but strict lookup is preferred. We will map them exactly as given.
             for lt in db_types:
-                # Normalize name for robust matching (e.g., 'Pre-Retirement Leave' -> 'pre-retirementleave')
                 norm_name = lt.leave_type_name.strip().lower().replace(" ", "")
                 self.leave_types_dict[norm_name] = lt.leave_type_id
 
-            # Verify required types
             for req in REQUIRED_LEAVE_TYPES:
                 norm_req = req.strip().lower().replace(" ", "")
                 if norm_req not in self.leave_types_dict:
                     raise RuntimeError(f"Configuration Error: Missing required leave type in database: '{req}'")
 
-            # Load valid employees to avoid orphaned records crashing the DB
             emps = session.query(Employee.id_no).all()
             self.valid_employees = {e[0] for e in emps}
 
@@ -89,7 +111,6 @@ class LeaveProcessor:
         if isinstance(cell_val, date):
             return cell_val, None
 
-        # String parsing
         str_val = str(cell_val).strip()
         try:
             parsed = parse_date(str_val, dayfirst=True)
@@ -108,7 +129,7 @@ class LeaveProcessor:
         if header_idx is None:
             raise ValueError("Could not find valid leave file headers.")
 
-        data_start_idx = header_idx + 2
+        data_start_idx = header_idx + 2  # Skips Major + Sub headers (Excel Row 1 & 2)
         
         with get_session() as session:
             for idx in range(data_start_idx, len(df_raw)):
@@ -120,38 +141,64 @@ class LeaveProcessor:
             
         self._dump_report()
         
+        # ✅ FIX: Return format expected by worker._mark_completed()
+        # Worker expects: {table_name: {"success": int, "failed": int}}
         return {
-            "success": self.summary["total_rows_read"] - len(self.summary["failures"]),
-            "failed": len(self.summary["failures"]),
-            "details": self.summary
+            "LeaveApplication": {
+                "success": self.summary["total_leave_entries_inserted"],
+                "failed": len(self.summary["failures"])
+            }
         }
 
     def _find_header_row(self, df_raw: pd.DataFrame) -> int | None:
-        """Find the 0-indexed row corresponding to Major Headers."""
-        for i in range(min(5, max(0, len(df_raw) - 1))):
-            try:
-                r1 = df_raw.iloc[i]
-                r2 = df_raw.iloc[i + 1]
-                
-                def check(val, expected) -> bool:
-                    return str(val).strip().upper().replace(" ", "") == str(expected).upper().replace(" ", "")
+        """Assume Excel Row 1 = Major Header, Row 2 = Sub-Header.
 
-                if (
-                    check(r1[8], "PRE-RETIREMENTLEAVE") and
-                    check(r1[10], "CASUALBEFOREANNUAL") and
-                    check(r1[22], "COMPASSIONATELEAVE") and
-                    check(r1[24], "PATERNITYLEAVE") and
-                    check(r2[2], "STAFFID") and
-                    check(r2[6], "PROPOSEDLEAVEDATE") and
-                    check(r2[7], "RESUMPTIONDATE")
-                ):
-                    return i
-            except (IndexError, KeyError):
-                continue
-        return None
+        Returns 0 (pandas index) if the file has at least 3 rows.
+        Signature validation is kept for logging but won't block ingestion.
+        
+        NOTE: Uses .iloc[] for positional access to be compatible with pandas 3.0+
+        """
+        if len(df_raw) < 3:
+            log.warning("Leave file has fewer than 3 rows. Cannot process.")
+            return None
+
+        r1 = df_raw.iloc[0]  # Excel Row 1 (Major Header)
+        r2 = df_raw.iloc[1]  # Excel Row 2 (Sub-Header)
+
+        def check(val, expected) -> bool:
+            return str(val).strip().upper().replace(" ", "") == str(expected).upper().replace(" ", "")
+
+        # ✅ FIX: Use .iloc[] for positional access (pandas 3.0+ compatibility)
+        major_checks = [
+            check(r1.iloc[8], "PRE-RETIREMENTLEAVE"),
+            check(r1.iloc[10], "CASUALBEFOREANNUAL"),
+            check(r1.iloc[22], "COMPASSIONATELEAVE"),
+            check(r1.iloc[24], "PATERNITYLEAVE"),
+        ]
+        sub_checks = [
+            check(r2.iloc[2], "STAFFID"),
+            check(r2.iloc[6], "PROPOSEDLEAVEDATE"),
+            check(r2.iloc[7], "RESUMPTIONDATE"),
+        ]
+
+        if all(major_checks) and all(sub_checks):
+            log.info("Leave file validated: Excel Row 1 (Major) & Row 2 (Sub) match signatures.")
+        else:
+            log.warning(
+                "Leave file signature mismatch detected. "
+                "Proceeding anyway as requested (assuming Excel Row 1 = Major, Row 2 = Sub). "
+                "Check file template if data extraction fails later."
+            )
+            # Log actual values for debugging
+            log.debug(f"Row 1 values at signature cols: {r1.iloc[[8,10,22,24]].tolist()}")
+            log.debug(f"Row 2 values at signature cols: {r2.iloc[[2,6,7]].tolist()}")
+
+        # Always return 0 so ingestion continues
+        return 0
 
     def _process_row(self, row_idx: int, row: pd.Series, session: Any) -> None:
-        staff_id = str(row[2]).strip()
+        # ✅ FIX: Use .iloc[] for all positional accesses (pandas 3.0+ compatibility)
+        staff_id = str(row.iloc[2]).strip()
         if not staff_id or staff_id == "nan":
             self._add_failure("MISSING_STAFF_ID", f"Row {row_idx}: No staff ID found.", staff_id)
             return
@@ -160,16 +207,15 @@ class LeaveProcessor:
             self._add_failure("INVALID_STAFF_ID", f"Row {row_idx}: Staff ID '{staff_id}' not found in database.", staff_id)
             return
 
-        # 1. Parse Proposed Leave Dates
-        prop_date, prop_raw = self._parse_date_cell(row[6])
-        resum_date, resum_raw = self._parse_date_cell(row[7])
+        prop_date, prop_raw = self._parse_date_cell(row.iloc[6])
+        resum_date, resum_raw = self._parse_date_cell(row.iloc[7])
 
         if prop_raw:
             self._add_warning("UNPARSEABLE_PROPOSED_DATE", f"Row {row_idx}: Proposed date '{prop_raw}' is a string.", staff_id)
         if resum_raw:
             self._add_warning("UNPARSEABLE_RESUMPTION_DATE", f"Row {row_idx}: Resumption date '{resum_raw}' is a string.", staff_id)
 
-        remark = str(row[37]).strip()
+        remark = str(row.iloc[37]).strip()
         if remark == "nan" or not remark:
             remark = None
 
@@ -177,8 +223,8 @@ class LeaveProcessor:
         
         # Helper to process standard leave chunks
         def extract_leave(start_col, end_col, type_name):
-            start_d, start_r = self._parse_date_cell(row[start_col])
-            end_d, end_r = self._parse_date_cell(row[end_col])
+            start_d, start_r = self._parse_date_cell(row.iloc[start_col])
+            end_d, end_r = self._parse_date_cell(row.iloc[end_col])
             
             if start_d is None and start_r is None and end_d is None and end_r is None:
                 return # completely empty, skip silently
@@ -216,8 +262,8 @@ class LeaveProcessor:
         extract_leave(32, 33, "EXAM")
 
         # Standalone Start/End Date (Cols 19 & 20) -> Annual or Maternity
-        s_start_d, s_start_r = self._parse_date_cell(row[19])
-        s_end_d, s_end_r = self._parse_date_cell(row[20])
+        s_start_d, s_start_r = self._parse_date_cell(row.iloc[19])
+        s_end_d, s_end_r = self._parse_date_cell(row.iloc[20])
         
         if not (s_start_d is None and s_start_r is None and s_end_d is None and s_end_r is None):
             self.summary["total_leave_entries_attempted"] += 1
@@ -280,10 +326,10 @@ class LeaveProcessor:
                     start_date_raw=prop_raw,
                     end_date=resum_date,
                     end_date_raw=resum_raw,
-                    planned_start_date=prop_date,
-                    planned_start_date_raw=prop_raw,
-                    planned_end_date=resum_date,
-                    planned_end_date_raw=resum_raw
+                    planned_start_date=prop_date if prop_date else None,
+                    planned_start_date_raw=prop_raw if prop_raw else None,
+                    planned_end_date=resum_date if resum_date else None,
+                    planned_end_date_raw=resum_raw if resum_raw else None
                 )
                 session.add(rec)
                 self.summary["total_leave_entries_inserted"] += 1
