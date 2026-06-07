@@ -1,0 +1,12 @@
+Name: Training2507.xlsx
+Status: failed
+Error Context: {'fatal_error': 'Database session error — transaction rolled back.'}
+----------------------------------------
+Name: AttendanceSwipingCardReport202605261232531724853_051847.xlsx
+Status: completed
+Error Context: {'status': 'completed', 'source_file': 'nest\\card_Swiping_Folder\\AHRD_CardSwipe_202606_v1.xlsx', 'ingestion_id': '5a0f8638-a5c3-4515-9bab-15d17c3564e7', 'load_results': {'quarantine_card_swipes': {'failed': 0, 'success': 11089}}, 'validation_results': {'total_rejected': 0, 'errors_by_table': {}}}
+----------------------------------------
+Name: Leave testing 2705.xlsx
+Status: failed
+Error Context: {'fatal_error': 'Database session error — transaction rolled back.'}
+----------------------------------------

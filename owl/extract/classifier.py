@@ -122,34 +122,34 @@ class StructuralClassifier:
         def check(val, expected) -> bool:
             return str(val).strip().upper().replace(" ", "") == str(expected).upper().replace(" ", "")
 
-        # ✅ CRITICAL FIX: Use .iloc[] for positional access (pandas 3.0+ compatibility)
-        # In pandas 3.0+, series[int] is label-based lookup; .iloc[int] is positional
+        def safe_iloc(row, idx):
+            return row.iloc[idx] if idx < len(row) else ""
+
+        # ✅ CRITICAL FIX: Use safe_iloc for positional access to avoid IndexError on shorter files
         major_checks = [
-            check(r1.iloc[8], "PRE-RETIREMENTLEAVE"),
-            check(r1.iloc[10], "CASUALBEFOREANNUAL"),
-            check(r1.iloc[22], "COMPASSIONATELEAVE"),
-            check(r1.iloc[24], "PATERNITYLEAVE"),
+            check(safe_iloc(r1, 8), "PRE-RETIREMENTLEAVE"),
+            check(safe_iloc(r1, 10), "CASUALBEFOREANNUAL"),
+            check(safe_iloc(r1, 22), "COMPASSIONATELEAVE"),
+            check(safe_iloc(r1, 24), "PATERNITYLEAVE"),
         ]
         sub_checks = [
-            check(r2.iloc[2], "STAFFID"),
-            check(r2.iloc[6], "PROPOSEDLEAVEDATE"),
-            check(r2.iloc[7], "RESUMPTIONDATE"),
+            check(safe_iloc(r2, 2), "STAFFID"),
+            check(safe_iloc(r2, 6), "PROPOSEDLEAVEDATE"),
+            check(safe_iloc(r2, 7), "RESUMPTIONDATE"),
         ]
 
-        if all(major_checks) and all(sub_checks):
-            log.info("Leave file validated: Excel Row 1 (Major) & Row 2 (Sub) match signatures.")
-        else:
-            log.warning(
-                "Leave file signature mismatch detected. "
-                "Proceeding anyway as requested (assuming Excel Row 1 = Major, Row 2 = Sub). "
-                "Check file template if data extraction fails later."
-            )
-            # Log actual values for debugging
-            log.debug(f"Row 1 values at signature cols: {r1.iloc[[8,10,22,24]].tolist()}")
-            log.debug(f"Row 2 values at signature cols: {r2.iloc[[2,6,7]].tolist()}")
+        # If it has the STAFFID column and at least one other matching signature, consider it a Leave file
+        is_leave_file = check(safe_iloc(r2, 2), "STAFFID") and (any(major_checks) or any(sub_checks[1:]))
 
-        # Always return 0 so ingestion continues
-        return 0
+        if is_leave_file:
+            if all(major_checks) and all(sub_checks):
+                log.info("Leave file validated: Excel Row 1 (Major) & Row 2 (Sub) match signatures.")
+            else:
+                log.warning("Leave file partial signature match detected. Proceeding as Leave file.")
+            return 0
+
+        # If it doesn't match the signature, return None so the classifier can check other file types
+        return None
 
     @classmethod
     def find_best_header_row(cls, df_raw: pd.DataFrame) -> tuple[ReportType, int] | None:

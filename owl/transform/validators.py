@@ -109,19 +109,19 @@ class GradeLevelRecord(OwlBaseRecord):
 
 class LocationRecord(OwlBaseRecord):
     """Validates rows for the 'locations' dimension table."""
-    location_id: int
+    location_id: Optional[int] = None
     location_name: str
 
 
 class VenueRecord(OwlBaseRecord):
     """Validates rows for the 'venues' dimension table."""
-    venue_id: int
+    venue_id: Optional[int] = None
     venue_name: str
 
 
 class ConsultantRecord(OwlBaseRecord):
     """Validates rows for the 'consultants' dimension table."""
-    consultant_id: int
+    consultant_id: Optional[int] = None
     consultant_name: str
 
 

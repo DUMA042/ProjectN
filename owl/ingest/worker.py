@@ -90,21 +90,77 @@ class IngestionWorker:
         # ── All other report types: generic Pipeline ─────────────────────────
         # Fetch valid id_no set for orphan detection in card swipes / training
         valid_ids = set()
+        name_to_id = {}
         with get_session() as session:
             from owl.load.models import Employee
-            res = session.execute(select(Employee.id_no)).scalars().all()
-            valid_ids = set(res)
+            emps = session.execute(select(Employee.id_no, Employee.full_name)).all()
+            for id_no, full_name in emps:
+                if id_no:
+                    valid_ids.add(id_no)
+                if full_name:
+                    name_to_id[str(full_name).lower().strip()] = id_no
             log.debug(f"Process[{record.id}]: Loaded {len(valid_ids)} valid staff IDs.")
 
         normalizer_class = NORMALIZER_REGISTRY.get(r_type)
         if normalizer_class is None:
             log.warning(f"No normalizer registered for type '{r_type.value}'.")
 
+        # ── Training: inject a DimensionCache so the normalizer can resolve ──
+        # and auto-create venue / consultant / location IDs against real DB PKs.
+        if r_type == ReportType.TRAINING:
+            from owl.transform.dimension_cache import DimensionCache
+            with get_session() as dim_session:
+                dim_cache = DimensionCache(dim_session)
+                pipeline = Pipeline(
+                    source_file=record.file_path,
+                    normalizer_class=normalizer_class,
+                    ingestion_id=str(record.id),
+                    context={
+                        "valid_ids": valid_ids,
+                        "name_to_id": name_to_id,
+                        "dim_cache": dim_cache,
+                    }
+                )
+                # Run only the Extract + Transform stages inside the dim_session scope
+                # so that any new dimension rows are written and then committed
+                # BEFORE the Load stage opens its own connection.
+                frames   = pipeline._extract()
+                entities = pipeline._transform(frames)
+                entities, validation_errors = pipeline._validate(entities)
+
+                # Commit the dimension inserts NOW so the loader's separate
+                # connection can see the new venue/consultant/location rows
+                # when it checks FK constraints on employee_trainings.
+                dim_session.commit()
+                log.info(f"Process[{record.id}]: Dimension inserts committed.")
+
+            # Load stage runs AFTER dim_session is closed and committed
+            load_reports = pipeline._load(entities)
+            results = {
+                "source_file": str(pipeline._source_file),
+                "ingestion_id": str(record.id),
+                "status": "completed",
+                "validation_results": {
+                    "total_rejected": sum(len(e) for e in validation_errors.values()),
+                    "errors_by_table": {
+                        t: [{"row": e["row_index"], "field": e["field"], "message": e["message"]}
+                            for e in errs]
+                        for t, errs in validation_errors.items() if errs
+                    }
+                },
+                "load_results": {
+                    t: {"success": r.success_count, "failed": len(r.failed_rows)}
+                    for t, r in load_reports.items()
+                }
+            }
+            self._mark_completed(record.id, results)
+            return
+
         pipeline = Pipeline(
             source_file=record.file_path,
             normalizer_class=normalizer_class,
             ingestion_id=str(record.id),
-            context={"valid_ids": valid_ids}
+            context={"valid_ids": valid_ids, "name_to_id": name_to_id}
         )
         results = pipeline.run()
         self._mark_completed(record.id, results)
