@@ -34,6 +34,7 @@ import json
 import math
 from dataclasses import dataclass, field
 from datetime import date, datetime
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Optional
 
@@ -197,49 +198,79 @@ def _to_str(value: Any) -> Optional[str]:
 
 
 def _to_date(value: Any) -> Optional[date]:
-    """Convert Excel cell (serial, datetime, string) to a Python date."""
+    """Convert Excel cell (serial, datetime, string) to a Python date.
+    
+    First pass: fast pd.to_datetime (vectorized internally, cached for repeated strings).
+    Second pass: cached xlrd/dateutil fallback only for NaT results.
+    """
     if value is None:
         return None
-        
-    if isinstance(value, str):
-        value = value.strip()
-        try:
-            value = float(value)
-        except ValueError:
-            pass
-
-    if isinstance(value, (int, float)):
-        if math.isnan(value):
-            return None
-        # Excel serial date number
-        try:
-            import xlrd  # type: ignore
-            return xlrd.xldate_as_datetime(int(value), 0).date()
-        except Exception:
-            pass
-        # Try epoch arithmetic as fallback
-        try:
-            from datetime import timedelta
-            base = date(1899, 12, 30)
-            return base + timedelta(days=int(value))
-        except Exception:
-            return None
-            
+    if isinstance(value, float) and math.isnan(value):
+        return None
     if isinstance(value, datetime):
         return value.date()
     if isinstance(value, date):
         return value
-        
+
+    # Fast path: pandas vectorized parser (covers most cases)
     try:
         import warnings
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             dt = pd.to_datetime(str(value).strip(), dayfirst=True, errors='coerce')
-            if pd.isna(dt):
-                return None
-            return dt.date()
+            if not pd.isna(dt):
+                return dt.date()
+    except Exception:
+        pass
+
+    # Slow path: xlrd / epoch / dateutil — cached to avoid repeated work
+    return _fallback_parse_date(str(value).strip())
+
+
+@lru_cache(maxsize=1024)
+def _fallback_parse_date(raw: str) -> Optional[date]:
+    """Cached slow-path date parser — handles Excel serials and ambiguous strings."""
+    if not raw:
+        return None
+
+    # Try numeric (Excel serial)
+    try:
+        num = float(raw)
+        if not math.isnan(num):
+            import xlrd  # type: ignore
+            return xlrd.xldate_as_datetime(int(num), 0).date()
+    except (ValueError, ImportError):
+        pass
+
+    # Try epoch fallback
+    try:
+        num = int(float(raw))
+        from datetime import timedelta
+        base = date(1899, 12, 30)
+        return base + timedelta(days=num)
+    except (ValueError, OverflowError):
+        pass
+
+    # Try dateutil as last resort
+    try:
+        from dateutil.parser import parse as parse_dateutil
+        return parse_dateutil(raw, dayfirst=True).date()
     except Exception:
         return None
+
+
+def _to_date_from_series(series: pd.Series, idx: int) -> Optional[date]:
+    """Extract a date from a pre-parsed Series, returning None for NaT/out-of-bounds."""
+    if idx < 0 or idx >= len(series):
+        return None
+    val = series.iloc[idx]
+    if pd.isna(val):
+        return None
+    if isinstance(val, datetime):
+        return val.date()
+    if isinstance(val, date):
+        return val
+    return None
 
 
 def _to_id_no(value: Any) -> Optional[str]:
@@ -400,6 +431,14 @@ class NominalProcessor:
         report.total_rows_read = len(data_rows)
         log.info(f"Processing {report.total_rows_read} data rows from '{self._file_path.name}'")
 
+        # ── Pre-parse deployment dates (vectorized, avoids per-row try/except) ──
+        deploy_raw = data_rows.iloc[:, ColIdx.DEPLOYMENT_DATE]
+        deploy_dates = pd.to_datetime(deploy_raw, errors='coerce')
+        nat_mask = deploy_dates.isna() & deploy_raw.notna()
+        if nat_mask.any():
+            for idx in deploy_dates.index[nat_mask]:
+                deploy_dates.iloc[idx] = _fallback_parse_date(str(deploy_raw.iloc[idx]).strip())
+
         # ── Stage 3: Pre-load lookup tables and process each row ─────────────
         with get_session() as session:
             cache = LookupTableCache(session)
@@ -414,6 +453,7 @@ class NominalProcessor:
                     session=session,
                     cache=cache,
                     report=report,
+                    pre_parsed_deploy_date=_to_date_from_series(deploy_dates, local_idx),
                 )
                 report.row_outcomes.append(outcome)
 
@@ -440,6 +480,7 @@ class NominalProcessor:
         session,
         cache: LookupTableCache,
         report: NominalProcessingReport,
+        pre_parsed_deploy_date: Optional[date] = None,
     ) -> RowOutcome:
         """Process one Excel data row inside a savepoint transaction.
 
@@ -469,8 +510,8 @@ class NominalProcessor:
         status_raw = _to_str(_cell(row, ColIdx.STATUS))
         remark_raw = _to_str(_cell(row, ColIdx.REMARK))
         remark = remark_raw if remark_raw and remark_raw.strip() else None
+        deploy_date = pre_parsed_deploy_date
         deploy_date_raw = _cell(row, ColIdx.DEPLOYMENT_DATE)
-        deploy_date = _to_date(deploy_date_raw)
 
         # ── Step 3: Validate sex ──────────────────────────────────────────────
         if sex and sex.upper() not in ("M", "F"):

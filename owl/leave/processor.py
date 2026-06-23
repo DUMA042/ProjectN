@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, date
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -63,6 +64,15 @@ def _check_leave_signatures(r1: pd.Series, r2: pd.Series) -> bool:
     return major_ok and sub_ok
 
 
+@lru_cache(maxsize=2048)
+def _cached_parse_date(str_val: str) -> date | None:
+    """Cached dateutil parsing — avoids repeated work on duplicate date strings."""
+    try:
+        return parse_date(str_val, dayfirst=True).date()
+    except Exception:
+        return None
+
+
 class LeaveProcessor:
     """Processes Leave Excel files matching 0-indexed column signatures."""
 
@@ -112,11 +122,10 @@ class LeaveProcessor:
             return cell_val, None
 
         str_val = str(cell_val).strip()
-        try:
-            parsed = parse_date(str_val, dayfirst=True)
-            return parsed.date(), None
-        except Exception:
-            return None, str_val
+        parsed = _cached_parse_date(str_val)
+        if parsed is not None:
+            return parsed, None
+        return None, str_val
 
     def process(self) -> dict:
         """Main execution flow for leave processing."""
@@ -130,15 +139,37 @@ class LeaveProcessor:
             raise ValueError("Could not find valid leave file headers.")
 
         data_start_idx = header_idx + 2  # Skips Major + Sub headers (Excel Row 1 & 2)
-        
+
+        # ── Phase 1: Build all row objects in memory (no DB writes yet) ──
+        accumulated_data: list[tuple[LeaveApplication, list[LeaveRecord]]] = []
+
+        for idx in range(data_start_idx, len(df_raw)):
+            row = df_raw.iloc[idx]
+            self.summary["total_rows_read"] += 1
+            result = self._build_row_objects(idx, row)
+            if result is not None:
+                accumulated_data.append(result)
+
+        if not accumulated_data:
+            self._dump_report()
+            return {"LeaveApplication": {"success": 0, "failed": len(self.summary["failures"])}}
+
+        # ── Phase 2: Bulk insert in two passes ──
         with get_session() as session:
-            for idx in range(data_start_idx, len(df_raw)):
-                row = df_raw.iloc[idx]
-                self.summary["total_rows_read"] += 1
-                self._process_row(idx, row, session)
-            
+            apps = [app for app, _ in accumulated_data]
+            session.add_all(apps)
+            session.flush()  # Populate application_id on all apps
+
+            all_records: list[LeaveRecord] = []
+            for app, records in accumulated_data:
+                for rec in records:
+                    rec.application_id = app.application_id
+                all_records.extend(records)
+
+            session.add_all(all_records)
             session.commit()
-            
+
+        self.summary["total_leave_entries_inserted"] = len(all_records)
         self._dump_report()
         
         # ✅ FIX: Return format expected by worker._mark_completed()
@@ -196,16 +227,16 @@ class LeaveProcessor:
         # Always return 0 so ingestion continues
         return 0
 
-    def _process_row(self, row_idx: int, row: pd.Series, session: Any) -> None:
+    def _build_row_objects(self, row_idx: int, row: pd.Series) -> tuple[LeaveApplication, list[LeaveRecord]] | None:
         # ✅ FIX: Use .iloc[] for all positional accesses (pandas 3.0+ compatibility)
         staff_id = str(row.iloc[2]).strip()
         if not staff_id or staff_id == "nan":
             self._add_failure("MISSING_STAFF_ID", f"Row {row_idx}: No staff ID found.", staff_id)
-            return
+            return None
 
         if staff_id not in self.valid_employees:
             self._add_failure("INVALID_STAFF_ID", f"Row {row_idx}: Staff ID '{staff_id}' not found in database.", staff_id)
-            return
+            return None
 
         prop_date, prop_raw = self._parse_date_cell(row.iloc[6])
         resum_date, resum_raw = self._parse_date_cell(row.iloc[7])
@@ -303,7 +334,7 @@ class LeaveProcessor:
                 except Exception as e:
                     self._add_warning("CALCULATION_ERROR", f"Row {row_idx}: Could not calculate duration - {str(e)}", staff_id)
 
-        # Create the LeaveApplication (Staff Leave Snapshot)
+        # Create the LeaveApplication (no session — return as object)
         app = LeaveApplication(
             id_no=staff_id,
             proposed_leave_date=prop_date,
@@ -311,15 +342,13 @@ class LeaveProcessor:
             resumption_date=resum_date,
             remark=remark
         )
-        session.add(app)
-        session.flush() # flush to get application_id
+
+        records: list[LeaveRecord] = []
 
         # Insert leave records
         if not leave_entries_to_insert:
-            # If no actual leaves were found but we have proposed dates, insert a NULL leave type record
             if prop_date or prop_raw or resum_date or resum_raw:
                 rec = LeaveRecord(
-                    application_id=app.application_id,
                     id_no=staff_id,
                     leave_type_id=None,
                     start_date=prop_date,
@@ -331,27 +360,21 @@ class LeaveProcessor:
                     planned_end_date=resum_date if resum_date else None,
                     planned_end_date_raw=resum_raw if resum_raw else None
                 )
-                session.add(rec)
-                self.summary["total_leave_entries_inserted"] += 1
+                records.append(rec)
         else:
-            # Find the entry with the latest start_date
             latest_entry = None
             latest_date = None
-            
             for entry in leave_entries_to_insert:
                 if entry["start_d"]:
                     if latest_date is None or entry["start_d"] > latest_date:
                         latest_date = entry["start_d"]
                         latest_entry = entry
-            
-            # If no valid start dates found, fallback to the first entry
             if latest_entry is None and leave_entries_to_insert:
                 latest_entry = leave_entries_to_insert[0]
 
             for entry in leave_entries_to_insert:
                 is_latest = (entry is latest_entry)
                 rec = LeaveRecord(
-                    application_id=app.application_id,
                     id_no=staff_id,
                     leave_type_id=entry["type_id"],
                     start_date=entry["start_d"],
@@ -363,8 +386,9 @@ class LeaveProcessor:
                     planned_end_date=resum_date if is_latest else None,
                     planned_end_date_raw=resum_raw if is_latest else None
                 )
-                session.add(rec)
-                self.summary["total_leave_entries_inserted"] += 1
+                records.append(rec)
+
+        return (app, records)
 
     def _add_warning(self, w_type: str, message: str, staff_id: str) -> None:
         self.summary["warnings"].append({"type": w_type, "message": message, "staff_id": staff_id})

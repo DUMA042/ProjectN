@@ -6,19 +6,20 @@ SQLAlchemy 2.x ORM models — EXACTLY aligned with the existing database.
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Optional
 import uuid
 
 from sqlalchemy import (
+    Computed,
     Date,
     DateTime,
     ForeignKey,
     Integer,
+    Interval,
     String,
     Text,
     func,
-    FetchedValue,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -50,7 +51,7 @@ class EmploymentType(Base):
 class EmployeeStatus(Base):
     __tablename__ = "employee_statuses"
     status_id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    status_name: Mapped[str] = mapped_column(String(50), unique=True)
+    status_name: Mapped[str] = mapped_column(String(100), unique=True)
 
 class Venue(Base):
     __tablename__ = "venues"
@@ -218,10 +219,10 @@ class FileIngestionMeta(Base):
     normalized_filename: Mapped[str] = mapped_column(Text, nullable=False)
     department: Mapped[Optional[str]] = mapped_column(String(128))
     report_type: Mapped[Optional[str]] = mapped_column(String(128))
-    period: Mapped[Optional[date]] = mapped_column(Date, server_default=FetchedValue())
+    period: Mapped[Optional[date]] = mapped_column(Date, Computed("make_date((substring(split_part(normalized_filename, '_'::text, 3) from 1 for 4))::integer, (substring(split_part(normalized_filename, '_'::text, 3) from 5 for 2))::integer, 1)", persisted=True))
     version: Mapped[Optional[int]] = mapped_column(Integer)
     file_path: Mapped[str] = mapped_column(Text, nullable=False)
-    checksum_sha256: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    checksum_sha256: Mapped[str] = mapped_column(Text, nullable=False)
     file_size_bytes: Mapped[Optional[int]] = mapped_column(Integer)
     status: Mapped[str] = mapped_column(String(32), server_default="pending", nullable=False)
     error_context: Mapped[Optional[dict]] = mapped_column(JSONB)
@@ -295,4 +296,4 @@ class KanbanTaskHistory(Base):
     to_column_id: Mapped[int] = mapped_column(ForeignKey("kanban_columns.column_id"), nullable=False)
     moved_by: Mapped[Optional[str]] = mapped_column(String(64))
     moved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    duration_in_previous: Mapped[Optional[str]] = mapped_column(String(255)) # Store interval as string representation for ORM compatibility
+    duration_in_previous: Mapped[Optional[timedelta]] = mapped_column(Interval)

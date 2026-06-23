@@ -1,0 +1,135 @@
+{
+  "filename": "AHRD_Nominal_202606_v1.xlsx",
+  "processed_at": "2026-06-23T11:49:36.109494",
+  "total_rows_read": 1656,
+  "total_new_inserts": 5,
+  "total_updates": 1643,
+  "history_writes": {
+    "employee_department_history": 88,
+    "employee_gl_history": 1,
+    "employee_location_history": 70,
+    "employee_rank_history": 81
+  },
+  "new_lookup_values": {
+    "departments": [
+      "Onne",
+      "ROS",
+      "0",
+      "GS&P AHRD",
+      "Health Services",
+      "HSU",
+      "IAU"
+    ],
+    "grade_levels": [],
+    "locations": [
+      "SARBC - Azare",
+      "Apapa Port",
+      "Azare",
+      "SARBC, AHRD"
+    ],
+    "ranks": [
+      "Director, SERVICOM",
+      "Director, Special Duties (ER&TC)",
+      "DD-WZ",
+      "H-ICT",
+      "DD-MGC",
+      "DD/Head, Transport & Logistics",
+      "DD/ Head- Library",
+      "DD - Survey & Certification",
+      "DD-MSSSD (Survey and Certification)",
+      "DD/Head, Welfare",
+      "DD - Exams & Certification",
+      "DD- Compliance & Enforcement",
+      "AD-Radio Survey",
+      "AD- Stakeholders and Investor Relations",
+      "AD-Maintenace",
+      "PSC-Onne",
+      "AD- Flag Intelligence & Compliance",
+      "AD - Shipping Company Registration",
+      "AD-MGC",
+      "CMLO- Compliance & Monitoring",
+      "CAO- Programmes and Initiatives",
+      "CCS",
+      "CEO - Reform Development & Coordination",
+      "CMEMO, Pollution Prevention",
+      "CMEMO- Sea Sustainability & Project",
+      "CMEO- Climate Change",
+      "CCO - Waiver",
+      "CMEMO  - Fouling",
+      "CA- Revenue",
+      "CMEMO - Support Services",
+      "ACA - Special Unit",
+      "ACMEO (Pollution Prevention)",
+      "Assistant Chief Ship Registration Officer - Ship Registry)",
+      "ACSDO -Shipping Promotion",
+      "ACMEMO -Pollution Control",
+      "ACSDO- Surveillance",
+      "PAO - Personnel & Records",
+      "AMSO- Operations",
+      "PEOI/ Head Registry",
+      "PCO - Revenue &  2%",
+      "PMEMO - Compliance Tracking and Business Dev. Desk",
+      "AC- Maritime Labour Service",
+      "PAO - Transport & Logistics",
+      "PMEMO - Stakeholders Engagement & Advocate - MEM",
+      "PEO I - Customer Service",
+      "PA -Final Account",
+      "PCO- Enforcement",
+      "PEO II-GS&P (AHRD",
+      "PEO",
+      "SSO - Customer Service",
+      "Pincipal Works Superintendent II",
+      "PWS II",
+      "Principal Technical Officer II (Facility Management)",
+      "ITO II- Data Management Services"
+    ],
+    "employee_statuses": [
+      "Deployed to Abuja MoU from 27/06/2023 to 26/06/2025"
+    ]
+  },
+  "total_successes": 1646,
+  "total_partial_successes": 2,
+  "total_failures": 8,
+  "failed_id_nos": [
+    {
+      "row": 2,
+      "id_no": "3040",
+      "reason": "Unknown employment_type 'Political' \u2014 not in controlled list; row skipped"
+    },
+    {
+      "row": 3,
+      "id_no": "2637",
+      "reason": "Unknown employment_type 'Political' \u2014 not in controlled list; row skipped"
+    },
+    {
+      "row": 4,
+      "id_no": "3038",
+      "reason": "Unknown employment_type 'Political' \u2014 not in controlled list; row skipped"
+    },
+    {
+      "row": 5,
+      "id_no": "3039",
+      "reason": "Unknown employment_type 'Political' \u2014 not in controlled list; row skipped"
+    },
+    {
+      "row": 35,
+      "id_no": "641",
+      "reason": "Unknown employment_type 'Secondment on National Interest' \u2014 not in controlled list; row skipped"
+    },
+    {
+      "row": 324,
+      "id_no": "3045",
+      "reason": "Unknown employment_type 'Secondment' \u2014 not in controlled list; row skipped"
+    },
+    {
+      "row": 479,
+      "id_no": "3021",
+      "reason": "Unknown employment_type 'Secondment' \u2014 not in controlled list; row skipped"
+    },
+    {
+      "row": 780,
+      "id_no": "3043",
+      "reason": "Unknown employment_type 'Secondment' \u2014 not in controlled list; row skipped"
+    }
+  ]
+}

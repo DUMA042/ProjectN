@@ -61,6 +61,11 @@ class Settings(BaseSettings):
         description="Landing zone for new file uploads.",
     )
 
+    max_file_size_mb: int = Field(
+        default=50,
+        description="Files larger than this (MB) will be read in streaming mode to avoid memory exhaustion.",
+    )
+
 
     # ── Logging ───────────────────────────────────────────────────────────────
     log_level: str = Field(

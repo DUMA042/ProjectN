@@ -123,11 +123,13 @@ class ExcelReader:
         sheet_names: list[str] | None = None,
         header_row: int = 1,
         per_sheet_header_rows: dict[str, int] | None = None,
+        chunk_size: int | None = None,
     ) -> None:
         self._path = Path(file_path)
         self._sheet_names = sheet_names
         self._default_header_row = header_row
         self._per_sheet_header_rows: dict[str, int] = per_sheet_header_rows or {}
+        self._chunk_size = chunk_size  # If set, read() returns an iterator of chunks
 
     # ── Public API ────────────────────────────────────────────────────────────
 
@@ -182,7 +184,58 @@ class ExcelReader:
             import gc
             gc.collect()
 
+    def read_streaming(self, sheet_name: str | None = None) -> Generator[pd.DataFrame, None, None]:
+        """Stream rows from a sheet in chunks to avoid loading entire file into memory.
 
+        Yields DataFrames of up to ``self._chunk_size`` rows each.
+        Use for files exceeding MAX_FILE_SIZE_MB.
+        """
+        chunk_size = self._chunk_size or 10000
+        self._validate_file()
+
+        log.info(f"Streaming workbook: {self._path.name} (chunk_size={chunk_size})")
+        wb = None
+        try:
+            wb = openpyxl.load_workbook(self._path, read_only=True, data_only=True)
+            names = [sheet_name] if sheet_name else wb.sheetnames
+            for name in names:
+                ws = wb[name]
+                header_row = self._per_sheet_header_rows.get(name, self._default_header_row)
+                chunk = []
+                header = None
+                row_count = 0
+                for row_num, row_data in enumerate(ws.iter_rows(values_only=True), start=1):
+                    if header is None and row_num == header_row:
+                        header = [str(h).strip() if h is not None else f"col_{i}"
+                                  for i, h in enumerate(row_data)]
+                        continue
+                    if header is None:
+                        continue
+                    chunk.append(dict(zip(header, row_data)))
+                    if len(chunk) >= chunk_size:
+                        df = pd.DataFrame(chunk)
+                        # Strip whitespace from string columns
+                        for col in df.select_dtypes(include="object").columns:
+                            df[col] = df[col].astype(str).str.strip()
+                        yield df
+                        chunk = []
+                if chunk:
+                    df = pd.DataFrame(chunk)
+                    for col in df.select_dtypes(include="object").columns:
+                        df[col] = df[col].astype(str).str.strip()
+                    yield df
+        except Exception as exc:
+            msg = f"Failed to stream from '{self._path.name}': {exc}"
+            log.error(msg)
+            raise ExtractionError(msg) from exc
+        finally:
+            if wb:
+                try:
+                    wb.close()
+                except Exception:
+                    pass
+            import gc
+            gc.collect()
 
     # ── Private helpers ───────────────────────────────────────────────────────
 

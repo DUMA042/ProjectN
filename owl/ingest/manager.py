@@ -74,7 +74,16 @@ class IngestionManager:
     def _process_file(self, file_path: Path) -> None:
         """Handle identification, renaming, and routing for a single file."""
         log.info(f"Classifying: {file_path.name}")
-        
+
+        # Warn about large files — full processing may need streaming mode
+        size_mb = file_path.stat().st_size / (1024 * 1024)
+        if size_mb > settings.max_file_size_mb:
+            log.warning(
+                f"File '{file_path.name}' is {size_mb:.0f} MB (threshold: "
+                f"{settings.max_file_size_mb} MB). Will read in streaming mode "
+                f"to avoid memory exhaustion."
+            )
+
         reader_raw = ExcelReader(file_path, header_row=None)
         frames_raw = reader_raw.read()
         

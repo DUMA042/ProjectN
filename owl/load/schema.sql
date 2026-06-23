@@ -1,97 +1,592 @@
--- owl: PostgreSQL Schema — Single Source of Truth
--- Convention: All DDL is idempotent (CREATE TABLE IF NOT EXISTS).
--- Mirror every table here with a corresponding SQLAlchemy ORM model in models.py.
+-- AttendanceN Authoritative Schema — Single Source of Truth
+-- Derived from originalschematofollow.sql (pgAdmin 4 ERD export).
 -- Run via: scripts/init_db.py
+-- Convention: All DDL is idempotent (CREATE TABLE IF NOT EXISTS).
 
--- ── Extensions ────────────────────────────────────────────────────────────────
-CREATE EXTENSION IF NOT EXISTS "pgcrypto";   -- gen_random_uuid() support
+BEGIN;
 
--- ── Dimension: Employee ───────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS dim_employee (
-    id             VARCHAR(36)  PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    employee_id    VARCHAR(64)  NOT NULL,
-    full_name      VARCHAR(255) NOT NULL,
-    department     VARCHAR(128),
-    position       VARCHAR(128),
-    is_active      BOOLEAN      NOT NULL DEFAULT TRUE,
-    created_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    updated_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_employee_employee_id UNIQUE (employee_id)
+-- ============================================================================
+-- 1. LOOKUP / DIMENSION TABLES
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS public.consultants
+(
+    consultant_id serial NOT NULL,
+    consultant_name character varying(255) COLLATE pg_catalog."default" NOT NULL,
+    CONSTRAINT consultants_pkey PRIMARY KEY (consultant_id),
+    CONSTRAINT consultants_consultant_name_key UNIQUE (consultant_name)
 );
 
-CREATE INDEX IF NOT EXISTS idx_employee_employee_id ON dim_employee (employee_id);
-
--- ── Dimension: Date ───────────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS dim_date (
-    id             VARCHAR(36)  PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    calendar_date  DATE         NOT NULL,
-    year           SMALLINT     NOT NULL,
-    month          SMALLINT     NOT NULL,
-    day            SMALLINT     NOT NULL,
-    day_of_week    VARCHAR(16)  NOT NULL,    -- e.g. 'Monday'
-    is_weekend     BOOLEAN      NOT NULL,
-    week_of_year   SMALLINT     NOT NULL,
-    quarter        SMALLINT     NOT NULL,
-    created_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    updated_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_date_calendar_date UNIQUE (calendar_date)
+CREATE TABLE IF NOT EXISTS public.departments
+(
+    department_id serial NOT NULL,
+    department_name character varying(255) COLLATE pg_catalog."default" NOT NULL,
+    CONSTRAINT departments_pkey PRIMARY KEY (department_id),
+    CONSTRAINT departments_department_name_key UNIQUE (department_name)
 );
 
-CREATE INDEX IF NOT EXISTS idx_date_calendar_date ON dim_date (calendar_date);
-CREATE INDEX IF NOT EXISTS idx_date_year_month    ON dim_date (year, month);
-
--- ── Dimension: Leave Type ─────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS dim_leave_type (
-    id               VARCHAR(36)  PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    leave_type_name  VARCHAR(128) NOT NULL,
-    description      TEXT,
-    created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    updated_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_leave_type_name UNIQUE (leave_type_name)
+CREATE TABLE IF NOT EXISTS public.employee_statuses
+(
+    status_id serial NOT NULL,
+    status_name character varying(100) COLLATE pg_catalog."default" NOT NULL,
+    CONSTRAINT employee_statuses_pkey PRIMARY KEY (status_id),
+    CONSTRAINT employee_statuses_status_name_key UNIQUE (status_name)
 );
 
--- ── Fact: Attendance ──────────────────────────────────────────────────────────
--- Uncomment and extend when the first attendance sheet is ready.
---
--- CREATE TABLE IF NOT EXISTS fact_attendance (
---     id              VARCHAR(36)  PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
---     employee_fk     VARCHAR(36)  NOT NULL REFERENCES dim_employee(id)  ON DELETE RESTRICT,
---     date_fk         VARCHAR(36)  NOT NULL REFERENCES dim_date(id)       ON DELETE RESTRICT,
---     status          VARCHAR(32)  NOT NULL,   -- 'Present' | 'Absent' | 'Leave' | 'Holiday'
---     leave_type_fk   VARCHAR(36)  REFERENCES dim_leave_type(id),
---     notes           TEXT,
---     created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
---     updated_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
---     CONSTRAINT uq_attendance_employee_date UNIQUE (employee_fk, date_fk)
--- );
---
--- CREATE INDEX IF NOT EXISTS idx_attendance_employee ON fact_attendance (employee_fk);
--- CREATE INDEX IF NOT EXISTS idx_attendance_date     ON fact_attendance (date_fk);
--- CREATE INDEX IF NOT EXISTS idx_attendance_status   ON fact_attendance (status);
+CREATE TABLE IF NOT EXISTS public.employment_types
+(
+    emp_type_id serial NOT NULL,
+    emp_type_name character varying(100) COLLATE pg_catalog."default" NOT NULL,
+    CONSTRAINT employment_types_pkey PRIMARY KEY (emp_type_id),
+    CONSTRAINT employment_types_emp_type_name_key UNIQUE (emp_type_name)
+);
 
--- ── Audit trigger helper ──────────────────────────────────────────────────────
--- Automatically updates `updated_at` on every row change.
+CREATE TABLE IF NOT EXISTS public.grade_levels
+(
+    gl_id serial NOT NULL,
+    gl_name character varying(50) COLLATE pg_catalog."default" NOT NULL,
+    CONSTRAINT grade_levels_pkey PRIMARY KEY (gl_id),
+    CONSTRAINT grade_levels_gl_name_key UNIQUE (gl_name)
+);
 
-CREATE OR REPLACE FUNCTION set_updated_at()
-RETURNS TRIGGER LANGUAGE plpgsql AS $$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
+CREATE TABLE IF NOT EXISTS public.leave_types
+(
+    leave_type_id serial NOT NULL,
+    leave_type_name character varying(100) COLLATE pg_catalog."default" NOT NULL,
+    CONSTRAINT leave_types_pkey PRIMARY KEY (leave_type_id),
+    CONSTRAINT leave_types_leave_type_name_key UNIQUE (leave_type_name)
+);
+
+CREATE TABLE IF NOT EXISTS public.locations
+(
+    location_id serial NOT NULL,
+    location_name character varying(100) COLLATE pg_catalog."default" NOT NULL,
+    CONSTRAINT locations_pkey PRIMARY KEY (location_id),
+    CONSTRAINT locations_location_name_key UNIQUE (location_name)
+);
+
+CREATE TABLE IF NOT EXISTS public.ranks
+(
+    rank_id serial NOT NULL,
+    rank_name character varying(255) COLLATE pg_catalog."default" NOT NULL,
+    CONSTRAINT ranks_pkey PRIMARY KEY (rank_id),
+    CONSTRAINT ranks_rank_name_key UNIQUE (rank_name)
+);
+
+CREATE TABLE IF NOT EXISTS public.units
+(
+    unit_id serial NOT NULL,
+    unit_name character varying(255) COLLATE pg_catalog."default" NOT NULL,
+    CONSTRAINT units_pkey PRIMARY KEY (unit_id),
+    CONSTRAINT units_unit_name_key UNIQUE (unit_name)
+);
+
+CREATE TABLE IF NOT EXISTS public.venues
+(
+    venue_id serial NOT NULL,
+    venue_name character varying(255) COLLATE pg_catalog."default" NOT NULL,
+    CONSTRAINT venues_pkey PRIMARY KEY (venue_id),
+    CONSTRAINT venues_venue_name_key UNIQUE (venue_name)
+);
+
+-- ============================================================================
+-- 2. CORE ENTITY: EMPLOYEES
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS public.employees
+(
+    id_no character varying(64) COLLATE pg_catalog."default" NOT NULL,
+    full_name character varying(255) COLLATE pg_catalog."default" NOT NULL,
+    sex character varying(10) COLLATE pg_catalog."default",
+    rank_id integer,
+    emp_type_id integer,
+    status_id integer,
+    remark text COLLATE pg_catalog."default",
+    location_id integer,
+    department_id integer,
+    gl_id integer,
+    geographical_zone character varying(100) COLLATE pg_catalog."default",
+    date_of_last_deployment date,
+    phone_number character varying(30) COLLATE pg_catalog."default",
+    CONSTRAINT employees_pkey PRIMARY KEY (id_no)
+);
+
+-- ============================================================================
+-- 3. HISTORY & TRACKING TABLES
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS public.employee_card_swipes
+(
+    swipe_id serial NOT NULL,
+    id_no character varying(64) COLLATE pg_catalog."default",
+    location_id integer,
+    swipe_time timestamp with time zone NOT NULL,
+    CONSTRAINT employee_card_swipes_pkey PRIMARY KEY (swipe_id)
+);
+
+CREATE TABLE IF NOT EXISTS public.employee_department_history
+(
+    history_id serial NOT NULL,
+    id_no character varying(64) COLLATE pg_catalog."default",
+    department_id integer,
+    start_date date NOT NULL,
+    end_date date,
+    CONSTRAINT employee_department_history_pkey PRIMARY KEY (history_id)
+);
+
+CREATE TABLE IF NOT EXISTS public.employee_gl_history
+(
+    history_id serial NOT NULL,
+    id_no character varying(64) COLLATE pg_catalog."default",
+    gl_id integer,
+    start_date date NOT NULL,
+    end_date date,
+    CONSTRAINT employee_gl_history_pkey PRIMARY KEY (history_id)
+);
+
+CREATE TABLE IF NOT EXISTS public.employee_location_history
+(
+    history_id serial NOT NULL,
+    id_no character varying(64) COLLATE pg_catalog."default",
+    location_id integer,
+    start_date date NOT NULL,
+    end_date date,
+    CONSTRAINT employee_location_history_pkey PRIMARY KEY (history_id)
+);
+
+CREATE TABLE IF NOT EXISTS public.employee_rank_history
+(
+    history_id serial NOT NULL,
+    id_no character varying(64) COLLATE pg_catalog."default",
+    rank_id integer,
+    start_date date NOT NULL,
+    end_date date,
+    CONSTRAINT employee_rank_history_pkey PRIMARY KEY (history_id)
+);
+
+CREATE TABLE IF NOT EXISTS public.employee_trainings
+(
+    training_id serial NOT NULL,
+    id_no character varying(64) COLLATE pg_catalog."default",
+    venue_id integer,
+    consultant_id integer,
+    location_id integer,
+    start_date date NOT NULL,
+    end_date date NOT NULL,
+    CONSTRAINT employee_trainings_pkey PRIMARY KEY (training_id)
+);
+
+-- ============================================================================
+-- 4. LEAVE TABLES
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS public.leave_applications
+(
+    application_id serial NOT NULL,
+    id_no character varying(64) COLLATE pg_catalog."default",
+    proposed_leave_date date,
+    proposed_leave_date_raw character varying(255) COLLATE pg_catalog."default",
+    resumption_date date,
+    forfeiture character varying(255) COLLATE pg_catalog."default",
+    issuance_date date,
+    issuance_date_raw character varying(255) COLLATE pg_catalog."default",
+    remark text COLLATE pg_catalog."default",
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT leave_applications_pkey PRIMARY KEY (application_id)
+);
+
+CREATE TABLE IF NOT EXISTS public.leave_records
+(
+    record_id serial NOT NULL,
+    application_id integer,
+    id_no character varying(64) COLLATE pg_catalog."default",
+    leave_type_id integer,
+    start_date date,
+    end_date date,
+    start_date_raw character varying(255) COLLATE pg_catalog."default",
+    end_date_raw character varying(255) COLLATE pg_catalog."default",
+    planned_start_date date,
+    planned_start_date_raw character varying(255) COLLATE pg_catalog."default",
+    planned_end_date date,
+    planned_end_date_raw character varying(255) COLLATE pg_catalog."default",
+    CONSTRAINT leave_records_pkey PRIMARY KEY (record_id)
+);
+
+-- ============================================================================
+-- 5. QUARANTINE TABLES
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS public.quarantine_card_swipes
+(
+    id serial NOT NULL,
+    id_no character varying(64) COLLATE pg_catalog."default",
+    location_name character varying(128) COLLATE pg_catalog."default",
+    swipe_time timestamp with time zone NOT NULL,
+    quarantined_at timestamp with time zone NOT NULL DEFAULT now(),
+    employee_name character varying(255) COLLATE pg_catalog."default",
+    CONSTRAINT quarantine_card_swipes_pkey PRIMARY KEY (id)
+);
+
+CREATE TABLE IF NOT EXISTS public.quarantine_trainings
+(
+    id serial NOT NULL,
+    id_no character varying(64) COLLATE pg_catalog."default" NOT NULL,
+    venue_name character varying(255) COLLATE pg_catalog."default",
+    consultant_name character varying(255) COLLATE pg_catalog."default",
+    start_date date NOT NULL,
+    end_date date NOT NULL,
+    quarantined_at timestamp with time zone NOT NULL DEFAULT now(),
+    CONSTRAINT quarantine_trainings_pkey PRIMARY KEY (id)
+);
+
+-- ============================================================================
+-- 6. INGESTION METADATA
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS public.file_ingestion_meta
+(
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    original_filename text COLLATE pg_catalog."default" NOT NULL,
+    normalized_filename text COLLATE pg_catalog."default" NOT NULL,
+    department text COLLATE pg_catalog."default",
+    report_type text COLLATE pg_catalog."default",
+    period date GENERATED ALWAYS AS (make_date((SUBSTRING(split_part(normalized_filename, '_'::text, 3) FROM 1 FOR 4))::integer, (SUBSTRING(split_part(normalized_filename, '_'::text, 3) FROM 5 FOR 2))::integer, 1)) STORED,
+    version integer,
+    file_path text COLLATE pg_catalog."default" NOT NULL,
+    checksum_sha256 text COLLATE pg_catalog."default" NOT NULL,
+    file_size_bytes bigint,
+    status text COLLATE pg_catalog."default" DEFAULT 'pending'::text,
+    error_context jsonb,
+    detected_at timestamp with time zone DEFAULT now(),
+    processed_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT file_ingestion_meta_pkey PRIMARY KEY (id),
+    CONSTRAINT file_ingestion_meta_checksum_sha256_department_report_type__key UNIQUE (checksum_sha256, department, report_type, period)
+);
+
+-- ============================================================================
+-- 7. KANBAN BOARD TABLES
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS public.kanban_boards
+(
+    board_id serial NOT NULL,
+    board_name character varying(255) COLLATE pg_catalog."default" NOT NULL,
+    description text COLLATE pg_catalog."default",
+    department_id integer,
+    is_archived boolean NOT NULL DEFAULT false,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at timestamp with time zone NOT NULL DEFAULT now(),
+    CONSTRAINT kanban_boards_pkey PRIMARY KEY (board_id),
+    CONSTRAINT kanban_boards_board_name_key UNIQUE (board_name)
+);
+
+COMMENT ON TABLE public.kanban_boards IS 'Top-level Kanban board container. Each board represents a project, initiative, or department workflow.';
+
+CREATE TABLE IF NOT EXISTS public.kanban_columns
+(
+    column_id serial NOT NULL,
+    board_id integer NOT NULL,
+    column_name character varying(255) COLLATE pg_catalog."default" NOT NULL,
+    "position" integer NOT NULL DEFAULT 0,
+    color character varying(7) COLLATE pg_catalog."default",
+    is_done_column boolean NOT NULL DEFAULT false,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    CONSTRAINT kanban_columns_pkey PRIMARY KEY (column_id),
+    CONSTRAINT kanban_columns_board_id_column_name_key UNIQUE (board_id, column_name)
+);
+
+COMMENT ON TABLE public.kanban_columns IS 'Flexible stages within a board. Unlimited columns per board, ordered by position.';
+
+CREATE TABLE IF NOT EXISTS public.kanban_labels
+(
+    label_id serial NOT NULL,
+    label_name character varying(100) COLLATE pg_catalog."default" NOT NULL,
+    color character varying(7) COLLATE pg_catalog."default",
+    CONSTRAINT kanban_labels_pkey PRIMARY KEY (label_id),
+    CONSTRAINT kanban_labels_label_name_key UNIQUE (label_name)
+);
+
+COMMENT ON TABLE public.kanban_labels IS 'Reusable tags/labels that can be applied to tasks across any board.';
+
+CREATE TABLE IF NOT EXISTS public.kanban_tasks
+(
+    task_id serial NOT NULL,
+    board_id integer NOT NULL,
+    column_id integer NOT NULL,
+    title character varying(500) COLLATE pg_catalog."default" NOT NULL,
+    description text COLLATE pg_catalog."default",
+    priority character varying(20) COLLATE pg_catalog."default" NOT NULL DEFAULT 'medium'::character varying,
+    due_date date,
+    "position" integer NOT NULL DEFAULT 0,
+    is_archived boolean NOT NULL DEFAULT false,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at timestamp with time zone NOT NULL DEFAULT now(),
+    completed_at timestamp with time zone,
+    CONSTRAINT kanban_tasks_pkey PRIMARY KEY (task_id)
+);
+
+COMMENT ON TABLE public.kanban_tasks IS 'The actual task/card. Core entity of the Kanban system.';
+
+CREATE TABLE IF NOT EXISTS public.kanban_task_assignees
+(
+    assignment_id serial NOT NULL,
+    task_id integer NOT NULL,
+    id_no character varying(64) COLLATE pg_catalog."default",
+    assigned_at timestamp with time zone NOT NULL DEFAULT now(),
+    assigned_by character varying(64) COLLATE pg_catalog."default",
+    CONSTRAINT kanban_task_assignees_pkey PRIMARY KEY (assignment_id),
+    CONSTRAINT kanban_task_assignees_task_id_id_no_key UNIQUE (task_id, id_no)
+);
+
+COMMENT ON TABLE public.kanban_task_assignees IS 'Many-to-many junction linking tasks to staff. Zero assignees = unassigned company goal.';
+
+CREATE TABLE IF NOT EXISTS public.kanban_task_labels
+(
+    task_id integer NOT NULL,
+    label_id integer NOT NULL,
+    CONSTRAINT kanban_task_labels_pkey PRIMARY KEY (task_id, label_id)
+);
+
+COMMENT ON TABLE public.kanban_task_labels IS 'Many-to-many junction linking tasks to labels/tags.';
+
+CREATE TABLE IF NOT EXISTS public.kanban_task_history
+(
+    history_id serial NOT NULL,
+    task_id integer NOT NULL,
+    from_column_id integer,
+    to_column_id integer NOT NULL,
+    moved_by character varying(64) COLLATE pg_catalog."default",
+    moved_at timestamp with time zone NOT NULL DEFAULT now(),
+    duration_in_previous interval,
+    CONSTRAINT kanban_task_history_pkey PRIMARY KEY (history_id)
+);
+
+COMMENT ON TABLE public.kanban_task_history IS 'Audit log of every task movement between columns. duration_in_previous tracks time spent in the previous column.';
+
+-- ============================================================================
+-- 8. FOREIGN KEY CONSTRAINTS
+-- ============================================================================
+
+ALTER TABLE IF EXISTS public.employee_card_swipes
+    ADD CONSTRAINT employee_card_swipes_id_no_fkey FOREIGN KEY (id_no)
+    REFERENCES public.employees (id_no) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE NO ACTION;
+CREATE INDEX IF NOT EXISTS idx_emp_swipe_id ON public.employee_card_swipes(id_no);
+
+ALTER TABLE IF EXISTS public.employee_card_swipes
+    ADD CONSTRAINT employee_card_swipes_location_id_fkey FOREIGN KEY (location_id)
+    REFERENCES public.locations (location_id) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE SET NULL;
+
+ALTER TABLE IF EXISTS public.employee_department_history
+    ADD CONSTRAINT employee_department_history_department_id_fkey FOREIGN KEY (department_id)
+    REFERENCES public.departments (department_id) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE RESTRICT;
+
+ALTER TABLE IF EXISTS public.employee_department_history
+    ADD CONSTRAINT employee_department_history_id_no_fkey FOREIGN KEY (id_no)
+    REFERENCES public.employees (id_no) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE NO ACTION;
+CREATE INDEX IF NOT EXISTS idx_dept_hist_id ON public.employee_department_history(id_no);
+
+ALTER TABLE IF EXISTS public.employee_gl_history
+    ADD CONSTRAINT employee_gl_history_gl_id_fkey FOREIGN KEY (gl_id)
+    REFERENCES public.grade_levels (gl_id) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE RESTRICT;
+
+ALTER TABLE IF EXISTS public.employee_gl_history
+    ADD CONSTRAINT employee_gl_history_id_no_fkey FOREIGN KEY (id_no)
+    REFERENCES public.employees (id_no) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE NO ACTION;
+CREATE INDEX IF NOT EXISTS idx_gl_hist_id ON public.employee_gl_history(id_no);
+
+ALTER TABLE IF EXISTS public.employee_location_history
+    ADD CONSTRAINT employee_location_history_id_no_fkey FOREIGN KEY (id_no)
+    REFERENCES public.employees (id_no) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE NO ACTION;
+CREATE INDEX IF NOT EXISTS idx_loc_hist_id ON public.employee_location_history(id_no);
+
+ALTER TABLE IF EXISTS public.employee_location_history
+    ADD CONSTRAINT employee_location_history_location_id_fkey FOREIGN KEY (location_id)
+    REFERENCES public.locations (location_id) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE RESTRICT;
+
+ALTER TABLE IF EXISTS public.employee_rank_history
+    ADD CONSTRAINT employee_rank_history_id_no_fkey FOREIGN KEY (id_no)
+    REFERENCES public.employees (id_no) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE NO ACTION;
+CREATE INDEX IF NOT EXISTS idx_emp_rank_hist_active ON public.employee_rank_history(id_no);
+
+ALTER TABLE IF EXISTS public.employee_rank_history
+    ADD CONSTRAINT employee_rank_history_rank_id_fkey FOREIGN KEY (rank_id)
+    REFERENCES public.ranks (rank_id) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE NO ACTION;
+
+ALTER TABLE IF EXISTS public.employee_trainings
+    ADD CONSTRAINT employee_trainings_consultant_id_fkey FOREIGN KEY (consultant_id)
+    REFERENCES public.consultants (consultant_id) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE RESTRICT;
+
+ALTER TABLE IF EXISTS public.employee_trainings
+    ADD CONSTRAINT employee_trainings_id_no_fkey FOREIGN KEY (id_no)
+    REFERENCES public.employees (id_no) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE NO ACTION;
+CREATE INDEX IF NOT EXISTS idx_emp_train_id ON public.employee_trainings(id_no);
+
+ALTER TABLE IF EXISTS public.employee_trainings
+    ADD CONSTRAINT employee_trainings_location_id_fkey FOREIGN KEY (location_id)
+    REFERENCES public.locations (location_id) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE SET NULL;
+
+ALTER TABLE IF EXISTS public.employee_trainings
+    ADD CONSTRAINT employee_trainings_venue_id_fkey FOREIGN KEY (venue_id)
+    REFERENCES public.venues (venue_id) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE RESTRICT;
+CREATE INDEX IF NOT EXISTS idx_emp_train_venue ON public.employee_trainings(venue_id);
+
+ALTER TABLE IF EXISTS public.employees
+    ADD CONSTRAINT employees_department_id_fkey FOREIGN KEY (department_id)
+    REFERENCES public.departments (department_id) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE NO ACTION;
+
+ALTER TABLE IF EXISTS public.employees
+    ADD CONSTRAINT employees_emp_type_id_fkey FOREIGN KEY (emp_type_id)
+    REFERENCES public.employment_types (emp_type_id) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE SET NULL;
+
+ALTER TABLE IF EXISTS public.employees
+    ADD CONSTRAINT employees_gl_id_fkey FOREIGN KEY (gl_id)
+    REFERENCES public.grade_levels (gl_id) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE NO ACTION;
+
+ALTER TABLE IF EXISTS public.employees
+    ADD CONSTRAINT employees_rank_id_fkey FOREIGN KEY (rank_id)
+    REFERENCES public.ranks (rank_id) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE SET NULL;
+
+ALTER TABLE IF EXISTS public.employees
+    ADD CONSTRAINT employees_status_id_fkey FOREIGN KEY (status_id)
+    REFERENCES public.employee_statuses (status_id) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_employees_status ON public.employees(status_id);
+
+ALTER TABLE IF EXISTS public.employees
+    ADD CONSTRAINT fk_employees_location FOREIGN KEY (location_id)
+    REFERENCES public.locations (location_id) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE NO ACTION;
+
+ALTER TABLE IF EXISTS public.kanban_boards
+    ADD CONSTRAINT kanban_boards_department_id_fkey FOREIGN KEY (department_id)
+    REFERENCES public.departments (department_id) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE SET NULL;
+
+ALTER TABLE IF EXISTS public.kanban_columns
+    ADD CONSTRAINT kanban_columns_board_id_fkey FOREIGN KEY (board_id)
+    REFERENCES public.kanban_boards (board_id) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE CASCADE;
+
+ALTER TABLE IF EXISTS public.kanban_task_assignees
+    ADD CONSTRAINT kanban_task_assignees_id_no_fkey FOREIGN KEY (id_no)
+    REFERENCES public.employees (id_no) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_kanban_task_assignees_id_no ON public.kanban_task_assignees(id_no);
+
+ALTER TABLE IF EXISTS public.kanban_task_assignees
+    ADD CONSTRAINT kanban_task_assignees_task_id_fkey FOREIGN KEY (task_id)
+    REFERENCES public.kanban_tasks (task_id) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE CASCADE;
+
+ALTER TABLE IF EXISTS public.kanban_task_history
+    ADD CONSTRAINT kanban_task_history_from_column_id_fkey FOREIGN KEY (from_column_id)
+    REFERENCES public.kanban_columns (column_id) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE NO ACTION;
+
+ALTER TABLE IF EXISTS public.kanban_task_history
+    ADD CONSTRAINT kanban_task_history_task_id_fkey FOREIGN KEY (task_id)
+    REFERENCES public.kanban_tasks (task_id) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS idx_kanban_task_history_task_id ON public.kanban_task_history(task_id);
+
+ALTER TABLE IF EXISTS public.kanban_task_history
+    ADD CONSTRAINT kanban_task_history_to_column_id_fkey FOREIGN KEY (to_column_id)
+    REFERENCES public.kanban_columns (column_id) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE NO ACTION;
+
+ALTER TABLE IF EXISTS public.kanban_task_labels
+    ADD CONSTRAINT kanban_task_labels_label_id_fkey FOREIGN KEY (label_id)
+    REFERENCES public.kanban_labels (label_id) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE CASCADE;
+
+ALTER TABLE IF EXISTS public.kanban_task_labels
+    ADD CONSTRAINT kanban_task_labels_task_id_fkey FOREIGN KEY (task_id)
+    REFERENCES public.kanban_tasks (task_id) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE CASCADE;
+
+ALTER TABLE IF EXISTS public.kanban_tasks
+    ADD CONSTRAINT kanban_tasks_board_id_fkey FOREIGN KEY (board_id)
+    REFERENCES public.kanban_boards (board_id) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE CASCADE;
+
+ALTER TABLE IF EXISTS public.kanban_tasks
+    ADD CONSTRAINT kanban_tasks_column_id_fkey FOREIGN KEY (column_id)
+    REFERENCES public.kanban_columns (column_id) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE NO ACTION;
+
+ALTER TABLE IF EXISTS public.leave_applications
+    ADD CONSTRAINT leave_applications_id_no_fkey FOREIGN KEY (id_no)
+    REFERENCES public.employees (id_no) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE NO ACTION;
+
+ALTER TABLE IF EXISTS public.leave_records
+    ADD CONSTRAINT leave_records_application_id_fkey FOREIGN KEY (application_id)
+    REFERENCES public.leave_applications (application_id) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE CASCADE;
+
+ALTER TABLE IF EXISTS public.leave_records
+    ADD CONSTRAINT leave_records_id_no_fkey FOREIGN KEY (id_no)
+    REFERENCES public.employees (id_no) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE NO ACTION;
+
+ALTER TABLE IF EXISTS public.leave_records
+    ADD CONSTRAINT leave_records_leave_type_id_fkey FOREIGN KEY (leave_type_id)
+    REFERENCES public.leave_types (leave_type_id) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE NO ACTION;
+
 END;
-$$;
-
-DO $$
-DECLARE
-    _tbl TEXT;
-BEGIN
-    FOREACH _tbl IN ARRAY ARRAY['dim_employee', 'dim_date', 'dim_leave_type']
-    LOOP
-        EXECUTE format(
-            'CREATE OR REPLACE TRIGGER trg_%s_updated_at
-             BEFORE UPDATE ON %s
-             FOR EACH ROW EXECUTE FUNCTION set_updated_at();',
-            _tbl, _tbl
-        );
-    END LOOP;
-END;
-$$;

@@ -71,9 +71,16 @@ class DataLoader:
         return reports
 
     def _upsert_entity(self, table_name: str, df: pd.DataFrame) -> EntityLoadReport:
-        """Upsert a single entity DataFrame into *table_name*."""
+        """Upsert a single entity DataFrame into *table_name*.
+
+        Implements 3-tier fallback:
+          1. Bulk insert                  (fast, single round-trip)
+          2. Batch-of-50 with savepoints   (medium, ~2% of row-by-row round-trips)
+          3. Batch-of-10 with savepoints   (fine-grained retry)
+          4. Row-by-row with savepoints    (last resort, isolates single bad rows)
+        """
         report = EntityLoadReport(table_name=table_name)
-        
+
         if df.empty:
             return report
 
@@ -85,37 +92,78 @@ class DataLoader:
         table = model_class.__table__
         pk_cols = [col.name for col in table.primary_key.columns]
 
-        # Remove PKs that are None across all records to allow auto-increment
         for pk in pk_cols:
             if all(r.get(pk) is None for r in records):
                 for r in records:
                     r.pop(pk, None)
 
-        # 1. Attempt Bulk Operation
+        total = len(records)
+
+        # ── Tier 1: Bulk insert ────────────────────────────────────────────
         try:
             self._execute_upsert(table, pk_cols, records)
-            report.success_count = len(records)
+            report.success_count = total
             return report
         except Exception as exc:
             if not self._robust:
                 raise LoadError(f"Bulk load failed for '{table_name}'.", context={"error": str(exc)})
-            
-            log.warning(f"Bulk load failed for '{table_name}'. Falling back to row-by-row recovery. Error: {exc}")
-            self._session.rollback() # Clear the failed transaction state if necessary (handled by get_session usually, but be safe)
+            log.warning(f"Bulk load failed for '{table_name}' ({total} rows). Falling back to batched recovery.")
 
-        # 2. Robust Recovery: Row-by-row isolation
-        for record in records:
-            try:
-                # We use a nested transaction (savepoint) for each row in robust mode
-                with self._session.begin_nested():
-                    self._execute_upsert(table, pk_cols, [record])
-                report.success_count += 1
-            except Exception as exc:
-                report.failed_rows.append(record)
-                report.errors.append(str(exc))
-                log.error(f"Row failed in '{table_name}': {exc}")
+        # ── Tier 2 & 3 & 4: Batched recovery ────────────────────────────────
+        for batch_size in (50, 10, 1):
+            if batch_size == 1 and total > 100:
+                log.warning(f"Row-by-row recovery for '{table_name}' ({total} rows) — this may be slow.")
+            self._session.rollback()
+            self._recover_in_batches(table, pk_cols, records, batch_size, report, total)
+            if report.success_count + len(report.failed_rows) == total:
+                break
 
         return report
+
+    def _recover_in_batches(
+        self, table, pk_cols: list[str], records: list[dict],
+        batch_size: int, report: EntityLoadReport, total: int,
+    ) -> None:
+        """Process remaining unprocessed records in batches with savepoint isolation."""
+        # Determine which records still need processing (not yet succeeded or failed)
+        succeeded_ids = set()
+        failed_count = len(report.failed_rows)
+        processed_count = report.success_count + failed_count
+
+        batch_start = 0
+        remaining = records[processed_count:] if batch_size > 1 else records
+
+        if batch_size > 1:
+            for i in range(0, len(remaining), batch_size):
+                batch = remaining[i : i + batch_size]
+                try:
+                    with self._session.begin_nested():
+                        self._execute_upsert(table, pk_cols, batch)
+                    report.success_count += len(batch)
+                    log.debug(
+                        f"Tier {batch_size}: {report.success_count}/{total} "
+                        f"rows loaded for '{report.table_name}'"
+                    )
+                except Exception:
+                    log.debug(
+                        f"Batch of {len(batch)} failed in '{report.table_name}'. "
+                        f"Will retry at smaller batch size."
+                    )
+                    self._session.rollback()
+        else:
+            # Row-by-row (batch_size == 1)
+            for record in remaining:
+                try:
+                    with self._session.begin_nested():
+                        self._execute_upsert(table, pk_cols, [record])
+                    report.success_count += 1
+                except Exception as exc:
+                    report.failed_rows.append(record)
+                    report.errors.append(str(exc))
+
+        if report.success_count + len(report.failed_rows) < total and batch_size > 1:
+            # Some records still unprocessed — will be picked up by next batch_size tier
+            pass
 
     def _execute_upsert(self, table, pk_cols: list[str], records: list[dict]) -> None:
         """Helper to execute a PG upsert statement."""

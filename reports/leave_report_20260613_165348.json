@@ -1,0 +1,163 @@
+{
+    "total_rows_read": 1659,
+    "total_leave_entries_attempted": 686,
+    "total_leave_entries_inserted": 1743,
+    "warnings": [
+        {
+            "type": "MISSING_DATE_BOUND",
+            "message": "Row 55: Standalone leave missing start or end date.",
+            "staff_id": "680"
+        },
+        {
+            "type": "UNPARSEABLE_PROPOSED_DATE",
+            "message": "Row 71: Proposed date 'ON TRAINING' is a string.",
+            "staff_id": "2036"
+        },
+        {
+            "type": "MISSING_DATE_BOUND",
+            "message": "Row 73: SICK missing start or end date.",
+            "staff_id": "2338"
+        },
+        {
+            "type": "UNPARSEABLE_PROPOSED_DATE",
+            "message": "Row 87: Proposed date 'ON STUDY LEAVE' is a string.",
+            "staff_id": "3007"
+        },
+        {
+            "type": "UNPARSEABLE_PROPOSED_DATE",
+            "message": "Row 181: Proposed date 'STUDY LEAVE' is a string.",
+            "staff_id": "2627"
+        },
+        {
+            "type": "UNPARSEABLE_PROPOSED_DATE",
+            "message": "Row 182: Proposed date 'SICK LEAVE' is a string.",
+            "staff_id": "1285"
+        },
+        {
+            "type": "MISSING_DATE_BOUND",
+            "message": "Row 277: ANNUAL missing start or end date.",
+            "staff_id": "2323"
+        },
+        {
+            "type": "MISSING_DATE_BOUND",
+            "message": "Row 707: ANNUAL missing start or end date.",
+            "staff_id": "2810"
+        },
+        {
+            "type": "MISSING_DATE_BOUND",
+            "message": "Row 771: Standalone leave missing start or end date.",
+            "staff_id": "2022"
+        },
+        {
+            "type": "MISSING_DATE_BOUND",
+            "message": "Row 836: SICK missing start or end date.",
+            "staff_id": "2226"
+        },
+        {
+            "type": "MISSING_DATE_BOUND",
+            "message": "Row 956: ANNUAL missing start or end date.",
+            "staff_id": "1768"
+        },
+        {
+            "type": "MISSING_DATE_BOUND",
+            "message": "Row 1070: PRE-RETIREMENT LEAVE missing start or end date.",
+            "staff_id": "1945"
+        },
+        {
+            "type": "UNPARSEABLE_PROPOSED_DATE",
+            "message": "Row 1083: Proposed date '31/11/26' is a string.",
+            "staff_id": "2646"
+        },
+        {
+            "type": "MISSING_DATE_BOUND",
+            "message": "Row 1179: SICK missing start or end date.",
+            "staff_id": "2046"
+        }
+    ],
+    "failures": [
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 132: Staff ID '1943' not found in database.",
+            "staff_id": "1943"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 226: Staff ID '1331' not found in database.",
+            "staff_id": "1331"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 358: Staff ID '1236' not found in database.",
+            "staff_id": "1236"
+        },
+        {
+            "type": "MISSING_STAFF_ID",
+            "message": "Row 361: No staff ID found.",
+            "staff_id": "nan"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 411: Staff ID '561' not found in database.",
+            "staff_id": "561"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 681: Staff ID '261' not found in database.",
+            "staff_id": "261"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 686: Staff ID '1087' not found in database.",
+            "staff_id": "1087"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 931: Staff ID '3046' not found in database.",
+            "staff_id": "3046"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1004: Staff ID '1992' not found in database.",
+            "staff_id": "1992"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1123: Staff ID '1220' not found in database.",
+            "staff_id": "1220"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1177: Staff ID '1116' not found in database.",
+            "staff_id": "1116"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1327: Staff ID '1509' not found in database.",
+            "staff_id": "1509"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1430: Staff ID '2534' not found in database.",
+            "staff_id": "2534"
+        },
+        {
+            "type": "MISSING_STAFF_ID",
+            "message": "Row 1457: No staff ID found.",
+            "staff_id": "nan"
+        }
+    ],
+    "failed_staff_ids": [
+        "1943",
+        "1331",
+        "1236",
+        "561",
+        "261",
+        "1087",
+        "3046",
+        "1992",
+        "1220",
+        "1116",
+        "1509",
+        "2534"
+    ]
+}
