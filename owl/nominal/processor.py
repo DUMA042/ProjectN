@@ -36,7 +36,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 import pandas as pd
 from sqlalchemy import select, text
@@ -295,8 +295,7 @@ def _to_lookup_key(value: Any) -> Optional[str]:
 class LookupTableCache:
     """Pre-loads all 6 lookup tables and handles auto-insert for permitted tables.
 
-    Auto-insert permitted: departments, grade_levels, locations, ranks, employee_statuses
-    Auto-insert BLOCKED:   employment_types
+    Auto-insert permitted: departments, grade_levels, locations, ranks, employee_statuses, employment_types
     """
 
     def __init__(self, session) -> None:
@@ -371,10 +370,9 @@ class LookupTableCache:
         log.info(f"[LOOKUP AUTO-INSERT] {table_label}: '{name.strip()}' → id={new_id}")
         return new_id
 
-    def get_emp_type(self, name: str) -> Optional[int]:
-        """Look up employment type WITHOUT auto-inserting. Returns None if unknown."""
-        key = name.strip().lower()
-        return self.emp_types.get(key)
+    def get_or_insert_emp_type(self, name: str, report: NominalProcessingReport) -> int:
+        return self._get_or_insert(name, self.emp_types, EmploymentType, "emp_type_name",
+                                   "emp_type_id", report, "employment_types")
 
 
 # ── NominalProcessor ─────────────────────────────────────────────────────────
@@ -396,8 +394,14 @@ class NominalProcessor:
     def __init__(self, file_path: str | Path) -> None:
         self._file_path = Path(file_path)
 
-    def process(self) -> dict:
+    def process(self, progress_callback: Callable[[str, int, int], None] | None = None) -> dict:
         """Run the full Nominal Roll processing pipeline.
+
+        Parameters
+        ----------
+        progress_callback:
+            Optional callback(stage, current, total) for SSE progress streaming.
+            Called once per row with stage="row".
 
         Returns
         -------
@@ -456,6 +460,9 @@ class NominalProcessor:
                     pre_parsed_deploy_date=_to_date_from_series(deploy_dates, local_idx),
                 )
                 report.row_outcomes.append(outcome)
+
+                if progress_callback and (local_idx % 50 == 0 or local_idx == report.total_rows_read - 1):
+                    progress_callback("row", local_idx + 1, report.total_rows_read)
 
                 if outcome.status == "SUCCESS":
                     report.total_successes += 1
@@ -525,17 +532,8 @@ class NominalProcessor:
             )
             log.warning(f"Row {excel_row_num}: date_of_last_deployment '{deploy_date_raw}' unparseable")
 
-        # ── Step 5: Check employment_type — HARD STOP if unknown ─────────────
-        emp_type_id: Optional[int] = None
-        if emp_type_raw:
-            emp_type_id = cache.get_emp_type(emp_type_raw)
-            if emp_type_id is None:
-                outcome.error = (
-                    f"Unknown employment_type '{emp_type_raw}' — "
-                    "not in controlled list; row skipped"
-                )
-                log.error(f"Row {excel_row_num}: FAILURE — {outcome.error}")
-                return outcome
+        # ── Step 5: Resolve employment type (auto-insert if new) ──────────
+        emp_type_id = cache.get_or_insert_emp_type(emp_type_raw, report) if emp_type_raw else None
 
         # ── Step 6: Resolve auto-insert lookup IDs ────────────────────────────
         try:

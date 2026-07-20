@@ -93,6 +93,27 @@ def get_session() -> Generator[Session, None, None]:
         session.close()
 
 
+@contextmanager
+def get_db_session() -> Generator[Session, None, None]:
+    """Yield a SQLAlchemy Session for FastAPI Depends() — does NOT auto-commit.
+
+    The caller (route handler) is responsible for committing or rolling back.
+    The session is always closed in the finally block.
+
+    Usage
+    -----
+    >>> def route(db: Session = Depends(get_db_session)):
+    ...     result = db.execute(...)
+    ...     db.commit()
+    """
+    get_engine()
+    session = _SessionFactory()
+    try:
+        yield session
+    finally:
+        session.close()
+
+
 # ── Connection health check ────────────────────────────────────────────────────
 
 @retry(

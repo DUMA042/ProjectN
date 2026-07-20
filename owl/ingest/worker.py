@@ -24,6 +24,7 @@ from sqlalchemy import select, update
 
 from owl.extract.classifier import ReportType
 from owl.extract.registry import NORMALIZER_REGISTRY
+from owl.ingest.progress import make_callback, set_completed
 from owl.load.database import get_session
 from owl.load.models import FileIngestionMeta
 from owl.logger import get_logger
@@ -69,13 +70,18 @@ class IngestionWorker:
         """Execute the pipeline for a single metadata record."""
         log.info(f"Processing[{record.id}]: {record.normalized_filename}")
 
+        ingestion_id = str(record.id)
+        on_progress = make_callback(ingestion_id)
+
         r_type = ReportType(record.report_type)
 
         # ── Nominal Roll: dedicated processor with history tracking ──────────
         if r_type == ReportType.NOMINAL:
             from owl.nominal.processor import NominalProcessor
             processor = NominalProcessor(file_path=record.file_path)
-            summary = processor.process()
+            on_progress("start", 0, 1)
+            summary = processor.process(progress_callback=on_progress)
+            set_completed(ingestion_id, "completed")
             self._mark_completed(record.id, {"load_results": summary})
             return
 
@@ -83,7 +89,9 @@ class IngestionWorker:
         if r_type == ReportType.LEAVE:
             from owl.leave.processor import LeaveProcessor
             processor = LeaveProcessor(file_path=record.file_path)
-            summary = processor.process()
+            on_progress("start", 0, 1)
+            summary = processor.process(progress_callback=on_progress)
+            set_completed(ingestion_id, "completed")
             self._mark_completed(record.id, {"load_results": summary})
             return
 
@@ -204,6 +212,7 @@ class IngestionWorker:
 
     def _mark_failed(self, ingestion_id: str, error: str) -> None:
         """Mark record as failed on critical pipeline crash."""
+        set_completed(ingestion_id, "failed")
         with get_session() as session:
             stmt = (
                 update(FileIngestionMeta)

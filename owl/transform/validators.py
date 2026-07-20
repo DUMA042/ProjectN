@@ -193,6 +193,7 @@ class TrainingRecord(OwlBaseRecord):
     location_id: Optional[int] = None
     start_date: Optional[date] = None
     end_date: Optional[date] = None
+    title: Optional[str] = None
 
     @field_validator("start_date", "end_date", mode="before")
     @classmethod
@@ -367,6 +368,7 @@ class QuarantineTrainingRecord(OwlBaseRecord):
     consultant_name: Optional[str] = None
     start_date: date
     end_date: date
+    title: Optional[str] = None
 
     @field_validator("start_date", "end_date", mode="before")
     @classmethod

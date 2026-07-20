@@ -1,0 +1,1350 @@
+{
+    "total_rows_read": 1888,
+    "total_leave_entries_attempted": 2356,
+    "total_leave_entries_inserted": 2480,
+    "warnings": [
+        {
+            "type": "UNPARSEABLE_LEAVE_DATE",
+            "message": "Row 149: CASUAL AFTER ANNUAL has unparseable date strings.",
+            "staff_id": "1148"
+        },
+        {
+            "type": "UNPARSEABLE_LEAVE_DATE",
+            "message": "Row 227: SICK has unparseable date strings.",
+            "staff_id": "2259"
+        },
+        {
+            "type": "MISSING_DATE_BOUND",
+            "message": "Row 250: Standalone leave missing start or end date.",
+            "staff_id": "2779"
+        },
+        {
+            "type": "UNPARSEABLE_LEAVE_DATE",
+            "message": "Row 345: Standalone leave has unparseable date strings.",
+            "staff_id": "1671"
+        },
+        {
+            "type": "UNPARSEABLE_PROPOSED_DATE",
+            "message": "Row 406: Proposed date 'STUDY LEAVE' is a string.",
+            "staff_id": "2627"
+        },
+        {
+            "type": "MISSING_DATE_BOUND",
+            "message": "Row 482: Standalone leave missing start or end date.",
+            "staff_id": "1489"
+        },
+        {
+            "type": "MISSING_DATE_BOUND",
+            "message": "Row 595: Standalone leave missing start or end date.",
+            "staff_id": "2380"
+        },
+        {
+            "type": "UNPARSEABLE_PROPOSED_DATE",
+            "message": "Row 630: Proposed date 'MATERNITY LEAVE' is a string.",
+            "staff_id": "2798"
+        },
+        {
+            "type": "MISSING_DATE_BOUND",
+            "message": "Row 675: EXAM missing start or end date.",
+            "staff_id": "1583"
+        },
+        {
+            "type": "UNPARSEABLE_PROPOSED_DATE",
+            "message": "Row 727: Proposed date 'STUDY LEAVE' is a string.",
+            "staff_id": "2457"
+        },
+        {
+            "type": "MISSING_DATE_BOUND",
+            "message": "Row 735: SICK missing start or end date.",
+            "staff_id": "2470"
+        },
+        {
+            "type": "MISSING_DATE_BOUND",
+            "message": "Row 948: Standalone leave missing start or end date.",
+            "staff_id": "2105"
+        },
+        {
+            "type": "MISSING_DATE_BOUND",
+            "message": "Row 969: Standalone leave missing start or end date.",
+            "staff_id": "1521"
+        },
+        {
+            "type": "MISSING_DATE_BOUND",
+            "message": "Row 1145: PATERNITY missing start or end date.",
+            "staff_id": "2782"
+        },
+        {
+            "type": "MISSING_DATE_BOUND",
+            "message": "Row 1336: Standalone leave missing start or end date.",
+            "staff_id": "1915"
+        },
+        {
+            "type": "MISSING_DATE_BOUND",
+            "message": "Row 1388: SICK missing start or end date.",
+            "staff_id": "1208"
+        },
+        {
+            "type": "UNPARSEABLE_LEAVE_DATE",
+            "message": "Row 1393: ANNUAL has unparseable date strings.",
+            "staff_id": "1571"
+        },
+        {
+            "type": "MISSING_DATE_BOUND",
+            "message": "Row 1444: ANNUAL missing start or end date.",
+            "staff_id": "2915"
+        },
+        {
+            "type": "MISSING_DATE_BOUND",
+            "message": "Row 1817: ANNUAL missing start or end date.",
+            "staff_id": "2530"
+        },
+        {
+            "type": "MISSING_DATE_BOUND",
+            "message": "Row 1837: SICK missing start or end date.",
+            "staff_id": "693"
+        },
+        {
+            "type": "MISSING_DATE_BOUND",
+            "message": "Row 1866: COMPASSIONATE missing start or end date.",
+            "staff_id": "2900"
+        }
+    ],
+    "failures": [
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 2: Staff ID '405' not found in database.",
+            "staff_id": "405"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 8: Staff ID '2656' not found in database.",
+            "staff_id": "2656"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 29: Staff ID '-' not found in database.",
+            "staff_id": "-"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 31: Staff ID '488' not found in database.",
+            "staff_id": "488"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 48: Staff ID '1332' not found in database.",
+            "staff_id": "1332"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 49: Staff ID '910' not found in database.",
+            "staff_id": "910"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 83: Staff ID '1175' not found in database.",
+            "staff_id": "1175"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 86: Staff ID '2165' not found in database.",
+            "staff_id": "2165"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 92: Staff ID '1804' not found in database.",
+            "staff_id": "1804"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 95: Staff ID '2037' not found in database.",
+            "staff_id": "2037"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 105: Staff ID '1063' not found in database.",
+            "staff_id": "1063"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 120: Staff ID '1061' not found in database.",
+            "staff_id": "1061"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 131: Staff ID '695' not found in database.",
+            "staff_id": "695"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 182: Staff ID '2838' not found in database.",
+            "staff_id": "2838"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 234: Staff ID '2966' not found in database.",
+            "staff_id": "2966"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 244: Staff ID '2358' not found in database.",
+            "staff_id": "2358"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 251: Staff ID '426' not found in database.",
+            "staff_id": "426"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 252: Staff ID '2325' not found in database.",
+            "staff_id": "2325"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 253: Staff ID '257' not found in database.",
+            "staff_id": "257"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 254: Staff ID '413' not found in database.",
+            "staff_id": "413"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 257: Staff ID '68' not found in database.",
+            "staff_id": "68"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 258: Staff ID '1797' not found in database.",
+            "staff_id": "1797"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 290: Staff ID '229' not found in database.",
+            "staff_id": "229"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 291: Staff ID '390' not found in database.",
+            "staff_id": "390"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 294: Staff ID '262' not found in database.",
+            "staff_id": "262"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 298: Staff ID '640' not found in database.",
+            "staff_id": "640"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 302: Staff ID '1172' not found in database.",
+            "staff_id": "1172"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 303: Staff ID '1803' not found in database.",
+            "staff_id": "1803"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 308: Staff ID '1691' not found in database.",
+            "staff_id": "1691"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 310: Staff ID '36' not found in database.",
+            "staff_id": "36"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 315: Staff ID '193' not found in database.",
+            "staff_id": "193"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 337: Staff ID '1562' not found in database.",
+            "staff_id": "1562"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 341: Staff ID '168' not found in database.",
+            "staff_id": "168"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 351: Staff ID '1661' not found in database.",
+            "staff_id": "1661"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 359: Staff ID '503' not found in database.",
+            "staff_id": "503"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 365: Staff ID '2365' not found in database.",
+            "staff_id": "2365"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 390: Staff ID '2780' not found in database.",
+            "staff_id": "2780"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 394: Staff ID '575' not found in database.",
+            "staff_id": "575"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 395: Staff ID '544' not found in database.",
+            "staff_id": "544"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 396: Staff ID '595' not found in database.",
+            "staff_id": "595"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 397: Staff ID '1333' not found in database.",
+            "staff_id": "1333"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 398: Staff ID '1178' not found in database.",
+            "staff_id": "1178"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 408: Staff ID '880' not found in database.",
+            "staff_id": "880"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 412: Staff ID '16' not found in database.",
+            "staff_id": "16"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 462: Staff ID '265' not found in database.",
+            "staff_id": "265"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 486: Staff ID '1089' not found in database.",
+            "staff_id": "1089"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 489: Staff ID '242' not found in database.",
+            "staff_id": "242"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 490: Staff ID '1325' not found in database.",
+            "staff_id": "1325"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 492: Staff ID '1117' not found in database.",
+            "staff_id": "1117"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 495: Staff ID '1360' not found in database.",
+            "staff_id": "1360"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 496: Staff ID '1141' not found in database.",
+            "staff_id": "1141"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 510: Staff ID '1564' not found in database.",
+            "staff_id": "1564"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 534: Staff ID '2938' not found in database.",
+            "staff_id": "2938"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 540: Staff ID '2230' not found in database.",
+            "staff_id": "2230"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 546: Staff ID '383' not found in database.",
+            "staff_id": "383"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 551: Staff ID '2280' not found in database.",
+            "staff_id": "2280"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 555: Staff ID '1754' not found in database.",
+            "staff_id": "1754"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 556: Staff ID '1118' not found in database.",
+            "staff_id": "1118"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 565: Staff ID '1237' not found in database.",
+            "staff_id": "1237"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 581: Staff ID '457' not found in database.",
+            "staff_id": "457"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 610: Staff ID '2896' not found in database.",
+            "staff_id": "2896"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 611: Staff ID '2775' not found in database.",
+            "staff_id": "2775"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 658: Staff ID '208' not found in database.",
+            "staff_id": "208"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 660: Staff ID '236' not found in database.",
+            "staff_id": "236"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 662: Staff ID '261' not found in database.",
+            "staff_id": "261"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 665: Staff ID '654' not found in database.",
+            "staff_id": "654"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 666: Staff ID '1401' not found in database.",
+            "staff_id": "1401"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 669: Staff ID '1087' not found in database.",
+            "staff_id": "1087"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 674: Staff ID '1639' not found in database.",
+            "staff_id": "1639"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 682: Staff ID '252' not found in database.",
+            "staff_id": "252"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 693: Staff ID '1865' not found in database.",
+            "staff_id": "1865"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 712: Staff ID '1169' not found in database.",
+            "staff_id": "1169"
+        },
+        {
+            "type": "MISSING_STAFF_ID",
+            "message": "Row 738: No staff ID found.",
+            "staff_id": "nan"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 745: Staff ID '418' not found in database.",
+            "staff_id": "418"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 762: Staff ID '2887' not found in database.",
+            "staff_id": "2887"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 771: Staff ID '1320' not found in database.",
+            "staff_id": "1320"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 772: Staff ID '1351' not found in database.",
+            "staff_id": "1351"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 773: Staff ID '22' not found in database.",
+            "staff_id": "22"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 781: Staff ID '2070' not found in database.",
+            "staff_id": "2070"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 783: Staff ID '484' not found in database.",
+            "staff_id": "484"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 803: Staff ID '1337' not found in database.",
+            "staff_id": "1337"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 807: Staff ID '1566' not found in database.",
+            "staff_id": "1566"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 809: Staff ID '2988' not found in database.",
+            "staff_id": "2988"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 816: Staff ID '2216' not found in database.",
+            "staff_id": "2216"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 823: Staff ID '2350' not found in database.",
+            "staff_id": "2350"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 830: Staff ID '77' not found in database.",
+            "staff_id": "77"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 835: Staff ID '1164' not found in database.",
+            "staff_id": "1164"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 840: Staff ID '1685' not found in database.",
+            "staff_id": "1685"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 843: Staff ID '379' not found in database.",
+            "staff_id": "379"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 844: Staff ID '627' not found in database.",
+            "staff_id": "627"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 855: Staff ID '1644' not found in database.",
+            "staff_id": "1644"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 889: Staff ID '1491' not found in database.",
+            "staff_id": "1491"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 893: Staff ID '2265' not found in database.",
+            "staff_id": "2265"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 907: Staff ID '1307' not found in database.",
+            "staff_id": "1307"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 925: Staff ID '1414' not found in database.",
+            "staff_id": "1414"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 936: Staff ID '1450' not found in database.",
+            "staff_id": "1450"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 937: Staff ID '170' not found in database.",
+            "staff_id": "170"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 940: Staff ID '2799' not found in database.",
+            "staff_id": "2799"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 951: Staff ID '2292' not found in database.",
+            "staff_id": "2292"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 963: Staff ID '260' not found in database.",
+            "staff_id": "260"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 966: Staff ID '1516' not found in database.",
+            "staff_id": "1516"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 971: Staff ID '144' not found in database.",
+            "staff_id": "144"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 991: Staff ID '2333' not found in database.",
+            "staff_id": "2333"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1001: Staff ID '1627' not found in database.",
+            "staff_id": "1627"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1002: Staff ID '1629' not found in database.",
+            "staff_id": "1629"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1024: Staff ID '330' not found in database.",
+            "staff_id": "330"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1037: Staff ID '1526' not found in database.",
+            "staff_id": "1526"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1054: Staff ID '1534' not found in database.",
+            "staff_id": "1534"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1068: Staff ID '1871' not found in database.",
+            "staff_id": "1871"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1091: Staff ID '2527' not found in database.",
+            "staff_id": "2527"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1125: Staff ID '176' not found in database.",
+            "staff_id": "176"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1132: Staff ID '2241' not found in database.",
+            "staff_id": "2241"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1133: Staff ID '857' not found in database.",
+            "staff_id": "857"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1156: Staff ID '1362' not found in database.",
+            "staff_id": "1362"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1157: Staff ID '1667' not found in database.",
+            "staff_id": "1667"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1168: Staff ID '2164' not found in database.",
+            "staff_id": "2164"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1175: Staff ID '386' not found in database.",
+            "staff_id": "386"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1187: Staff ID '161' not found in database.",
+            "staff_id": "161"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1198: Staff ID '1010' not found in database.",
+            "staff_id": "1010"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1199: Staff ID '707' not found in database.",
+            "staff_id": "707"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1201: Staff ID '1079' not found in database.",
+            "staff_id": "1079"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1202: Staff ID '1036' not found in database.",
+            "staff_id": "1036"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1203: Staff ID '1076' not found in database.",
+            "staff_id": "1076"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1205: Staff ID '1162' not found in database.",
+            "staff_id": "1162"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1210: Staff ID '916' not found in database.",
+            "staff_id": "916"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1214: Staff ID '404' not found in database.",
+            "staff_id": "404"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1216: Staff ID '1149' not found in database.",
+            "staff_id": "1149"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1217: Staff ID '69' not found in database.",
+            "staff_id": "69"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1218: Staff ID '194' not found in database.",
+            "staff_id": "194"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1219: Staff ID '1447' not found in database.",
+            "staff_id": "1447"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1221: Staff ID '333' not found in database.",
+            "staff_id": "333"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1226: Staff ID '2026' not found in database.",
+            "staff_id": "2026"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1231: Staff ID '1410' not found in database.",
+            "staff_id": "1410"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1234: Staff ID '117' not found in database.",
+            "staff_id": "117"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1235: Staff ID '1111' not found in database.",
+            "staff_id": "1111"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1248: Staff ID '2112' not found in database.",
+            "staff_id": "2112"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1283: Staff ID '276' not found in database.",
+            "staff_id": "276"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1284: Staff ID '1814' not found in database.",
+            "staff_id": "1814"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1287: Staff ID '923' not found in database.",
+            "staff_id": "923"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1295: Staff ID '1123' not found in database.",
+            "staff_id": "1123"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1299: Staff ID '1153' not found in database.",
+            "staff_id": "1153"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1317: Staff ID '73' not found in database.",
+            "staff_id": "73"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1321: Staff ID '546' not found in database.",
+            "staff_id": "546"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1326: Staff ID '195' not found in database.",
+            "staff_id": "195"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1349: Staff ID '2599' not found in database.",
+            "staff_id": "2599"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1364: Staff ID '24' not found in database.",
+            "staff_id": "24"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1375: Staff ID '2392' not found in database.",
+            "staff_id": "2392"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1378: Staff ID '211' not found in database.",
+            "staff_id": "211"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1385: Staff ID '937' not found in database.",
+            "staff_id": "937"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1391: Staff ID '169' not found in database.",
+            "staff_id": "169"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1399: Staff ID '239' not found in database.",
+            "staff_id": "239"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1400: Staff ID '1710' not found in database.",
+            "staff_id": "1710"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1415: Staff ID '376' not found in database.",
+            "staff_id": "376"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1417: Staff ID '984' not found in database.",
+            "staff_id": "984"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1419: Staff ID '1384' not found in database.",
+            "staff_id": "1384"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1421: Staff ID '1116' not found in database.",
+            "staff_id": "1116"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1422: Staff ID '1361' not found in database.",
+            "staff_id": "1361"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1428: Staff ID '1884' not found in database.",
+            "staff_id": "1884"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1448: Staff ID '731' not found in database.",
+            "staff_id": "731"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1451: Staff ID '443' not found in database.",
+            "staff_id": "443"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1452: Staff ID '217' not found in database.",
+            "staff_id": "217"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1454: Staff ID '440' not found in database.",
+            "staff_id": "440"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1456: Staff ID '214' not found in database.",
+            "staff_id": "214"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1457: Staff ID '636' not found in database.",
+            "staff_id": "636"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1460: Staff ID '1356' not found in database.",
+            "staff_id": "1356"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1467: Staff ID '1344' not found in database.",
+            "staff_id": "1344"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1485: Staff ID '175' not found in database.",
+            "staff_id": "175"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1490: Staff ID '1086' not found in database.",
+            "staff_id": "1086"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1493: Staff ID '139' not found in database.",
+            "staff_id": "139"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1494: Staff ID '561' not found in database.",
+            "staff_id": "561"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1503: Staff ID '80' not found in database.",
+            "staff_id": "80"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1515: Staff ID '1967' not found in database.",
+            "staff_id": "1967"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1516: Staff ID '1762' not found in database.",
+            "staff_id": "1762"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1528: Staff ID '2529' not found in database.",
+            "staff_id": "2529"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1540: Staff ID '2431' not found in database.",
+            "staff_id": "2431"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1557: Staff ID '2680' not found in database.",
+            "staff_id": "2680"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1562: Staff ID '1331' not found in database.",
+            "staff_id": "1331"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1564: Staff ID '1979' not found in database.",
+            "staff_id": "1979"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1566: Staff ID '754' not found in database.",
+            "staff_id": "754"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1568: Staff ID '1863' not found in database.",
+            "staff_id": "1863"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1569: Staff ID '2210' not found in database.",
+            "staff_id": "2210"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1576: Staff ID '75' not found in database.",
+            "staff_id": "75"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1583: Staff ID '160' not found in database.",
+            "staff_id": "160"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1597: Staff ID '2219' not found in database.",
+            "staff_id": "2219"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1626: Staff ID '2307' not found in database.",
+            "staff_id": "2307"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1629: Staff ID '468' not found in database.",
+            "staff_id": "468"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1640: Staff ID '2480' not found in database.",
+            "staff_id": "2480"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1657: Staff ID '2706' not found in database.",
+            "staff_id": "2706"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1664: Staff ID '319' not found in database.",
+            "staff_id": "319"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1666: Staff ID '1199' not found in database.",
+            "staff_id": "1199"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1685: Staff ID '2101' not found in database.",
+            "staff_id": "2101"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1690: Staff ID '1878' not found in database.",
+            "staff_id": "1878"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1709: Staff ID '2995' not found in database.",
+            "staff_id": "2995"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1711: Staff ID '2816' not found in database.",
+            "staff_id": "2816"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1742: Staff ID '2730' not found in database.",
+            "staff_id": "2730"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1744: Staff ID '412' not found in database.",
+            "staff_id": "412"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1745: Staff ID '1821' not found in database.",
+            "staff_id": "1821"
+        },
+        {
+            "type": "MISSING_STAFF_ID",
+            "message": "Row 1787: No staff ID found.",
+            "staff_id": "nan"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1789: Staff ID '637' not found in database.",
+            "staff_id": "637"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1830: Staff ID '500' not found in database.",
+            "staff_id": "500"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1831: Staff ID '938' not found in database.",
+            "staff_id": "938"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1849: Staff ID '1218' not found in database.",
+            "staff_id": "1218"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1851: Staff ID '1129' not found in database.",
+            "staff_id": "1129"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1857: Staff ID '2568' not found in database.",
+            "staff_id": "2568"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1873: Staff ID '1787' not found in database.",
+            "staff_id": "1787"
+        },
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 1881: Staff ID '2816' not found in database.",
+            "staff_id": "2816"
+        }
+    ],
+    "failed_staff_ids": [
+        "405",
+        "2656",
+        "-",
+        "488",
+        "1332",
+        "910",
+        "1175",
+        "2165",
+        "1804",
+        "2037",
+        "1063",
+        "1061",
+        "695",
+        "2838",
+        "2966",
+        "2358",
+        "426",
+        "2325",
+        "257",
+        "413",
+        "68",
+        "1797",
+        "229",
+        "390",
+        "262",
+        "640",
+        "1172",
+        "1803",
+        "1691",
+        "36",
+        "193",
+        "1562",
+        "168",
+        "1661",
+        "503",
+        "2365",
+        "2780",
+        "575",
+        "544",
+        "595",
+        "1333",
+        "1178",
+        "880",
+        "16",
+        "265",
+        "1089",
+        "242",
+        "1325",
+        "1117",
+        "1360",
+        "1141",
+        "1564",
+        "2938",
+        "2230",
+        "383",
+        "2280",
+        "1754",
+        "1118",
+        "1237",
+        "457",
+        "2896",
+        "2775",
+        "208",
+        "236",
+        "261",
+        "654",
+        "1401",
+        "1087",
+        "1639",
+        "252",
+        "1865",
+        "1169",
+        "418",
+        "2887",
+        "1320",
+        "1351",
+        "22",
+        "2070",
+        "484",
+        "1337",
+        "1566",
+        "2988",
+        "2216",
+        "2350",
+        "77",
+        "1164",
+        "1685",
+        "379",
+        "627",
+        "1644",
+        "1491",
+        "2265",
+        "1307",
+        "1414",
+        "1450",
+        "170",
+        "2799",
+        "2292",
+        "260",
+        "1516",
+        "144",
+        "2333",
+        "1627",
+        "1629",
+        "330",
+        "1526",
+        "1534",
+        "1871",
+        "2527",
+        "176",
+        "2241",
+        "857",
+        "1362",
+        "1667",
+        "2164",
+        "386",
+        "161",
+        "1010",
+        "707",
+        "1079",
+        "1036",
+        "1076",
+        "1162",
+        "916",
+        "404",
+        "1149",
+        "69",
+        "194",
+        "1447",
+        "333",
+        "2026",
+        "1410",
+        "117",
+        "1111",
+        "2112",
+        "276",
+        "1814",
+        "923",
+        "1123",
+        "1153",
+        "73",
+        "546",
+        "195",
+        "2599",
+        "24",
+        "2392",
+        "211",
+        "937",
+        "169",
+        "239",
+        "1710",
+        "376",
+        "984",
+        "1384",
+        "1116",
+        "1361",
+        "1884",
+        "731",
+        "443",
+        "217",
+        "440",
+        "214",
+        "636",
+        "1356",
+        "1344",
+        "175",
+        "1086",
+        "139",
+        "561",
+        "80",
+        "1967",
+        "1762",
+        "2529",
+        "2431",
+        "2680",
+        "1331",
+        "1979",
+        "754",
+        "1863",
+        "2210",
+        "75",
+        "160",
+        "2219",
+        "2307",
+        "468",
+        "2480",
+        "2706",
+        "319",
+        "1199",
+        "2101",
+        "1878",
+        "2995",
+        "2816",
+        "2730",
+        "412",
+        "1821",
+        "637",
+        "500",
+        "938",
+        "1218",
+        "1129",
+        "2568",
+        "1787",
+        "2816"
+    ]
+}

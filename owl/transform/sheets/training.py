@@ -105,8 +105,13 @@ class TrainingNormalizer(BaseNormalizer):
         valid_recs["end_date"]   = self._safe_parse_dates(valid_recs, "end_date")
 
         # ── 6. Build fact table ───────────────────────────────────────────────
+        # Ensure optional columns exist (newer Excel versions may have extra columns)
+        for col in ("title",):
+            if col not in valid_recs.columns:
+                valid_recs[col] = None
+
         final_cols = ["id_no", "venue_id", "consultant_id", "location_id",
-                      "start_date", "end_date"]
+                      "start_date", "end_date", "title"]
         entities["employee_trainings"] = valid_recs[final_cols].copy()
 
         log.info(
@@ -132,8 +137,13 @@ class TrainingNormalizer(BaseNormalizer):
         q["start_date"] = self._safe_parse_dates(q, "start_date")
         q["end_date"]   = self._safe_parse_dates(q, "end_date")
 
+        # Ensure optional columns exist
+        for col in ("title",):
+            if col not in q.columns:
+                q[col] = None
+
         # Keep only the columns the quarantine model accepts
-        keep = ["id_no", "venue_name", "consultant_name", "start_date", "end_date"]
+        keep = ["id_no", "venue_name", "consultant_name", "start_date", "end_date", "title"]
         keep = [c for c in keep if c in q.columns]
         return q[keep]
 

@@ -1,0 +1,33 @@
+{
+  "filename": "AHRD_Nominal_202606_v1.xlsx",
+  "processed_at": "2026-06-23T13:32:09.097802",
+  "total_rows_read": 1656,
+  "total_new_inserts": 0,
+  "total_updates": 1656,
+  "history_writes": {
+    "employee_department_history": 0,
+    "employee_gl_history": 0,
+    "employee_location_history": 0,
+    "employee_rank_history": 0
+  },
+  "new_lookup_values": {
+    "departments": [],
+    "grade_levels": [
+      "DG",
+      "ED"
+    ],
+    "locations": [],
+    "ranks": [
+      "DG/CEO",
+      "ED(F&A)",
+      "ED(OPS)",
+      "ED(ML&CS)",
+      "DD, Deep Blue Project"
+    ],
+    "employee_statuses": []
+  },
+  "total_successes": 1654,
+  "total_partial_successes": 2,
+  "total_failures": 0,
+  "failed_id_nos": []
+}

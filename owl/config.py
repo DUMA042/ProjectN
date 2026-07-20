@@ -66,6 +66,21 @@ class Settings(BaseSettings):
         description="Files larger than this (MB) will be read in streaming mode to avoid memory exhaustion.",
     )
 
+    # ── API ────────────────────────────────────────────────────────────────────
+    api_host: str = Field(
+        default="127.0.0.1",
+        description="Host address for the FastAPI server.",
+    )
+
+    api_port: int = Field(
+        default=8000,
+        description="Port for the FastAPI server.",
+    )
+
+    cors_origins: list[str] = Field(
+        default=["http://localhost:1420"],
+        description="Allowed CORS origins for the frontend (Tauri dev port).",
+    )
 
     # ── Logging ───────────────────────────────────────────────────────────────
     log_level: str = Field(

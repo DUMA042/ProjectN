@@ -11,7 +11,7 @@ import json
 from datetime import datetime, date
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import numpy as np
 import pandas as pd
@@ -127,8 +127,14 @@ class LeaveProcessor:
             return parsed, None
         return None, str_val
 
-    def process(self) -> dict:
-        """Main execution flow for leave processing."""
+    def process(self, progress_callback: Callable[[str, int, int], None] | None = None) -> dict:
+        """Main execution flow for leave processing.
+        
+        Parameters
+        ----------
+        progress_callback:
+            Optional callback(stage, current, total) for SSE progress streaming.
+        """
         log.info(f"Starting LeaveProcessor for: {self.file_path}")
         self._load_leave_types()
 
@@ -147,6 +153,10 @@ class LeaveProcessor:
             row = df_raw.iloc[idx]
             self.summary["total_rows_read"] += 1
             result = self._build_row_objects(idx, row)
+
+            if progress_callback and (idx % 50 == 0 or idx == len(df_raw) - 1):
+                progress_callback("parse", idx - data_start_idx + 1, len(df_raw) - data_start_idx)
+
             if result is not None:
                 accumulated_data.append(result)
 

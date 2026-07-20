@@ -122,6 +122,7 @@ class EmployeeTraining(Base):
     location_id: Mapped[Optional[int]] = mapped_column(ForeignKey("locations.location_id"))
     start_date: Mapped[date] = mapped_column(Date, nullable=False)
     end_date: Mapped[date] = mapped_column(Date, nullable=False)
+    title: Mapped[Optional[str]] = mapped_column(Text)
 
 class EmployeeLocationHistory(Base):
     __tablename__ = "employee_location_history"
@@ -207,6 +208,7 @@ class QuarantineTraining(Base):
     consultant_name: Mapped[Optional[str]] = mapped_column(String(255))
     start_date: Mapped[date] = mapped_column(Date, nullable=False)
     end_date: Mapped[date] = mapped_column(Date, nullable=False)
+    title: Mapped[Optional[str]] = mapped_column(Text)
     quarantined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

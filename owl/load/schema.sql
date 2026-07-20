@@ -173,6 +173,7 @@ CREATE TABLE IF NOT EXISTS public.employee_trainings
     location_id integer,
     start_date date NOT NULL,
     end_date date NOT NULL,
+    title text COLLATE pg_catalog."default",
     CONSTRAINT employee_trainings_pkey PRIMARY KEY (training_id)
 );
 
@@ -235,6 +236,7 @@ CREATE TABLE IF NOT EXISTS public.quarantine_trainings
     consultant_name character varying(255) COLLATE pg_catalog."default",
     start_date date NOT NULL,
     end_date date NOT NULL,
+    title text COLLATE pg_catalog."default",
     quarantined_at timestamp with time zone NOT NULL DEFAULT now(),
     CONSTRAINT quarantine_trainings_pkey PRIMARY KEY (id)
 );
