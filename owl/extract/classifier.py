@@ -54,16 +54,24 @@ class IngestionMetadata:
 # A file is classified as Type X if it contains ALL 'identifier' columns.
 
 FINGERPRINTS: dict[ReportType, set[str]] = {
-    ReportType.NOMINAL: {
-        "id_no", "gl"
-    },
-    ReportType.TRAINING: {
-        "venue", "consultant", "start_date"
-    },
+    # Ordered most-specific-first to minimise false positives.
+    # card_swiping_time is the rarest column name — check it first.
     ReportType.CARD_SWIPE: {
         "card_swiping_time"
     },
-    # LEAVE fingerprint removed because we use strict positional validation for Leave files
+    # venue + consultant + start_date is a distinctive triple unique to training.
+    ReportType.TRAINING: {
+        "venue", "consultant", "start_date"
+    },
+    # Column-based fallback for Leave (primary detection uses positional validation).
+    ReportType.LEAVE: {
+        "staff_id", "proposed_leave_date", "resumption_date"
+    },
+    # Most generic — checked last to avoid false positives from other report types
+    # that may also carry employee id and grade-level columns.
+    ReportType.NOMINAL: {
+        "id_no", "gl", "rank"
+    },
 }
 
 # Mapping of Type -> Target Subdirectory

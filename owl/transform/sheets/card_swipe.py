@@ -82,8 +82,8 @@ class CardSwipeNormalizer(BaseNormalizer):
             fact_df["id_no"] = fact_df["mapped_id_no"]
             fact_df["location_id"] = 1  # Forced location hardcoding
             
-            # Ensure swipe_time is datetime
-            fact_df["swipe_time"] = pd.to_datetime(fact_df["swipe_time"])
+            # Ensure swipe_time is datetime (DD/MM/YYYY format)
+            fact_df["swipe_time"] = pd.to_datetime(fact_df["swipe_time"], dayfirst=True)
             
             final_cols = ["id_no", "location_id", "swipe_time"]
             entities["employee_card_swipes"] = fact_df[final_cols].copy()

@@ -29,7 +29,7 @@ import pandas as pd
 from sqlalchemy import select
 
 from owl.config import settings
-from owl.extract.classifier import classify_file, ROUTING_MAP, ReportType, StructuralClassifier
+from owl.extract.classifier import ROUTING_MAP, ReportType, StructuralClassifier, IngestionMetadata
 
 from owl.extract.excel_reader import ExcelReader
 from owl.load.database import get_session
@@ -115,8 +115,11 @@ class IngestionManager:
                 
                 df = normalise_column_names(df)
                 
-                found_meta = classify_file(df)
-                found_meta = replace(found_meta, report_type=report_type)
+                found_meta = IngestionMetadata(
+                    report_type=report_type,
+                    period=StructuralClassifier(df).extract_period(),
+                    version=1
+                )
                 found_df = df
                 target_sheet = sheet_name
                 break
