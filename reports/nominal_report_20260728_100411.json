@@ -1,0 +1,24 @@
+{
+  "filename": "AHRD_Nominal_202607_v1.xlsx",
+  "processed_at": "2026-07-28T10:04:11.216394",
+  "total_rows_read": 1651,
+  "total_new_inserts": 0,
+  "total_updates": 1651,
+  "history_writes": {
+    "employee_department_history": 88,
+    "employee_gl_history": 1,
+    "employee_location_history": 70,
+    "employee_rank_history": 81
+  },
+  "new_lookup_values": {
+    "departments": [],
+    "grade_levels": [],
+    "locations": [],
+    "ranks": [],
+    "employee_statuses": []
+  },
+  "total_successes": 1650,
+  "total_partial_successes": 1,
+  "total_failures": 0,
+  "failed_id_nos": []
+}
