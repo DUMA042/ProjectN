@@ -213,6 +213,9 @@ CREATE TABLE IF NOT EXISTS public.leave_records
     CONSTRAINT leave_records_pkey PRIMARY KEY (record_id)
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS uk_leave_records_dedup
+    ON public.leave_records (id_no, leave_type_id, start_date, end_date);
+
 -- ============================================================================
 -- 5. QUARANTINE TABLES
 -- ============================================================================

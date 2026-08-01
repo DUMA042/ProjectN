@@ -20,6 +20,7 @@ import holidays
 
 from owl.load.database import get_session
 from owl.load.models import LeaveApplication, LeaveRecord, LeaveType, Employee
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from owl.logger import get_logger
 
 log = get_logger(__name__)
@@ -176,7 +177,28 @@ class LeaveProcessor:
                     rec.application_id = app.application_id
                 all_records.extend(records)
 
-            session.add_all(all_records)
+            if all_records:
+                record_dicts = [
+                    {
+                        "application_id": r.application_id,
+                        "id_no": r.id_no,
+                        "leave_type_id": r.leave_type_id,
+                        "start_date": r.start_date,
+                        "end_date": r.end_date,
+                        "start_date_raw": r.start_date_raw,
+                        "end_date_raw": r.end_date_raw,
+                        "planned_start_date": r.planned_start_date,
+                        "planned_start_date_raw": r.planned_start_date_raw,
+                        "planned_end_date": r.planned_end_date,
+                        "planned_end_date_raw": r.planned_end_date_raw,
+                    }
+                    for r in all_records
+                ]
+                stmt = pg_insert(LeaveRecord.__table__).values(record_dicts)
+                stmt = stmt.on_conflict_do_nothing(
+                    index_elements=["id_no", "leave_type_id", "start_date", "end_date"]
+                )
+                session.execute(stmt)
             session.commit()
 
         self.summary["total_leave_entries_inserted"] = len(all_records)
