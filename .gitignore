@@ -40,3 +40,10 @@ htmlcov/
 .idea/
 *.DS_Store
 Thumbs.db
+
+# ── Node / Tauri artefacts ─────────────────────────────────────────────────────
+node_modules/
+src-tauri/target/
+dist-ssr/
+*.local
+*.log
