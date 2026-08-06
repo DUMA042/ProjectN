@@ -39,19 +39,19 @@ export default function DeptAttendanceChart({
 
   if (loading) {
     return (
-      <div className="card-container p-5 animate-pulse">
+      <div className="card-container p-5 animate-pulse h-[440px]">
         <div className="flex justify-between mb-4">
           <div className="h-5 w-48 bg-nav-hover rounded" />
           <div className="h-8 w-28 bg-nav-hover rounded-btn" />
         </div>
-        <div className="h-[320px] bg-nav-hover rounded-lg" />
+        <div className="h-[360px] bg-nav-hover rounded-lg" />
       </div>
     );
   }
 
-  const chartData = (data || []).slice(0, 15).map((d) => ({
-    name: d.department_name?.length > 12
-      ? d.department_name.slice(0, 12) + "…"
+  const chartData = (data || []).map((d) => ({
+    name: d.department_name?.length > 14
+      ? d.department_name.slice(0, 14) + "…"
       : d.department_name,
     fullName: d.department_name,
     attendance_pct: d.attendance_pct ?? 0,
@@ -67,43 +67,66 @@ export default function DeptAttendanceChart({
   };
 
   return (
-    <div className="card-container p-5">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold text-text-primary">{title}</h3>
+    <div className="card-container p-5 h-[440px] flex flex-col justify-between">
+      <div className="flex items-center justify-between mb-2 flex-shrink-0">
+        <div>
+          <h3 className="text-sm font-semibold text-text-primary">{title}</h3>
+          <p className="text-xs text-text-secondary mt-0.5">Clustered breakdown for all HQ departments</p>
+        </div>
         <DateRangePicker value={dateRange} onChange={onDateChange} />
       </div>
 
-      <ResponsiveContainer width="100%" height={320}>
-        <BarChart data={chartData} layout="vertical" margin={{ left: 0, right: 20, top: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" horizontal={false} />
-          <XAxis type="number" tick={{ fontSize: 11, fill: "#94A3B8" }} axisLine={false} tickLine={false} />
-          <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "#64748B" }} axisLine={false} tickLine={false} width={100} />
-          <Tooltip
-            contentStyle={{ borderRadius: 8, border: "1px solid #EAECF0", boxShadow: "0px 4px 12px rgba(0,0,0,0.06)" }}
-            formatter={(value: number, name: string) => [`${value}%`, name]}
-            labelFormatter={(label, payload) => payload?.[0]?.payload?.fullName || label}
-          />
-          <Legend
-            onClick={handleLegendClick}
-            wrapperStyle={{ cursor: "pointer" }}
-            formatter={(value: string) => {
-              const segKey = SEGMENTS.find(s => s.label === value)?.key || value;
-              return (
-                <span style={{ color: isHidden(segKey) ? "#CBD5E1" : "#64748B", fontSize: 12 }}>
-                  {value}
-                </span>
-              );
-            }}
-          />
-          {SEGMENTS.map((seg) => (
-            <Bar key={seg.key} dataKey={seg.key} name={seg.label} stackId="a" barSize={16} hide={isHidden(seg.key)} radius={seg.key === "training_pct" ? [0, 4, 4, 0] : 0}>
-              {chartData.map((_, i) => (
-                <Cell key={i} fill={seg.color} />
-              ))}
-            </Bar>
-          ))}
-        </BarChart>
-      </ResponsiveContainer>
+      <div className="flex-1 min-h-0 pt-2">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={chartData} margin={{ left: -15, right: 10, top: 10, bottom: 45 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
+            <XAxis
+              dataKey="name"
+              tick={{ fontSize: 10, fill: "#64748B" }}
+              interval={0}
+              angle={-35}
+              textAnchor="end"
+              axisLine={false}
+              tickLine={false}
+            />
+            <YAxis
+              tick={{ fontSize: 11, fill: "#94A3B8" }}
+              unit="%"
+              axisLine={false}
+              tickLine={false}
+            />
+            <Tooltip
+              contentStyle={{ borderRadius: 8, border: "1px solid #EAECF0", boxShadow: "0px 4px 12px rgba(0,0,0,0.06)" }}
+              formatter={(value: number, name: string) => [`${value}%`, name]}
+              labelFormatter={(label, payload) => payload?.[0]?.payload?.fullName || label}
+            />
+            <Legend
+              onClick={handleLegendClick}
+              iconType="square"
+              iconSize={10}
+              wrapperStyle={{ cursor: "pointer", paddingTop: 8 }}
+              formatter={(value: string) => {
+                const segKey = SEGMENTS.find((s) => s.label === value)?.key || value;
+                return (
+                  <span style={{ color: isHidden(segKey) ? "#CBD5E1" : "#64748B", fontSize: 12, fontWeight: 500 }}>
+                    {value}
+                  </span>
+                );
+              }}
+            />
+            {SEGMENTS.map((seg) => (
+              <Bar
+                key={seg.key}
+                dataKey={seg.key}
+                name={seg.label}
+                fill={seg.color}
+                hide={isHidden(seg.key)}
+                radius={[3, 3, 0, 0]}
+              />
+            ))}
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }

@@ -86,3 +86,13 @@ export function useEmployeeSummary() {
     staleTime: 60_000,
   });
 }
+
+export function useDepartments() {
+  return useQuery({
+    queryKey: ["departments-list"],
+    queryFn: () =>
+      api.get("/api/dashboard/departments").then((r) => (r.data as string[]) || []),
+    staleTime: 300_000,
+  });
+}
+

@@ -358,7 +358,15 @@ def get_dept_attendance(start_date: str, end_date: str, department: str = ""):
         dept_filter = "AND d.department_name = :department"
         params["department"] = department
     return run_query(f"""
-        WITH base_active AS (
+        WITH hq_depts AS (
+            SELECT DISTINCT d.department_name
+            FROM employees e
+            JOIN locations l ON e.location_id = l.location_id
+            JOIN departments d ON e.department_id = d.department_id
+            WHERE LOWER(l.location_name) = 'hq'
+              {dept_filter}
+        ),
+        base_active AS (
             SELECT e.id_no, d.department_name
             FROM employees e
             JOIN employee_statuses es ON e.status_id = es.status_id
@@ -408,18 +416,19 @@ def get_dept_attendance(start_date: str, end_date: str, department: str = ""):
             GROUP BY department_name
         )
         SELECT
-            department_name,
-            attendance_count,
-            ROUND(100.0 * attendance_count / NULLIF(total_staff, 0), 2) AS attendance_pct,
-            absent_count,
-            ROUND(100.0 * absent_count / NULLIF(total_staff, 0), 2) AS absent_pct,
-            leave_count,
-            ROUND(100.0 * leave_count / NULLIF(total_staff, 0), 2) AS leave_pct,
-            training_count,
-            ROUND(100.0 * training_count / NULLIF(total_staff, 0), 2) AS training_pct,
-            total_staff
-        FROM dept_counts
-        ORDER BY department_name
+            hd.department_name,
+            COALESCE(dc.attendance_count, 0)::int AS attendance_count,
+            ROUND(100.0 * COALESCE(dc.attendance_count, 0) / NULLIF(COALESCE(dc.total_staff, 0), 0), 2) AS attendance_pct,
+            COALESCE(dc.absent_count, 0)::int AS absent_count,
+            ROUND(100.0 * COALESCE(dc.absent_count, 0) / NULLIF(COALESCE(dc.total_staff, 0), 0), 2) AS absent_pct,
+            COALESCE(dc.leave_count, 0)::int AS leave_count,
+            ROUND(100.0 * COALESCE(dc.leave_count, 0) / NULLIF(COALESCE(dc.total_staff, 0), 0), 2) AS leave_pct,
+            COALESCE(dc.training_count, 0)::int AS training_count,
+            ROUND(100.0 * COALESCE(dc.training_count, 0) / NULLIF(COALESCE(dc.total_staff, 0), 0), 2) AS training_pct,
+            COALESCE(dc.total_staff, 0)::int AS total_staff
+        FROM hq_depts hd
+        LEFT JOIN dept_counts dc ON hd.department_name = dc.department_name
+        ORDER BY hd.department_name
     """, params)
 
 
@@ -427,16 +436,17 @@ def get_earliest_checkins(start_date: str, end_date: str, limit: int = 10):
     single_day = start_date == end_date
     if single_day:
         return run_query("""
-            SELECT DISTINCT ON (cs.id_no)
+            SELECT
                 cs.id_no,
                 e.full_name,
                 COALESCE(d.department_name, 'Unknown') AS department,
-                TO_CHAR(MIN(cs.swipe_time) OVER (PARTITION BY cs.id_no), 'HH24:MI') AS swipe_time
+                TO_CHAR(MIN(cs.swipe_time), 'HH12:MI AM') AS swipe_time
             FROM employee_card_swipes cs
             JOIN employees e ON cs.id_no = e.id_no
             LEFT JOIN departments d ON e.department_id = d.department_id
             WHERE cs.swipe_time::date = :start_date
-            ORDER BY cs.id_no, swipe_time ASC
+            GROUP BY cs.id_no, e.full_name, d.department_name
+            ORDER BY MIN(cs.swipe_time) ASC
             LIMIT :limit
         """, {"start_date": start_date, "limit": limit})
     else:
@@ -445,13 +455,13 @@ def get_earliest_checkins(start_date: str, end_date: str, limit: int = 10):
                 cs.id_no,
                 e.full_name,
                 COALESCE(d.department_name, 'Unknown') AS department,
-                TO_CHAR((AVG(EXTRACT(EPOCH FROM cs.swipe_time::time)) * INTERVAL '1 second')::time, 'HH24:MI') AS swipe_time
+                TO_CHAR(MIN(cs.swipe_time::time), 'HH12:MI AM') AS swipe_time
             FROM employee_card_swipes cs
             JOIN employees e ON cs.id_no = e.id_no
             LEFT JOIN departments d ON e.department_id = d.department_id
             WHERE cs.swipe_time::date BETWEEN :start_date AND :end_date
             GROUP BY cs.id_no, e.full_name, d.department_name
-            ORDER BY AVG(EXTRACT(EPOCH FROM cs.swipe_time::time))
+            ORDER BY MIN(cs.swipe_time::time) ASC
             LIMIT :limit
         """, {"start_date": start_date, "end_date": end_date, "limit": limit})
 

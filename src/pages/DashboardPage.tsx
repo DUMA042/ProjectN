@@ -15,6 +15,7 @@ import {
   useDeptAttendance,
   useEarliestCheckins,
   useEmployeeSummary,
+  useDepartments,
 } from "@/hooks/useDashboard";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -27,16 +28,19 @@ export default function DashboardPage() {
   const { data: summary, isLoading: summaryLoading } = useDashboardSummary();
   const { data: swipeSummary, isLoading: swipeLoading } = useCardSwipeSummary(true);
   const { data: empSummary, isLoading: empLoading } = useEmployeeSummary();
+  const { data: departments } = useDepartments();
 
-  // Chart-specific date ranges (independent)
+  // Chart-specific filters & date ranges
   const [deptDateRange, setDeptDateRange] = useState<DateRange>(getDefaultDateRange());
   const [workforceDateRange, setWorkforceDateRange] = useState<DateRange>(getDefaultDateRange());
+  const [workforceDepartment, setWorkforceDepartment] = useState("");
   const [checkinDateRange, setCheckinDateRange] = useState<DateRange>(getDefaultDateRange());
-  const [checkinLimit, setCheckinLimit] = useState(10);
+  const [checkinLimit, setCheckinLimit] = useState(15);
 
   const { data: workforce, isLoading: workforceLoading } = useWorkforceStatus(
     workforceDateRange.startDate,
-    workforceDateRange.endDate
+    workforceDateRange.endDate,
+    workforceDepartment
   );
   const { data: deptAtt, isLoading: deptLoading } = useDeptAttendance(
     deptDateRange.startDate,
@@ -99,26 +103,15 @@ export default function DashboardPage() {
         <KpiCard title="Swipes Today" value={swipeSummary?.total_swipes ?? 0} trend={12} icon={BarChart3} loading={swipeLoading} />
       </div>
 
-      {/* Middle Grid */}
-      <div className="grid grid-cols-[65fr_35fr] gap-5">
-        <div className="space-y-5">
-          <DeptAttendanceChart
-            title="Department Attendance Performance"
-            data={deptAtt || []}
-            dateRange={deptDateRange}
-            onDateChange={setDeptDateRange}
-            loading={deptLoading}
-          />
-
-          <DonutChartCard
-            title="Workforce Status Distribution"
-            data={workforceDonut}
-            centerLabel={String(summary?.total_active ?? workforceDonut.reduce((s: number, d: any) => s + d.value, 0))}
-            dateRange={workforceDateRange}
-            onDateChange={setWorkforceDateRange}
-            loading={workforceLoading}
-          />
-        </div>
+      {/* Top Charts Section: Department Attendance Performance & Earliest Check-Ins (Side-by-Side) */}
+      <div className="grid grid-cols-[62fr_38fr] gap-5 items-stretch">
+        <DeptAttendanceChart
+          title="Department Attendance Performance"
+          data={deptAtt || []}
+          dateRange={deptDateRange}
+          onDateChange={setDeptDateRange}
+          loading={deptLoading}
+        />
 
         <EarliestCheckinsCard
           title="Earliest Check-Ins"
@@ -128,6 +121,21 @@ export default function DashboardPage() {
           limit={checkinLimit}
           onLimitChange={setCheckinLimit}
           loading={checkinsLoading}
+        />
+      </div>
+
+      {/* Workforce Status Distribution with Department & Day Filters */}
+      <div>
+        <DonutChartCard
+          title="Workforce Status Distribution"
+          data={workforceDonut}
+          centerLabel={String(workforceDonut.reduce((s: number, d: any) => s + d.value, 0))}
+          dateRange={workforceDateRange}
+          onDateChange={setWorkforceDateRange}
+          selectedDepartment={workforceDepartment}
+          onDepartmentChange={setWorkforceDepartment}
+          departments={departments || []}
+          loading={workforceLoading}
         />
       </div>
 

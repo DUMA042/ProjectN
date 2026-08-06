@@ -27,7 +27,7 @@ const medalStyles = [
   "bg-[#F8FAFC] text-[#94A3B8]",
 ];
 
-const LIMIT_OPTIONS = [5, 10, 15, 20, 25];
+const LIMIT_OPTIONS = [5, 10, 15, 20, 25, 50];
 
 export default function EarliestCheckinsCard({
   title,
@@ -40,7 +40,7 @@ export default function EarliestCheckinsCard({
 }: EarliestCheckinsCardProps) {
   if (loading) {
     return (
-      <div className="card-container p-5 animate-pulse">
+      <div className="card-container p-5 animate-pulse h-[440px]">
         <div className="flex justify-between mb-4">
           <div className="h-5 w-40 bg-nav-hover rounded" />
           <div className="flex gap-2">
@@ -61,24 +61,30 @@ export default function EarliestCheckinsCard({
 
   if (!data.length) {
     return (
-      <div className="card-container p-5 h-full">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-semibold text-text-primary">{title}</h3>
+      <div className="card-container p-5 h-[440px] flex flex-col">
+        <div className="flex items-center justify-between mb-4 flex-shrink-0">
+          <div>
+            <h3 className="text-sm font-semibold text-text-primary">{title}</h3>
+            <p className="text-xs text-text-secondary mt-0.5">First swipe times</p>
+          </div>
           <DateRangePicker value={dateRange} onChange={onDateChange} />
         </div>
-        <div className="flex flex-col items-center justify-center py-10 text-text-muted">
+        <div className="flex flex-col items-center justify-center flex-1 text-text-muted">
           <Clock size={36} strokeWidth={1.5} />
-          <p className="text-sm mt-3">No check-ins recorded</p>
-          <p className="text-xs mt-1">for this period</p>
+          <p className="text-sm mt-3 font-medium">No check-ins recorded</p>
+          <p className="text-xs mt-1">for this date range</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="card-container p-5 h-full flex flex-col">
+    <div className="card-container p-5 h-[440px] flex flex-col">
       <div className="flex items-center justify-between mb-3 flex-shrink-0">
-        <h3 className="text-sm font-semibold text-text-primary">{title}</h3>
+        <div>
+          <h3 className="text-sm font-semibold text-text-primary">{title}</h3>
+          <p className="text-xs text-text-secondary mt-0.5">Top earliest swipe times</p>
+        </div>
         <div className="flex items-center gap-2">
           <DateRangePicker value={dateRange} onChange={onDateChange} />
           <select
@@ -93,14 +99,14 @@ export default function EarliestCheckinsCard({
         </div>
       </div>
 
-      <div className="overflow-y-auto flex-1 min-h-0 space-y-0.5 pr-1">
+      <div className="overflow-y-auto flex-1 min-h-0 space-y-1 pr-1.5 custom-scrollbar">
         {data.slice(0, limit).map((entry, i) => (
           <motion.div
-            key={entry.id_no}
+            key={`${entry.id_no}-${i}`}
             initial={{ opacity: 0, x: -8 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: Math.min(i * 0.03, 0.3), duration: 0.15 }}
-            className="flex items-center gap-2.5 py-2 px-2 rounded-lg hover:bg-nav-hover transition-colors cursor-default group"
+            transition={{ delay: Math.min(i * 0.02, 0.2), duration: 0.15 }}
+            className="flex items-center gap-2.5 py-2 px-2.5 rounded-lg hover:bg-nav-hover transition-colors cursor-default group"
           >
             <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${medalStyles[i] || medalStyles[3]}`}>
               {i + 1}
@@ -111,7 +117,7 @@ export default function EarliestCheckinsCard({
               </p>
               <p className="text-[11px] text-text-secondary truncate">{entry.department}</p>
             </div>
-            <span className="text-[11px] font-mono font-medium bg-[#D1FAE5] text-[#059669] px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0">
+            <span className="text-[11px] font-mono font-semibold bg-[#D1FAE5] text-[#059669] px-2.5 py-0.5 rounded-full whitespace-nowrap flex-shrink-0">
               {entry.swipe_time}
             </span>
           </motion.div>

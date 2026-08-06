@@ -16,6 +16,9 @@ interface DonutChartCardProps {
   centerLabel?: string;
   dateRange: DateRange;
   onDateChange: (range: DateRange) => void;
+  selectedDepartment?: string;
+  onDepartmentChange?: (dept: string) => void;
+  departments?: string[];
   loading?: boolean;
   height?: number;
 }
@@ -26,8 +29,11 @@ export default function DonutChartCard({
   centerLabel,
   dateRange,
   onDateChange,
+  selectedDepartment = "",
+  onDepartmentChange,
+  departments = [],
   loading,
-  height = 280,
+  height = 260,
 }: DonutChartCardProps) {
   const { isHidden, toggle } = useClickableLegend();
 
@@ -36,9 +42,12 @@ export default function DonutChartCard({
       <div className="card-container p-5 animate-pulse">
         <div className="flex justify-between mb-4">
           <div className="h-5 w-48 bg-nav-hover rounded" />
-          <div className="h-8 w-28 bg-nav-hover rounded-btn" />
+          <div className="flex gap-2">
+            <div className="h-8 w-32 bg-nav-hover rounded-btn" />
+            <div className="h-8 w-28 bg-nav-hover rounded-btn" />
+          </div>
         </div>
-        <div className="h-[280px] bg-nav-hover rounded-lg" />
+        <div className="h-[260px] bg-nav-hover rounded-lg" />
       </div>
     );
   }
@@ -52,9 +61,28 @@ export default function DonutChartCard({
 
   return (
     <div className="card-container p-5">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold text-text-primary">{title}</h3>
-        <DateRangePicker value={dateRange} onChange={onDateChange} />
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <div>
+          <h3 className="text-sm font-semibold text-text-primary">{title}</h3>
+          <p className="text-xs text-text-secondary mt-0.5">Filter by department & day/date range</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {onDepartmentChange && (
+            <select
+              value={selectedDepartment}
+              onChange={(e) => onDepartmentChange(e.target.value)}
+              className="px-3 py-1.5 text-xs border border-border rounded-btn bg-surface text-text-secondary cursor-pointer hover:bg-nav-hover transition-colors font-medium"
+            >
+              <option value="">All HQ Departments</option>
+              {departments.map((dept) => (
+                <option key={dept} value={dept}>
+                  {dept}
+                </option>
+              ))}
+            </select>
+          )}
+          <DateRangePicker value={dateRange} onChange={onDateChange} />
+        </div>
       </div>
 
       <div className="relative">

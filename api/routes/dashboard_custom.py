@@ -5,6 +5,7 @@ from ui.lib.queries import (
     get_dept_attendance,
     get_earliest_checkins,
     get_employee_summary,
+    get_departments,
 )
 
 router = APIRouter(tags=["dashboard"])
@@ -44,3 +45,9 @@ def earliest_checkins(
 def employee_summary():
     df = get_employee_summary()
     return df.to_dict(orient="records")
+
+
+@router.get("/dashboard/departments")
+def dashboard_departments():
+    return get_departments()
+
