@@ -1,43 +1,58 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Users, Target, TrendingUp, BarChart3, Layers } from "lucide-react";
 import KpiCard from "@/components/ui/KpiCard";
-import BarChartCard from "@/components/charts/BarChartCard";
 import DonutChartCard from "@/components/charts/DonutChartCard";
-import LeaderboardCard from "@/components/ui/LeaderboardCard";
+import DeptAttendanceChart from "@/components/charts/DeptAttendanceChart";
+import EarliestCheckinsCard from "@/components/ui/EarliestCheckinsCard";
 import DataTable from "@/components/ui/DataTable";
+import { getDefaultDateRange } from "@/components/ui/DateRangePicker";
+import type { DateRange } from "@/components/ui/DateRangePicker";
 import {
   useDashboardSummary,
   useCardSwipeSummary,
-  useDepartmentDistribution,
   useWorkforceStatus,
+  useDeptAttendance,
   useEarliestCheckins,
   useEmployeeSummary,
 } from "@/hooks/useDashboard";
 
 const STATUS_COLORS: Record<string, string> = {
-  Present: "#10B981",
-  Absent: "#EF4444",
+  "Active (Available)": "#10B981",
   "On Leave": "#F59E0B",
-  "In Training": "#6366F1",
+  "On Training": "#6366F1",
 };
 
 export default function DashboardPage() {
   const { data: summary, isLoading: summaryLoading } = useDashboardSummary();
   const { data: swipeSummary, isLoading: swipeLoading } = useCardSwipeSummary(true);
-  const { data: departments, isLoading: deptLoading } = useDepartmentDistribution();
-  const { data: workforce, isLoading: workforceLoading } = useWorkforceStatus();
-  const { data: checkins, isLoading: checkinsLoading } = useEarliestCheckins(10);
   const { data: empSummary, isLoading: empLoading } = useEmployeeSummary();
 
-  const deptChartData = (departments || []).slice(0, 20).map((d: any) => ({
-    label: d.department_name,
-    value: d.employee_count,
-  }));
+  // Chart-specific date ranges (independent)
+  const [deptDateRange, setDeptDateRange] = useState<DateRange>(getDefaultDateRange());
+  const [workforceDateRange, setWorkforceDateRange] = useState<DateRange>(getDefaultDateRange());
+  const [checkinDateRange, setCheckinDateRange] = useState<DateRange>(getDefaultDateRange());
+  const [checkinLimit, setCheckinLimit] = useState(10);
+
+  const { data: workforce, isLoading: workforceLoading } = useWorkforceStatus(
+    workforceDateRange.startDate,
+    workforceDateRange.endDate
+  );
+  const { data: deptAtt, isLoading: deptLoading } = useDeptAttendance(
+    deptDateRange.startDate,
+    deptDateRange.endDate
+  );
+  const { data: checkins, isLoading: checkinsLoading } = useEarliestCheckins(
+    checkinDateRange.startDate,
+    checkinDateRange.endDate,
+    checkinLimit
+  );
 
   const workforceDonut = (workforce || []).map((w: any) => ({
     name: w.status,
     value: w.count,
     color: STATUS_COLORS[w.status] || "#94A3B8",
+    percentage: w.percentage,
   }));
 
   const empTableColumns = [
@@ -48,23 +63,17 @@ export default function DashboardPage() {
     {
       key: "days_present",
       header: "Days Present",
-      cell: (row: any) => (
-        <span className="font-medium text-success">{row.days_present ?? "—"}</span>
-      ),
+      cell: (row: any) => <span className="font-medium text-success">{row.days_present ?? "—"}</span>,
     },
     {
       key: "leave_records_count",
-      header: "Leave Count",
-      cell: (row: any) => (
-        <span className="font-medium text-warning">{row.leave_records_count ?? "—"}</span>
-      ),
+      header: "Leave",
+      cell: (row: any) => <span className="font-medium text-warning">{row.leave_records_count ?? "—"}</span>,
     },
     {
       key: "training_records_count",
       header: "Training",
-      cell: (row: any) => (
-        <span className="font-medium text-info">{row.training_records_count ?? "—"}</span>
-      ),
+      cell: (row: any) => <span className="font-medium text-info">{row.training_records_count ?? "—"}</span>,
     },
   ];
 
@@ -77,85 +86,53 @@ export default function DashboardPage() {
     >
       {/* Header */}
       <div>
-        <h1 className="text-xl font-semibold text-text-primary">
-          Hello, Admin 👋
-        </h1>
-        <p className="text-sm text-text-secondary mt-0.5">
-          Here is your daily workforce overview.
-        </p>
+        <h1 className="text-xl font-semibold text-text-primary">Hello, Admin 👋</h1>
+        <p className="text-sm text-text-secondary mt-0.5">Here is your daily workforce overview.</p>
       </div>
 
       {/* KPI Row */}
       <div className="grid grid-cols-5 gap-4">
-        <KpiCard
-          title="Total Employees"
-          value={summary?.total_employees ?? 0}
-          icon={Users}
-          loading={summaryLoading}
-          sparklineData={[1620, 1615, 1630, 1640, 1650, 1655, summary?.total_employees ?? 0]}
-        />
-        <KpiCard
-          title="Active Workforce"
-          value={summary?.active_employees ?? 0}
-          icon={Target}
-          loading={summaryLoading}
-          sparklineData={[1600, 1590, 1605, 1610, 1615, 1613, summary?.active_employees ?? 0]}
-        />
-        <KpiCard
-          title="On Leave Today"
-          value={summary?.staff_on_leave ?? 0}
-          trend={-3}
-          icon={Layers}
-          loading={summaryLoading}
-        />
-        <KpiCard
-          title="In Training"
-          value={summary?.staff_in_training ?? 0}
-          icon={TrendingUp}
-          loading={summaryLoading}
-        />
-        <KpiCard
-          title="Swipes Today"
-          value={swipeSummary?.total_swipes ?? 0}
-          trend={12}
-          icon={BarChart3}
-          loading={swipeLoading}
-        />
+        <KpiCard title="Total Employees" value={summary?.total_employees ?? 0} icon={Users} loading={summaryLoading} />
+        <KpiCard title="Active Workforce" value={summary?.active_employees ?? 0} icon={Target} loading={summaryLoading} />
+        <KpiCard title="On Leave Today" value={summary?.staff_on_leave ?? 0} trend={-3} icon={Layers} loading={summaryLoading} />
+        <KpiCard title="In Training" value={summary?.staff_in_training ?? 0} icon={TrendingUp} loading={summaryLoading} />
+        <KpiCard title="Swipes Today" value={swipeSummary?.total_swipes ?? 0} trend={12} icon={BarChart3} loading={swipeLoading} />
       </div>
 
       {/* Middle Grid */}
       <div className="grid grid-cols-[65fr_35fr] gap-5">
-        {/* Left Column */}
         <div className="space-y-5">
-          <BarChartCard
-            title="Department Distribution"
-            data={deptChartData}
+          <DeptAttendanceChart
+            title="Department Attendance Performance"
+            data={deptAtt || []}
+            dateRange={deptDateRange}
+            onDateChange={setDeptDateRange}
             loading={deptLoading}
           />
 
           <DonutChartCard
             title="Workforce Status Distribution"
             data={workforceDonut}
-            centerLabel={String(summary?.total_employees ?? "")}
+            centerLabel={String(summary?.total_active ?? workforceDonut.reduce((s: number, d: any) => s + d.value, 0))}
+            dateRange={workforceDateRange}
+            onDateChange={setWorkforceDateRange}
             loading={workforceLoading}
           />
         </div>
 
-        {/* Right Column */}
-        <LeaderboardCard
-          title="Top 10 Earliest Check-Ins 🏆"
+        <EarliestCheckinsCard
+          title="Earliest Check-Ins"
           data={checkins || []}
+          dateRange={checkinDateRange}
+          onDateChange={setCheckinDateRange}
+          limit={checkinLimit}
+          onLimitChange={setCheckinLimit}
           loading={checkinsLoading}
         />
       </div>
 
       {/* Bottom Table */}
-      <DataTable
-        columns={empTableColumns}
-        data={empSummary || []}
-        loading={empLoading}
-        searchable
-      />
+      <DataTable columns={empTableColumns} data={empSummary || []} loading={empLoading} searchable />
     </motion.div>
   );
 }

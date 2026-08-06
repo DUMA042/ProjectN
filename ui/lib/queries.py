@@ -295,52 +295,165 @@ def get_statuses():
 
 
 # ── Dashboard Custom Queries ──────────────────────────────────────────────────
-def get_workforce_status():
-    return run_query("""
-        WITH swiped_today AS (
-            SELECT DISTINCT id_no FROM employee_card_swipes
-            WHERE swipe_time::date = CURRENT_DATE
+
+def get_workforce_status(start_date: str, end_date: str, department: str = ""):
+    dept_filter = ""
+    params = {"start_date": start_date, "end_date": end_date}
+    if department:
+        dept_filter = "AND d.department_name = :department"
+        params["department"] = department
+    return run_query(f"""
+        WITH base_active AS (
+            SELECT e.id_no, d.department_name
+            FROM employees e
+            JOIN employee_statuses es ON e.status_id = es.status_id
+            JOIN locations l ON e.location_id = l.location_id
+            JOIN departments d ON e.department_id = d.department_id
+            WHERE LOWER(es.status_name) = 'active'
+              AND LOWER(l.location_name) = 'hq'
+              {dept_filter}
         ),
-        on_leave_today AS (
-            SELECT DISTINCT id_no FROM leave_records
-            WHERE CURRENT_DATE BETWEEN start_date AND COALESCE(end_date, start_date)
+        on_leave_range AS (
+            SELECT DISTINCT id_no
+            FROM leave_records
+            WHERE start_date <= :end_date
+              AND COALESCE(end_date, start_date) >= :start_date
         ),
-        in_training_today AS (
-            SELECT DISTINCT id_no FROM employee_trainings
-            WHERE CURRENT_DATE BETWEEN start_date AND end_date
+        on_training_range AS (
+            SELECT DISTINCT id_no
+            FROM employee_trainings
+            WHERE start_date <= :end_date
+              AND end_date >= :start_date
         ),
-        active AS (
-            SELECT e.id_no FROM employees e
-            JOIN employee_statuses s ON e.status_id = s.status_id
-            WHERE LOWER(s.status_name) = 'active'
+        classified AS (
+            SELECT
+                CASE
+                    WHEN ol.id_no IS NOT NULL THEN 'On Leave'
+                    WHEN ot.id_no IS NOT NULL THEN 'On Training'
+                    ELSE 'Active (Available)'
+                END AS status_category
+            FROM base_active b
+            LEFT JOIN on_leave_range ol ON ol.id_no = b.id_no
+            LEFT JOIN on_training_range ot ON ot.id_no = b.id_no
         )
-        SELECT 'Present' AS status, COUNT(*)::int FROM swiped_today
-        UNION ALL
-        SELECT 'On Leave', COUNT(*)::int FROM on_leave_today
-        UNION ALL
-        SELECT 'In Training', COUNT(*)::int FROM in_training_today
-        UNION ALL
-        SELECT 'Absent', COUNT(*)::int FROM active a
-        WHERE a.id_no NOT IN (SELECT id_no FROM swiped_today)
-          AND a.id_no NOT IN (SELECT id_no FROM on_leave_today)
-          AND a.id_no NOT IN (SELECT id_no FROM in_training_today)
-    """)
+        SELECT
+            status_category AS status,
+            COUNT(*)::int AS count,
+            ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER (), 2) AS percentage
+        FROM classified
+        GROUP BY status_category
+        ORDER BY
+            CASE status_category
+                WHEN 'On Leave' THEN 1
+                WHEN 'On Training' THEN 2
+                WHEN 'Active (Available)' THEN 3
+            END
+    """, params)
 
 
-def get_earliest_checkins(limit=10):
-    return run_query("""
-        SELECT DISTINCT ON (cs.id_no)
-            cs.id_no,
-            e.full_name,
-            COALESCE(d.department_name, 'Unknown') AS department,
-            TO_CHAR(cs.swipe_time, 'HH24:MI') AS swipe_time
-        FROM employee_card_swipes cs
-        JOIN employees e ON cs.id_no = e.id_no
-        LEFT JOIN departments d ON e.department_id = d.department_id
-        WHERE cs.swipe_time::date = CURRENT_DATE
-        ORDER BY cs.id_no, cs.swipe_time ASC
-        LIMIT :limit
-    """, {"limit": limit})
+def get_dept_attendance(start_date: str, end_date: str, department: str = ""):
+    dept_filter = ""
+    params = {"start_date": start_date, "end_date": end_date}
+    if department:
+        dept_filter = "AND d.department_name = :department"
+        params["department"] = department
+    return run_query(f"""
+        WITH base_active AS (
+            SELECT e.id_no, d.department_name
+            FROM employees e
+            JOIN employee_statuses es ON e.status_id = es.status_id
+            JOIN locations l ON e.location_id = l.location_id
+            JOIN departments d ON e.department_id = d.department_id
+            WHERE LOWER(es.status_name) = 'active'
+              AND LOWER(l.location_name) = 'hq'
+              {dept_filter}
+        ),
+        swiped_in_range AS (
+            SELECT DISTINCT id_no FROM employee_card_swipes
+            WHERE swipe_time::date BETWEEN :start_date AND :end_date
+        ),
+        on_leave_range AS (
+            SELECT DISTINCT id_no FROM leave_records
+            WHERE start_date <= :end_date
+              AND COALESCE(end_date, start_date) >= :start_date
+        ),
+        on_training_range AS (
+            SELECT DISTINCT id_no FROM employee_trainings
+            WHERE start_date <= :end_date
+              AND end_date >= :start_date
+        ),
+        classified AS (
+            SELECT
+                b.department_name,
+                CASE
+                    WHEN ol.id_no IS NOT NULL THEN 'Leave'
+                    WHEN ot.id_no IS NOT NULL THEN 'Training'
+                    WHEN sw.id_no IS NOT NULL THEN 'Attendance'
+                    ELSE 'Absent'
+                END AS status_category
+            FROM base_active b
+            LEFT JOIN swiped_in_range sw ON sw.id_no = b.id_no
+            LEFT JOIN on_leave_range ol ON ol.id_no = b.id_no
+            LEFT JOIN on_training_range ot ON ot.id_no = b.id_no
+        ),
+        dept_counts AS (
+            SELECT
+                department_name,
+                COUNT(*) FILTER (WHERE status_category = 'Attendance') AS attendance_count,
+                COUNT(*) FILTER (WHERE status_category = 'Absent') AS absent_count,
+                COUNT(*) FILTER (WHERE status_category = 'Leave') AS leave_count,
+                COUNT(*) FILTER (WHERE status_category = 'Training') AS training_count,
+                COUNT(*) AS total_staff
+            FROM classified
+            GROUP BY department_name
+        )
+        SELECT
+            department_name,
+            attendance_count,
+            ROUND(100.0 * attendance_count / NULLIF(total_staff, 0), 2) AS attendance_pct,
+            absent_count,
+            ROUND(100.0 * absent_count / NULLIF(total_staff, 0), 2) AS absent_pct,
+            leave_count,
+            ROUND(100.0 * leave_count / NULLIF(total_staff, 0), 2) AS leave_pct,
+            training_count,
+            ROUND(100.0 * training_count / NULLIF(total_staff, 0), 2) AS training_pct,
+            total_staff
+        FROM dept_counts
+        ORDER BY department_name
+    """, params)
+
+
+def get_earliest_checkins(start_date: str, end_date: str, limit: int = 10):
+    single_day = start_date == end_date
+    if single_day:
+        return run_query("""
+            SELECT DISTINCT ON (cs.id_no)
+                cs.id_no,
+                e.full_name,
+                COALESCE(d.department_name, 'Unknown') AS department,
+                TO_CHAR(MIN(cs.swipe_time) OVER (PARTITION BY cs.id_no), 'HH24:MI') AS swipe_time
+            FROM employee_card_swipes cs
+            JOIN employees e ON cs.id_no = e.id_no
+            LEFT JOIN departments d ON e.department_id = d.department_id
+            WHERE cs.swipe_time::date = :start_date
+            ORDER BY cs.id_no, swipe_time ASC
+            LIMIT :limit
+        """, {"start_date": start_date, "limit": limit})
+    else:
+        return run_query("""
+            SELECT
+                cs.id_no,
+                e.full_name,
+                COALESCE(d.department_name, 'Unknown') AS department,
+                TO_CHAR((AVG(EXTRACT(EPOCH FROM cs.swipe_time::time)) * INTERVAL '1 second')::time, 'HH24:MI') AS swipe_time
+            FROM employee_card_swipes cs
+            JOIN employees e ON cs.id_no = e.id_no
+            LEFT JOIN departments d ON e.department_id = d.department_id
+            WHERE cs.swipe_time::date BETWEEN :start_date AND :end_date
+            GROUP BY cs.id_no, e.full_name, d.department_name
+            ORDER BY AVG(EXTRACT(EPOCH FROM cs.swipe_time::time))
+            LIMIT :limit
+        """, {"start_date": start_date, "end_date": end_date, "limit": limit})
 
 
 def get_employee_summary():

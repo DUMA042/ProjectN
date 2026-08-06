@@ -1,0 +1,30 @@
+{
+  "filename": "AHRD_Nominal_202608_v2.xlsx",
+  "processed_at": "2026-08-04T10:00:01.014395",
+  "total_rows_read": 1649,
+  "total_new_inserts": 2,
+  "total_updates": 1647,
+  "history_writes": {
+    "employee_department_history": 7,
+    "employee_gl_history": 0,
+    "employee_location_history": 4,
+    "employee_rank_history": 7
+  },
+  "new_lookup_values": {
+    "departments": [],
+    "grade_levels": [],
+    "locations": [],
+    "ranks": [
+      "CEO- SERVICOM",
+      "Assistant Chief Information Technology Officer / PA-DICT",
+      "PIA- Personnel Emmolument",
+      "PEO I - MLS",
+      "Senior Maritime Safety Officer / PA (Technical) - DG/CEO"
+    ],
+    "employee_statuses": []
+  },
+  "total_successes": 1648,
+  "total_partial_successes": 1,
+  "total_failures": 0,
+  "failed_id_nos": []
+}
