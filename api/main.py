@@ -19,7 +19,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from api.routes import health, analytics, ingestion, staff, kanban, card_swipe, leave_routes, training, dashboard_custom, settings_routes  # noqa: E402
+from api.routes import health, analytics, ingestion, staff, kanban, card_swipe, leave_routes, training, dashboard_custom, settings_routes, rules  # noqa: E402
 
 app.include_router(health.router, prefix="/api")
 app.include_router(analytics.router, prefix="/api")
@@ -31,3 +31,4 @@ app.include_router(leave_routes.router, prefix="/api")
 app.include_router(training.router, prefix="/api")
 app.include_router(dashboard_custom.router, prefix="/api")
 app.include_router(settings_routes.router, prefix="/api")
+app.include_router(rules.router, prefix="/api")

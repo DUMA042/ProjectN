@@ -299,3 +299,12 @@ class KanbanTaskHistory(Base):
     moved_by: Mapped[Optional[str]] = mapped_column(String(64))
     moved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     duration_in_previous: Mapped[Optional[timedelta]] = mapped_column(Interval)
+
+
+# ── Rules Settings ───────────────────────────────────────────────────────────
+
+class RulesSetting(Base):
+    __tablename__ = "rules_settings"
+    rule_key: Mapped[str] = mapped_column(String(100), primary_key=True)
+    rule_value: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

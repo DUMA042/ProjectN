@@ -7,7 +7,6 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
-  Cell,
 } from "recharts";
 import DateRangePicker from "@/components/ui/DateRangePicker";
 import { useClickableLegend } from "@/lib/chartUtils";
@@ -25,6 +24,7 @@ interface DeptAttendanceChartProps {
   data: Record<string, any>[];
   dateRange: DateRange;
   onDateChange: (range: DateRange) => void;
+  location?: string;
   loading?: boolean;
 }
 
@@ -33,6 +33,7 @@ export default function DeptAttendanceChart({
   data,
   dateRange,
   onDateChange,
+  location = "HQ",
   loading,
 }: DeptAttendanceChartProps) {
   const { isHidden, toggle } = useClickableLegend();
@@ -71,7 +72,7 @@ export default function DeptAttendanceChart({
       <div className="flex items-center justify-between mb-2 flex-shrink-0">
         <div>
           <h3 className="text-sm font-semibold text-text-primary">{title}</h3>
-          <p className="text-xs text-text-secondary mt-0.5">Clustered breakdown for all HQ departments</p>
+          <p className="text-xs text-text-secondary mt-0.5">Clustered breakdown for all {location} departments</p>
         </div>
         <DateRangePicker value={dateRange} onChange={onDateChange} />
       </div>
@@ -104,23 +105,23 @@ export default function DeptAttendanceChart({
               onClick={handleLegendClick}
               iconType="square"
               iconSize={10}
-              wrapperStyle={{ cursor: "pointer", paddingTop: 8 }}
-              formatter={(value: string) => {
-                const segKey = SEGMENTS.find((s) => s.label === value)?.key || value;
-                return (
-                  <span style={{ color: isHidden(segKey) ? "#CBD5E1" : "#64748B", fontSize: 12, fontWeight: 500 }}>
-                    {value}
-                  </span>
-                );
-              }}
+              payload={SEGMENTS.map((s) => ({ value: s.label, color: isHidden(s.key) ? "#CBD5E1" : s.color, type: "square" as const }))}
+              wrapperStyle={{ cursor: "pointer", paddingTop: 16 }}
+            formatter={(value: string) => {
+              const segKey = SEGMENTS.find(s => s.label === value)?.key || value;
+              return (
+                <span className={isHidden(segKey) ? "opacity-40" : ""} style={{ color: "#64748B", fontSize: 12 }}>
+                  {value}
+                </span>
+              );
+            }}
             />
             {SEGMENTS.map((seg) => (
               <Bar
                 key={seg.key}
                 dataKey={seg.key}
                 name={seg.label}
-                fill={seg.color}
-                hide={isHidden(seg.key)}
+                fill={isHidden(seg.key) ? "transparent" : seg.color}
                 radius={[3, 3, 0, 0]}
               />
             ))}

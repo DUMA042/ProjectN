@@ -6,7 +6,7 @@
 
 @layer base {
   :root {
-    --color-canvas: #F8FAFC;
+    --color-canvas: #FAFAF9;
     --color-surface: #FFFFFF;
     --color-text-primary: #0F172A;
     --color-text-secondary: #64748B;

@@ -4,7 +4,7 @@ export default {
   theme: {
     extend: {
       colors: {
-        canvas: "#F8FAFC",
+        canvas: "#FAFAF9",
         surface: "#FFFFFF",
         sidebar: "#FFFFFF",
         "nav-hover": "#F1F5F9",

@@ -33,13 +33,13 @@ export default function DonutChartCard({
   onDepartmentChange,
   departments = [],
   loading,
-  height = 260,
+  height = 240,
 }: DonutChartCardProps) {
   const { isHidden, toggle } = useClickableLegend();
 
   if (loading) {
     return (
-      <div className="card-container p-5 animate-pulse">
+      <div className="card-container p-5 animate-pulse h-[440px]">
         <div className="flex justify-between mb-4">
           <div className="h-5 w-48 bg-nav-hover rounded" />
           <div className="flex gap-2">
@@ -47,7 +47,7 @@ export default function DonutChartCard({
             <div className="h-8 w-28 bg-nav-hover rounded-btn" />
           </div>
         </div>
-        <div className="h-[260px] bg-nav-hover rounded-lg" />
+        <div className="h-[360px] bg-nav-hover rounded-lg" />
       </div>
     );
   }
@@ -60,8 +60,8 @@ export default function DonutChartCard({
   };
 
   return (
-    <div className="card-container p-5">
-      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+    <div className="card-container p-5 h-[440px] flex flex-col justify-between">
+      <div className="flex items-center justify-between mb-2 flex-wrap gap-2 flex-shrink-0">
         <div>
           <h3 className="text-sm font-semibold text-text-primary">{title}</h3>
           <p className="text-xs text-text-secondary mt-0.5">Filter by department & day/date range</p>
@@ -73,7 +73,7 @@ export default function DonutChartCard({
               onChange={(e) => onDepartmentChange(e.target.value)}
               className="px-3 py-1.5 text-xs border border-border rounded-btn bg-surface text-text-secondary cursor-pointer hover:bg-nav-hover transition-colors font-medium"
             >
-              <option value="">All HQ Departments</option>
+              <option value="">All department</option>
               {departments.map((dept) => (
                 <option key={dept} value={dept}>
                   {dept}
@@ -85,7 +85,7 @@ export default function DonutChartCard({
         </div>
       </div>
 
-      <div className="relative">
+      <div className="relative flex-1 min-h-0 flex items-center justify-center">
         <ResponsiveContainer width="100%" height={height}>
           <PieChart>
             <Pie
@@ -99,8 +99,8 @@ export default function DonutChartCard({
               strokeWidth={0}
               isAnimationActive
             >
-              {visibleData.map((_, i) => (
-                <Cell key={i} fill={data[i]?.color ?? "#CBD5E1"} />
+              {visibleData.map((d, i) => (
+                <Cell key={i} fill={d.color ?? "#CBD5E1"} />
               ))}
             </Pie>
             <Tooltip
@@ -114,6 +114,21 @@ export default function DonutChartCard({
                 name,
               ]}
             />
+            <Legend
+              onClick={handleLegendClick}
+              payload={data.map((d) => ({ value: d.name, color: isHidden(d.name) ? "#CBD5E1" : d.color, type: "square" as const }))}
+              wrapperStyle={{ cursor: "pointer", paddingTop: 16 }}
+              formatter={(value: string) => (
+                <span className={isHidden(value) ? "opacity-40" : ""} style={{ color: "#64748B", fontSize: 12 }}>
+                  {value}{" "}
+                  {!isHidden(value) && (
+                    <span style={{ fontWeight: 600, color: "#0F172A" }}>
+                      {data.find((d) => d.name === value)?.percentage ?? 0}%
+                    </span>
+                  )}
+                </span>
+              )}
+            />
           </PieChart>
         </ResponsiveContainer>
 
@@ -126,26 +141,6 @@ export default function DonutChartCard({
           </div>
         )}
       </div>
-
-      <Legend
-        onClick={handleLegendClick}
-        wrapperStyle={{ cursor: "pointer", paddingTop: 8 }}
-        formatter={(value: string) => (
-          <span
-            style={{
-              color: isHidden(value) ? "#CBD5E1" : "#64748B",
-              fontSize: 12,
-            }}
-          >
-            {value}{" "}
-            {!isHidden(value) && (
-              <span style={{ fontWeight: 600, color: "#0F172A" }}>
-                {data.find((d) => d.name === value)?.percentage ?? 0}%
-              </span>
-            )}
-          </span>
-        )}
-      />
     </div>
   );
 }

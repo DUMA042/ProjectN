@@ -12,6 +12,7 @@ import {
 import { ChevronUp, ChevronDown, ChevronsUpDown, Search } from "lucide-react";
 
 interface DataTableProps<T extends object> {
+  title?: string;
   columns: { key: string; header: string; cell?: (row: T) => React.ReactNode }[];
   data: T[];
   loading?: boolean;
@@ -20,6 +21,7 @@ interface DataTableProps<T extends object> {
 }
 
 export default function DataTable<T extends object>({
+  title,
   columns: columnDefs,
   data,
   loading,
@@ -79,9 +81,9 @@ export default function DataTable<T extends object>({
     <div className="card-container overflow-hidden">
       {/* Header */}
       <div className="px-5 py-3 border-b border-divider flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-text-primary">
-          Employee Summary Report
-        </h3>
+            <h3 className="text-sm font-semibold text-text-primary">
+              {title || "Summary Report"}
+            </h3>
         {searchable && (
           <div className="relative">
             <Search

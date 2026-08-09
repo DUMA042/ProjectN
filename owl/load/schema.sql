@@ -371,6 +371,18 @@ CREATE TABLE IF NOT EXISTS public.kanban_task_history
 COMMENT ON TABLE public.kanban_task_history IS 'Audit log of every task movement between columns. duration_in_previous tracks time spent in the previous column.';
 
 -- ============================================================================
+-- 7.5. RULES SETTINGS
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS public.rules_settings
+(
+    rule_key character varying(100) COLLATE pg_catalog."default" NOT NULL,
+    rule_value jsonb NOT NULL,
+    updated_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT rules_settings_pkey PRIMARY KEY (rule_key)
+);
+
+-- ============================================================================
 -- 8. FOREIGN KEY CONSTRAINTS
 -- ============================================================================
 

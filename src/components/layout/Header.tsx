@@ -1,5 +1,5 @@
 import { useLocation } from "react-router-dom";
-import { Bell, Calendar } from "lucide-react";
+import { Bell } from "lucide-react";
 
 export default function Header() {
   const location = useLocation();
@@ -29,10 +29,6 @@ export default function Header() {
       </div>
 
       <div className="flex items-center gap-3">
-        <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-btn border border-border text-sm text-text-secondary hover:bg-nav-hover transition-colors">
-          <Calendar size={16} />
-          <span>Today</span>
-        </button>
         <button className="w-9 h-9 rounded-btn border border-border flex items-center justify-center text-text-muted hover:bg-nav-hover hover:text-text-secondary transition-colors">
           <Bell size={18} />
         </button>

@@ -14,6 +14,7 @@ import {
   ChevronDown,
   PanelLeftClose,
   PanelLeft,
+  Wrench,
 } from "lucide-react";
 import NavItem from "../ui/NavItem";
 
@@ -79,7 +80,11 @@ export default function Sidebar() {
     },
     {
       label: "System",
-      items: [{ icon: <Settings size={20} />, label: "Settings", path: "/settings" }],
+      collapsed: true,
+      items: [
+        { icon: <Settings size={18} />, label: "System Settings", path: "/settings" },
+        { icon: <Wrench size={18} />, label: "Rules Settings", path: "/rules-settings" },
+      ],
     },
   ];
 

@@ -11,6 +11,7 @@ import UploadPage from "./pages/UploadPage";
 import AdminPage from "./pages/AdminPage";
 import ReportsPage from "./pages/ReportsPage";
 import SettingsPage from "./pages/SettingsPage";
+import RulesSettingsPage from "./pages/RulesSettingsPage";
 
 export default function App() {
   return (
@@ -29,6 +30,7 @@ export default function App() {
             <Route path="/admin" element={<AdminPage />} />
             <Route path="/reports" element={<ReportsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/rules-settings" element={<RulesSettingsPage />} />
           </Routes>
         </main>
         <StatusBar />
