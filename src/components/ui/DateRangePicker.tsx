@@ -102,7 +102,7 @@ export default function DateRangePicker({ value, onChange }: DateRangePickerProp
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full mt-1 z-20 w-52 bg-surface border border-border rounded-card shadow-subtle p-2 space-y-1">
+          <div className="absolute right-0 top-full mt-1 z-20 w-52 bg-surface border border-border rounded-card p-2 space-y-1">
             {PRESETS.map((p) => (
               <button
                 key={p.label}

@@ -50,6 +50,10 @@ async def ingest_upload(files: List[UploadFile] = File(..., description="One or 
             ).scalars().first()
 
         if record:
+            worker = IngestionWorker()
+            await asyncio.to_thread(worker.run_once)
+
+            session.refresh(record)
             results.append({
                 "ingestion_id": str(record.id),
                 "original_filename": record.original_filename,
@@ -63,9 +67,6 @@ async def ingest_upload(files: List[UploadFile] = File(..., description="One or 
                 "original_filename": file.filename,
                 "status": "classification_failed",
             })
-
-    worker = IngestionWorker()
-    asyncio.create_task(asyncio.to_thread(worker.run_once))
 
     return {"results": results, "rejected": rejected}
 

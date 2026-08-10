@@ -74,9 +74,11 @@ export default function FileDropZone({
           strokeWidth={1.5}
         />
         <p className="text-sm font-medium text-text-primary">
-          {dragover ? "Drop files here" : "Drag & drop .xlsx files here"}
+          {dragover ? "Drop files here" : "Click or drag .xlsx files to this area to upload"}
         </p>
-        <p className="text-xs text-text-secondary mt-1">or click to browse</p>
+        <p className="text-xs text-text-secondary mt-1">
+          Support for a single or bulk upload. File size limit: 50MB
+        </p>
         <input
           ref={inputRef}
           type="file"

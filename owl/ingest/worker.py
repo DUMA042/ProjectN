@@ -106,7 +106,7 @@ class IngestionWorker:
                 if id_no:
                     valid_ids.add(id_no)
                 if full_name:
-                    name_to_id[str(full_name).lower().strip()] = id_no
+                    name_to_id[' '.join(str(full_name).lower().strip().split())] = id_no
             log.debug(f"Process[{record.id}]: Loaded {len(valid_ids)} valid staff IDs.")
 
         normalizer_class = NORMALIZER_REGISTRY.get(r_type)
@@ -132,9 +132,13 @@ class IngestionWorker:
                 # Run only the Extract + Transform stages inside the dim_session scope
                 # so that any new dimension rows are written and then committed
                 # BEFORE the Load stage opens its own connection.
+                on_progress("extract", 0, 1)
                 frames   = pipeline._extract()
+                on_progress("extract", 1, 1)
                 entities = pipeline._transform(frames)
+                on_progress("transform", 0, 1)
                 entities, validation_errors = pipeline._validate(entities)
+                on_progress("transform", 1, 1)
 
                 # Commit the dimension inserts NOW so the loader's separate
                 # connection can see the new venue/consultant/location rows
@@ -143,7 +147,9 @@ class IngestionWorker:
                 log.info(f"Process[{record.id}]: Dimension inserts committed.")
 
             # Load stage runs AFTER dim_session is closed and committed
+            on_progress("load", 0, 1)
             load_reports = pipeline._load(entities)
+            on_progress("load", 1, 1)
             results = {
                 "source_file": str(pipeline._source_file),
                 "ingestion_id": str(record.id),
@@ -170,7 +176,7 @@ class IngestionWorker:
             ingestion_id=str(record.id),
             context={"valid_ids": valid_ids, "name_to_id": name_to_id}
         )
-        results = pipeline.run()
+        results = pipeline.run(progress_callback=on_progress)
         self._mark_completed(record.id, results)
 
     def _mark_completed(self, ingestion_id: str, results: dict) -> None:

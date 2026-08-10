@@ -124,7 +124,7 @@ export default function UploadPage() {
           <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wider mb-3">
             Processing
           </h3>
-          <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-4">
             {uploadResults.map((r) => (
               <ProcessingTrackerWrapper
                 key={r.ingestion_id || r.original_filename}
@@ -188,7 +188,7 @@ export default function UploadPage() {
                       <span className="text-xs">{statusBadgeFn(row.status)} {row.status}</span>
                     </td>
                     <td className="px-4 py-2.5 text-text-muted text-xs">
-                      {row.created_at ? new Date(row.created_at).toLocaleString() : "—"}
+                      {row.created_at ? new Date(row.created_at).toLocaleDateString('en-GB') + ' ' + new Date(row.created_at).toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'}) : "—"}
                     </td>
                     <td className="px-4 py-2.5">
                       {row.status === "failed" && row.error_context?.fatal_error && (

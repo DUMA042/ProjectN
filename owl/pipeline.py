@@ -79,8 +79,13 @@ class Pipeline:
 
     # ── Public API ────────────────────────────────────────────────────────────
 
-    def run(self) -> dict[str, Any]:
+    def run(self, progress_callback=None) -> dict[str, Any]:
         """Execute the full ETL pipeline.
+
+        Parameters
+        ----------
+        progress_callback:
+            Optional callback(stage, current, total) for SSE progress streaming.
 
         Returns
         -------
@@ -100,10 +105,20 @@ class Pipeline:
 
         try:
             verify_connection()
+            if progress_callback:
+                progress_callback("extract", 0, 1)
             frames = self._extract()
+            if progress_callback:
+                progress_callback("extract", 1, 1)
             entities = self._transform(frames)
+            if progress_callback:
+                progress_callback("transform", 0, 1)
             entities, validation_errors = self._validate(entities)
+            if progress_callback:
+                progress_callback("transform", 1, 1)
             load_reports = self._load(entities)
+            if progress_callback:
+                progress_callback("load", 1, 1)
             
             # Populate validation results in the summary
             total_rejected = sum(len(errs) for errs in validation_errors.values())

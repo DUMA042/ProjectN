@@ -40,7 +40,7 @@ export default function ErrorSlidePanel({
 
           {/* Panel */}
           <motion.div
-            className="fixed right-0 top-0 h-full w-[420px] max-w-[90vw] bg-surface border-l border-border z-50 flex flex-col shadow-lg"
+            className="fixed right-0 top-0 h-full w-[420px] max-w-[90vw] bg-surface border-l border-border z-50 flex flex-col"
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}

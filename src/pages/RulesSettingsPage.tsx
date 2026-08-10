@@ -191,25 +191,6 @@ export default function RulesSettingsPage() {
             Configure business rules for attendance calculations
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleReset}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm border border-border rounded-btn text-text-secondary hover:bg-nav-hover transition-colors"
-          >
-            <RotateCcw size={14} />
-            Reset Defaults
-          </button>
-          <button
-            onClick={handleSaveAll}
-            disabled={updateRule.isPending}
-            className={`flex items-center gap-1.5 px-4 py-2 text-sm rounded-btn text-white font-medium transition-colors ${
-              saved ? "bg-success" : "bg-accent hover:opacity-90"
-            }`}
-          >
-            <Save size={14} />
-            {saved ? "Saved!" : "Save All"}
-          </button>
-        </div>
       </div>
 
       {/* Per-Day Working Hours */}
@@ -364,6 +345,29 @@ export default function RulesSettingsPage() {
           >
             <Plus size={12} />
             Add status
+          </button>
+        </div>
+      </div>
+      {/* Footer */}
+      <div className="card-container p-4 flex items-center justify-between">
+        <p className="text-xs text-text-muted">
+          Changes take effect immediately for all future calculations.
+        </p>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleReset}
+            className="px-4 py-2 text-sm border border-border rounded-btn text-text-secondary hover:bg-nav-hover transition-colors"
+          >
+            Reset Defaults
+          </button>
+          <button
+            onClick={handleSaveAll}
+            disabled={updateRule.isPending}
+            className={`px-5 py-2 text-sm rounded-btn text-white font-medium transition-colors ${
+              saved ? "bg-success" : "bg-accent hover:bg-accent-hover"
+            }`}
+          >
+            {saved ? "Saved!" : "Save All"}
           </button>
         </div>
       </div>

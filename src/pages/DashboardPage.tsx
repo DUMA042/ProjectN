@@ -32,9 +32,9 @@ function getLastMonthRange(): DateRange {
 
 
 const STATUS_COLORS: Record<string, string> = {
-  "Active (Available)": "#10B981",
-  "On Leave": "#F59E0B",
-  "On Training": "#6366F1",
+  "Active (Available)": "#52C41A",
+  "On Leave": "#FAAD14",
+  "On Training": "#1677FF",
 };
 
 export default function DashboardPage() {

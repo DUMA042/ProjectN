@@ -13,13 +13,13 @@ import { useClickableLegend } from "@/lib/chartUtils";
 import type { DateRange } from "@/components/ui/DateRangePicker";
 
 const SERIES = [
-  { key: "early_arrival", label: "Early Arrival", color: "#10B981" },
-  { key: "normal_arrival", label: "Normal Arrival", color: "#3B82F6" },
-  { key: "late_arrival", label: "Late Arrival", color: "#EF4444" },
-  { key: "early_departure", label: "Early Departure", color: "#F59E0B" },
-  { key: "normal_departure", label: "Normal Departure", color: "#6366F1" },
-  { key: "late_departure", label: "Late Departure", color: "#8B5CF6" },
-  { key: "incomplete", label: "Incomplete", color: "#64748B" },
+  { key: "early_arrival", label: "Early Arrival", color: "#52C41A" },
+  { key: "normal_arrival", label: "Normal Arrival", color: "#1677FF" },
+  { key: "late_arrival", label: "Late Arrival", color: "#FF4D4F" },
+  { key: "early_departure", label: "Early Departure", color: "#FAAD14" },
+  { key: "normal_departure", label: "Normal Departure", color: "#722ED1" },
+  { key: "late_departure", label: "Late Departure", color: "#EB2F96" },
+  { key: "incomplete", label: "Incomplete", color: "#8C8C8C" },
 ];
 
 interface ArrivalTimeChartProps {

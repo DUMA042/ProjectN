@@ -13,10 +13,10 @@ import { useClickableLegend } from "@/lib/chartUtils";
 import type { DateRange } from "@/components/ui/DateRangePicker";
 
 const SEGMENTS = [
-  { key: "attendance_pct", label: "Attendance", color: "#10B981" },
-  { key: "absent_pct", label: "Absent", color: "#EF4444" },
-  { key: "leave_pct", label: "Leave", color: "#F59E0B" },
-  { key: "training_pct", label: "Training", color: "#6366F1" },
+  { key: "attendance_pct", label: "Attendance", color: "#52C41A" },
+  { key: "absent_pct", label: "Absent", color: "#FF4D4F" },
+  { key: "leave_pct", label: "Leave", color: "#FAAD14" },
+  { key: "training_pct", label: "Training", color: "#1677FF" },
 ];
 
 interface DeptAttendanceChartProps {

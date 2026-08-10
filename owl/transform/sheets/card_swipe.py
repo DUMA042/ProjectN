@@ -42,7 +42,7 @@ class CardSwipeNormalizer(BaseNormalizer):
             raise KeyError(f"Required column 'name' not found. Columns found: {df.columns.tolist()}")
 
         # Clean name column for checking
-        df["name_clean"] = df["name"].astype(str).str.lower().str.strip()
+        df["name_clean"] = df["name"].astype(str).str.lower().str.strip().str.replace(r"\s+", " ", regex=True)
         
         # Map known names to IDs
         df["mapped_id_no"] = df["name_clean"].map(name_to_id)
