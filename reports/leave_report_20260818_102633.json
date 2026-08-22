@@ -1,0 +1,57 @@
+{
+    "total_rows_read": 359,
+    "total_leave_entries_attempted": 296,
+    "total_leave_entries_inserted": 436,
+    "warnings": [
+        {
+            "type": "MISSING_DATE_BOUND",
+            "message": "Row 55: Standalone leave missing start or end date.",
+            "staff_id": "680"
+        },
+        {
+            "type": "UNPARSEABLE_PROPOSED_DATE",
+            "message": "Row 71: Proposed date 'ON TRAINING' is a string.",
+            "staff_id": "2036"
+        },
+        {
+            "type": "MISSING_DATE_BOUND",
+            "message": "Row 73: SICK missing start or end date.",
+            "staff_id": "2338"
+        },
+        {
+            "type": "UNPARSEABLE_PROPOSED_DATE",
+            "message": "Row 87: Proposed date 'ON STUDY LEAVE' is a string.",
+            "staff_id": "3007"
+        },
+        {
+            "type": "UNPARSEABLE_PROPOSED_DATE",
+            "message": "Row 181: Proposed date 'STUDY LEAVE' is a string.",
+            "staff_id": "2627"
+        },
+        {
+            "type": "UNPARSEABLE_PROPOSED_DATE",
+            "message": "Row 182: Proposed date 'SICK LEAVE' is a string.",
+            "staff_id": "1285"
+        },
+        {
+            "type": "MISSING_DATE_BOUND",
+            "message": "Row 232: ANNUAL missing start or end date.",
+            "staff_id": "1523"
+        },
+        {
+            "type": "MISSING_DATE_BOUND",
+            "message": "Row 277: ANNUAL missing start or end date.",
+            "staff_id": "2323"
+        }
+    ],
+    "failures": [
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 226: Staff ID '1331' not found in database.",
+            "staff_id": "1331"
+        }
+    ],
+    "failed_staff_ids": [
+        "1331"
+    ]
+}

@@ -97,8 +97,10 @@ class IngestionWorker:
 
         # ── All other report types: generic Pipeline ─────────────────────────
         # Fetch valid id_no set for orphan detection in card swipes / training
+        import re
         valid_ids = set()
         name_to_id = {}
+        name_to_id_sorted = {}
         with get_session() as session:
             from owl.load.models import Employee
             emps = session.execute(select(Employee.id_no, Employee.full_name)).all()
@@ -106,7 +108,10 @@ class IngestionWorker:
                 if id_no:
                     valid_ids.add(id_no)
                 if full_name:
-                    name_to_id[' '.join(str(full_name).lower().strip().split())] = id_no
+                    clean = ' '.join(str(full_name).lower().strip().split())
+                    name_to_id[clean] = id_no
+                    sorted_key = ' '.join(sorted(re.sub(r'[^\w\s]', '', str(full_name).lower()).split()))
+                    name_to_id_sorted[sorted_key] = id_no
             log.debug(f"Process[{record.id}]: Loaded {len(valid_ids)} valid staff IDs.")
 
         normalizer_class = NORMALIZER_REGISTRY.get(r_type)
@@ -126,6 +131,7 @@ class IngestionWorker:
                     context={
                         "valid_ids": valid_ids,
                         "name_to_id": name_to_id,
+                        "name_to_id_sorted": name_to_id_sorted,
                         "dim_cache": dim_cache,
                     }
                 )
@@ -174,7 +180,7 @@ class IngestionWorker:
             source_file=record.file_path,
             normalizer_class=normalizer_class,
             ingestion_id=str(record.id),
-            context={"valid_ids": valid_ids, "name_to_id": name_to_id}
+            context={"valid_ids": valid_ids, "name_to_id": name_to_id, "name_to_id_sorted": name_to_id_sorted}
         )
         results = pipeline.run(progress_callback=on_progress)
         self._mark_completed(record.id, results)

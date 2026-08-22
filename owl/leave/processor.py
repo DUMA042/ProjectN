@@ -69,7 +69,7 @@ def _check_leave_signatures(r1: pd.Series, r2: pd.Series) -> bool:
 def _cached_parse_date(str_val: str) -> date | None:
     """Cached dateutil parsing — avoids repeated work on duplicate date strings."""
     try:
-        return parse_date(str_val, dayfirst=True).date()
+        return parse_date(str_val).date()
     except Exception:
         return None
 

@@ -217,7 +217,7 @@ def _to_date(value: Any) -> Optional[date]:
         import warnings
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            dt = pd.to_datetime(str(value).strip(), dayfirst=True, errors='coerce')
+            dt = pd.to_datetime(str(value).strip(), errors='coerce')
             if not pd.isna(dt):
                 return dt.date()
     except Exception:
@@ -254,7 +254,7 @@ def _fallback_parse_date(raw: str) -> Optional[date]:
     # Try dateutil as last resort
     try:
         from dateutil.parser import parse as parse_dateutil
-        return parse_dateutil(raw, dayfirst=True).date()
+        return parse_dateutil(raw).date()
     except Exception:
         return None
 

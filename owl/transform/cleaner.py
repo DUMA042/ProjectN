@@ -110,7 +110,7 @@ def coerce_dates(df: pd.DataFrame, date_columns: list[str]) -> pd.DataFrame:
     df = df.copy()
     for col in date_columns:
         if col in df.columns:
-            df[col] = pd.to_datetime(df[col], errors="coerce", dayfirst=True)
+            df[col] = pd.to_datetime(df[col], errors="coerce")
             nat_count = df[col].isna().sum()
             if nat_count:
                 log.warning(

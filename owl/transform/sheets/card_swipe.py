@@ -6,6 +6,7 @@ Decomposes Card Swipe data and handles orphan detection (Option A).
 
 from __future__ import annotations
 
+import re
 import pandas as pd
 from owl.transform.normalizer import BaseNormalizer, NormalizationResult
 from owl.logger import get_logger
@@ -44,8 +45,16 @@ class CardSwipeNormalizer(BaseNormalizer):
         # Clean name column for checking
         df["name_clean"] = df["name"].astype(str).str.lower().str.strip().str.replace(r"\s+", " ", regex=True)
         
-        # Map known names to IDs
+        # Map known names to IDs (primary: exact match)
         df["mapped_id_no"] = df["name_clean"].map(name_to_id)
+        
+        # Fallback: sorted-parts match for reversed/cross-ordered names
+        name_to_id_sorted = self._context.get("name_to_id_sorted", {})
+        if name_to_id_sorted:
+            def _sorted_parts(s):
+                return ' '.join(sorted(re.sub(r'[^\w\s]', '', str(s).lower()).split()))
+            still_orphan = df["mapped_id_no"].isna()
+            df.loc[still_orphan, "mapped_id_no"] = df.loc[still_orphan, "name_clean"].apply(_sorted_parts).map(name_to_id_sorted)
         
         # Mask orphans (unmapped)
         mask_orphan = df["mapped_id_no"].isna()
@@ -82,8 +91,8 @@ class CardSwipeNormalizer(BaseNormalizer):
             fact_df["id_no"] = fact_df["mapped_id_no"]
             fact_df["location_id"] = 1  # Forced location hardcoding
             
-            # Ensure swipe_time is datetime (DD/MM/YYYY format)
-            fact_df["swipe_time"] = pd.to_datetime(fact_df["swipe_time"], dayfirst=True)
+            # Ensure swipe_time is datetime
+            fact_df["swipe_time"] = pd.to_datetime(fact_df["swipe_time"])
             
             final_cols = ["id_no", "location_id", "swipe_time"]
             entities["employee_card_swipes"] = fact_df[final_cols].copy()
