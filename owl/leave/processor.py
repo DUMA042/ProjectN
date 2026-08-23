@@ -378,22 +378,7 @@ class LeaveProcessor:
         records: list[LeaveRecord] = []
 
         # Insert leave records
-        if not leave_entries_to_insert:
-            if prop_date or prop_raw or resum_date or resum_raw:
-                rec = LeaveRecord(
-                    id_no=staff_id,
-                    leave_type_id=None,
-                    start_date=prop_date,
-                    start_date_raw=prop_raw,
-                    end_date=resum_date,
-                    end_date_raw=resum_raw,
-                    planned_start_date=prop_date if prop_date else None,
-                    planned_start_date_raw=prop_raw if prop_raw else None,
-                    planned_end_date=resum_date if resum_date else None,
-                    planned_end_date_raw=resum_raw if resum_raw else None
-                )
-                records.append(rec)
-        else:
+        if leave_entries_to_insert:
             latest_entry = None
             latest_date = None
             for entry in leave_entries_to_insert:
@@ -419,6 +404,14 @@ class LeaveProcessor:
                     planned_end_date_raw=resum_raw if is_latest else None
                 )
                 records.append(rec)
+        else:
+            if prop_date or prop_raw or resum_date or resum_raw:
+                self._add_warning(
+                    "NO_LEAVE_DATES",
+                    f"Row {row_idx}: Employee has proposed/resumption dates but no "
+                    f"type-specific leave dates. No record created.",
+                    staff_id
+                )
 
         return (app, records)
 

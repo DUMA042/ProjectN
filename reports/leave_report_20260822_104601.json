@@ -1,0 +1,777 @@
+{
+    "total_rows_read": 359,
+    "total_leave_entries_attempted": 296,
+    "total_leave_entries_inserted": 292,
+    "warnings": [
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 2: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "3040"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 3: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "328"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 4: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "3042"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 5: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1194"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 6: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1168"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 7: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "3044"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 8: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1282"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 9: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2622"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 10: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2132"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 11: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2438"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 13: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1487"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 15: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2787"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 18: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2637"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 19: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "439"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 21: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2084"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 23: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "3013"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 24: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "3038"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 27: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1822"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 28: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1798"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 29: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "3034"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 31: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2614"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 32: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2718"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 33: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "3039"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 35: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1874"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 37: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1857"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 39: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1469"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 46: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "699"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 47: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "732"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 50: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1380"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 51: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1373"
+        },
+        {
+            "type": "MISSING_DATE_BOUND",
+            "message": "Row 55: Standalone leave missing start or end date.",
+            "staff_id": "680"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 58: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1368"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 60: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1292"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 63: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1704"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 64: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2266"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 66: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2169"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 68: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1915"
+        },
+        {
+            "type": "UNPARSEABLE_PROPOSED_DATE",
+            "message": "Row 71: Proposed date 'ON TRAINING' is a string.",
+            "staff_id": "2036"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 71: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2036"
+        },
+        {
+            "type": "MISSING_DATE_BOUND",
+            "message": "Row 73: SICK missing start or end date.",
+            "staff_id": "2338"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 74: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2326"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 81: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2582"
+        },
+        {
+            "type": "UNPARSEABLE_PROPOSED_DATE",
+            "message": "Row 87: Proposed date 'ON STUDY LEAVE' is a string.",
+            "staff_id": "3007"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 87: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "3007"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 94: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2716"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 95: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "538"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 104: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2253"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 109: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2120"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 110: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "623"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 114: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1848"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 117: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2474"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 123: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2781"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 125: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2468"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 126: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2470"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 127: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2815"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 128: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2850"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 130: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2319"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 132: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1943"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 134: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "469"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 135: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1214"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 137: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "691"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 138: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1136"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 145: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "532"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 150: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2580"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 153: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2940"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 155: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1942"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 157: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1363"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 161: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1859"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 164: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2801"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 165: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2442"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 167: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2951"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 174: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "888"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 176: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1421"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 177: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1519"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 178: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1191"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 179: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "578"
+        },
+        {
+            "type": "UNPARSEABLE_PROPOSED_DATE",
+            "message": "Row 181: Proposed date 'STUDY LEAVE' is a string.",
+            "staff_id": "2627"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 181: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2627"
+        },
+        {
+            "type": "UNPARSEABLE_PROPOSED_DATE",
+            "message": "Row 182: Proposed date 'SICK LEAVE' is a string.",
+            "staff_id": "1285"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 182: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1285"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 183: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1646"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 184: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1569"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 191: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2136"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 195: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1817"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 197: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1800"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 200: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2943"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 207: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2158"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 212: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2464"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 220: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2913"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 221: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "299"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 224: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1728"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 227: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2115"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 229: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2128"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 231: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1928"
+        },
+        {
+            "type": "MISSING_DATE_BOUND",
+            "message": "Row 232: ANNUAL missing start or end date.",
+            "staff_id": "1523"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 232: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1523"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 234: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1668"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 235: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "347"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 236: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2260"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 237: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "3024"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 243: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2783"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 246: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2532"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 247: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2993"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 250: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2944"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 251: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2661"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 254: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2927"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 263: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2042"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 267: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2586"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 268: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2483"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 272: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2931"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 276: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1885"
+        },
+        {
+            "type": "MISSING_DATE_BOUND",
+            "message": "Row 277: ANNUAL missing start or end date.",
+            "staff_id": "2323"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 277: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2323"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 279: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2467"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 282: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2055"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 286: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2804"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 289: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "367"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 290: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1310"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 291: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1115"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 292: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1708"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 293: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2874"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 294: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2090"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 295: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2427"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 300: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1137"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 304: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1923"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 305: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "320"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 307: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2214"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 313: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2054"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 314: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2127"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 316: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2137"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 317: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "545"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 319: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2236"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 320: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2748"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 321: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2851"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 325: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2511"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 332: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2947"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 335: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1484"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 337: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2884"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 338: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1767"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 340: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2847"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 343: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2660"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 344: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2691"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 345: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2663"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 346: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1343"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 347: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1448"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 349: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1902"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 350: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2020"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 352: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "397"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 353: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1502"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 355: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "2924"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 358: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1236"
+        },
+        {
+            "type": "NO_LEAVE_DATES",
+            "message": "Row 360: Employee has proposed/resumption dates but no type-specific leave dates. No record created.",
+            "staff_id": "1651"
+        }
+    ],
+    "failures": [
+        {
+            "type": "INVALID_STAFF_ID",
+            "message": "Row 226: Staff ID '1331' not found in database.",
+            "staff_id": "1331"
+        }
+    ],
+    "failed_staff_ids": [
+        "1331"
+    ]
+}
