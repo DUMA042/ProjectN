@@ -1,16 +1,15 @@
-import { useState, useCallback, useRef } from "react";
-import { motion } from "framer-motion";
-import { Upload, RotateCcw } from "lucide-react";
+import { useState, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Upload, RotateCcw, Undo2, X } from "lucide-react";
 import FileDropZone from "@/components/ui/FileDropZone";
-import ProcessTracker from "@/components/ui/ProcessTracker";
+import IngestionTrackerCard from "@/components/upload/IngestionTrackerCard";
+import DetailsContent from "@/components/upload/DetailsContent";
 import ErrorSlidePanel from "@/components/ui/ErrorSlidePanel";
 import {
   useUploadFiles,
-  useIngestionStatus,
-  useIngestionErrors,
+  useForgetIngestion,
   useIngestionHistory,
 } from "@/hooks/useIngestion";
-import type { UploadResult } from "@/hooks/useIngestion";
 
 function statusBadgeFn(s: string) {
   const map: Record<string, string> = {
@@ -29,21 +28,35 @@ interface QueuedFile {
   file: File;
 }
 
+interface TrackerEntry {
+  key: string;
+  result: {
+    ingestion_id: string | null;
+    original_filename: string;
+    normalized_filename?: string;
+    report_type?: string;
+    status: string;
+  };
+}
+
 export default function UploadPage() {
   const [queuedFiles, setQueuedFiles] = useState<QueuedFile[]>([]);
-  const [uploadResults, setUploadResults] = useState<UploadResult[]>([]);
-  const [activeIds, setActiveIds] = useState<string[]>([]);
-  const [errorPanel, setErrorPanel] = useState<{ open: boolean; filename: string; ingestionId: string | null }>({
-    open: false, filename: "", ingestionId: null,
+  const [trackers, setTrackers] = useState<TrackerEntry[]>([]);
+  const [detailsPanel, setDetailsPanel] = useState<{ open: boolean; ingestionId: string | null; filename: string }>({
+    open: false, ingestionId: null, filename: "",
   });
-  const [toasts, setToasts] = useState<{ id: string; message: string }[]>([]);
+  const [undoConfirm, setUndoConfirm] = useState<{ open: boolean; id: string; filename: string }>({
+    open: false, id: "", filename: "",
+  });
+  const [toasts, setToasts] = useState<{ id: string; message: string; kind: "success" | "warning" | "error" | "info" }[]>([]);
 
   const uploadMutation = useUploadFiles();
+  const forgetMutation = useForgetIngestion();
   const historyQuery = useIngestionHistory();
 
-  const addToast = (message: string) => {
-    const id = Date.now().toString();
-    setToasts((prev) => [...prev, { id, message }]);
+  const addToast = (message: string, kind: "success" | "warning" | "error" | "info" = "info") => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    setToasts((prev) => [...prev.slice(-4), { id, message, kind }]);
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 6000);
   };
 
@@ -64,32 +77,80 @@ export default function UploadPage() {
   const handleUpload = async () => {
     if (!queuedFiles.length || uploadMutation.isPending) return;
 
-    const result = await uploadMutation.mutateAsync(queuedFiles.map((f) => f.file));
-    const results = result.results || [];
-    setUploadResults(results);
+    // Optimistically clear the drop zone — files now live as tracker cards.
     setQueuedFiles([]);
+    setTrackers(
+      queuedFiles.map((f) => ({
+        key: `pending-${f.name}-${Date.now()}`,
+        result: { ingestion_id: null, original_filename: f.name, status: "uploading" },
+      }))
+    );
 
-    const ids = results.filter((r) => r.ingestion_id).map((r) => r.ingestion_id!);
-    setActiveIds((prev) => [...prev, ...ids]);
-
-    result.rejected?.forEach((r) => addToast(`⚠️ ${r.filename}: ${r.reason}`));
+    try {
+      const res = await uploadMutation.mutateAsync(queuedFiles.map((f) => f.file));
+      // Replace placeholders with real results keyed by filename.
+      setTrackers(
+        (res.results || []).map((r) => ({
+          key: r.ingestion_id || `fail-${r.original_filename}`,
+          result: r,
+        }))
+      );
+      res.rejected?.forEach((rj) => addToast(`⚠️ ${rj.filename}: ${rj.reason}`, "warning"));
+    } catch {
+      addToast("❌ Upload failed — check that the API server is running.", "error");
+      setTrackers([]);
+    }
   };
 
-  const handleViewFailures = (filename: string, ingestionId: string | null) => {
-    setErrorPanel({ open: true, filename, ingestionId });
+  const handleViewDetails = (filename: string, ingestionId: string | null) => {
+    setDetailsPanel({ open: true, ingestionId, filename });
+  };
+
+  const handleTrackerCompleted = (filename: string, rowsLoaded: number) => {
+    addToast(`✅ ${filename} processed — ${rowsLoaded.toLocaleString()} records loaded`, "success");
+    // Auto-dismiss the tracker card after 3 seconds.
+    setTimeout(() => {
+      setTrackers((prev) => prev.filter((t) => t.result.original_filename !== filename && (t.result.normalized_filename || "") !== filename));
+    }, 3000);
+  };
+
+  const handleTrackerQuarantined = (filename: string, reason: string) => {
+    addToast(`⚠️ ${filename} was quarantined — ${reason}`, "warning");
+  };
+
+  const handleTrackerFailed = (filename: string, message: string) => {
+    addToast(`❌ ${filename}: ${message}`, "error");
+  };
+
+  const handleDismissTracker = (key: string) => {
+    setTrackers((prev) => prev.filter((t) => t.key !== key));
+  };
+
+  const handleUndoConfirm = async () => {
+    if (!undoConfirm.id) return;
+    try {
+      const res = await forgetMutation.mutateAsync(undoConfirm.id);
+      addToast(`✅ ${res.message}`, "success");
+    } catch {
+      addToast("❌ Could not remove the upload record.", "error");
+    }
+    setUndoConfirm({ open: false, id: "", filename: "" });
   };
 
   const historyRows = historyQuery.data || [];
 
+  const toastStyles: Record<string, string> = {
+    success: "bg-badge-green-bg border-success/40 text-[#389E0D]",
+    warning: "bg-badge-amber-bg border-warning/40 text-badge-amber-text",
+    error: "bg-badge-red-bg border-danger/40 text-danger",
+    info: "bg-surface border-border text-text-primary",
+  };
+
   return (
-    <motion.div
-      className="p-6 space-y-5"
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-    >
+    <div className="p-6 space-y-5">
       {/* Header */}
       <div>
-        <h1 className="text-xl font-semibold text-text-primary">File Upload & Ingestion</h1>
+        <h1 className="text-xl font-semibold text-text-primary">File Upload &amp; Ingestion</h1>
         <p className="text-sm text-text-secondary mt-0.5">
           Upload Excel files to process into the database
         </p>
@@ -110,32 +171,41 @@ export default function UploadPage() {
           <button
             onClick={handleUpload}
             disabled={uploadMutation.isPending}
-            className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-accent rounded-btn hover:opacity-90 disabled:opacity-50 transition-opacity"
+            className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-accent rounded-btn hover:bg-accent-hover disabled:opacity-50 transition-colors"
           >
             <Upload size={16} />
-            {uploadMutation.isPending ? "Uploading..." : `Upload ${queuedFiles.length} file${queuedFiles.length > 1 ? "s" : ""}`}
+            {uploadMutation.isPending
+              ? "Uploading…"
+              : `Upload ${queuedFiles.length} file${queuedFiles.length > 1 ? "s" : ""}`}
           </button>
         </div>
       )}
 
-      {/* Processing */}
-      {activeIds.length > 0 && (
-        <div>
-          <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wider mb-3">
-            Processing
-          </h3>
+      {/* Processing trackers */}
+      <AnimatePresence>
+        {trackers.length > 0 && (
           <div className="grid grid-cols-2 gap-4">
-            {uploadResults.map((r) => (
-              <ProcessingTrackerWrapper
-                key={r.ingestion_id || r.original_filename}
-                result={r}
-                onViewFailures={handleViewFailures}
-                onQuarantine={(msg) => addToast(msg)}
-              />
+            {trackers.map((t) => (
+              <motion.div
+                key={t.key}
+                layout
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.35 } }}
+              >
+                <IngestionTrackerCard
+                  result={t.result}
+                  onViewDetails={handleViewDetails}
+                  onCompleted={handleTrackerCompleted}
+                  onQuarantined={handleTrackerQuarantined}
+                  onFailed={handleTrackerFailed}
+                  onDismiss={() => handleDismissTracker(t.key)}
+                />
+              </motion.div>
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
 
       {/* History */}
       <div>
@@ -174,44 +244,46 @@ export default function UploadPage() {
                   <th className="text-left px-4 py-2.5 text-xs text-text-muted font-semibold uppercase">Type</th>
                   <th className="text-left px-4 py-2.5 text-xs text-text-muted font-semibold uppercase">Status</th>
                   <th className="text-left px-4 py-2.5 text-xs text-text-muted font-semibold uppercase">When</th>
-                  <th className="text-left px-4 py-2.5 text-xs text-text-muted font-semibold uppercase">Details</th>
+                  <th className="text-left px-4 py-2.5 text-xs text-text-muted font-semibold uppercase">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {historyRows.map((row: any) => (
-                  <tr key={row.id} className="border-b border-divider last:border-0 hover:bg-nav-hover transition-colors">
-                    <td className="px-4 py-2.5 text-text-primary max-w-[200px] truncate" title={row.normalized_filename || row.original_filename}>
+                  <tr key={row.id} className="border-b border-divider last:border-0 hover:bg-nav-hover transition-colors group">
+                    <td className="px-4 py-2.5 text-text-primary max-w-[220px] truncate" title={row.normalized_filename || row.original_filename}>
                       {row.normalized_filename || row.original_filename}
                     </td>
                     <td className="px-4 py-2.5 text-text-secondary">{row.report_type || "—"}</td>
                     <td className="px-4 py-2.5">
                       <span className="text-xs">{statusBadgeFn(row.status)} {row.status}</span>
                     </td>
-                    <td className="px-4 py-2.5 text-text-muted text-xs">
-                      {row.created_at ? new Date(row.created_at).toLocaleDateString('en-GB') + ' ' + new Date(row.created_at).toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'}) : "—"}
+                    <td className="px-4 py-2.5 text-text-muted text-xs whitespace-nowrap">
+                      {row.created_at ? new Date(row.created_at).toLocaleDateString("en-GB") + " " + new Date(row.created_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "—"}
                     </td>
                     <td className="px-4 py-2.5">
-                      {row.status === "failed" && row.error_context?.fatal_error && (
+                      <div className="flex items-center gap-3 opacity-60 group-hover:opacity-100 transition-opacity">
+                        {(row.status === "completed" || row.status === "failed") && (
+                          <button
+                            onClick={() => handleViewDetails(row.normalized_filename || row.original_filename, row.id)}
+                            className="text-xs text-info hover:underline"
+                          >
+                            View details
+                          </button>
+                        )}
                         <button
-                          onClick={() => handleViewFailures(row.normalized_filename || row.original_filename, row.id)}
-                          className="text-xs text-danger hover:underline"
+                          onClick={() => setUndoConfirm({
+                            open: true,
+                            id: row.id,
+                            filename: row.normalized_filename || row.original_filename,
+                          })}
+                          disabled={forgetMutation.isPending}
+                          title="Remove upload record so this file can be re-uploaded"
+                          className="flex items-center gap-1 text-xs text-text-muted hover:text-danger transition-colors disabled:opacity-40"
                         >
-                          View error
+                          <Undo2 size={12} />
+                          Undo
                         </button>
-                      )}
-                      {row.status === "quarantined" && row.error_context?.reason && (
-                        <span className="text-xs text-[#D97706]" title={row.error_context.reason}>
-                          {row.error_context.reason}
-                        </span>
-                      )}
-                      {row.status === "completed" && (
-                        <button
-                          onClick={() => handleViewFailures(row.normalized_filename || row.original_filename, row.id)}
-                          className="text-xs text-info hover:underline"
-                        >
-                          View details
-                        </button>
-                      )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -221,178 +293,88 @@ export default function UploadPage() {
         )}
       </div>
 
-      {/* Error slide panel */}
+      {/* Details slide panel */}
       <ErrorSlidePanel
-        open={errorPanel.open}
-        onClose={() => setErrorPanel({ ...errorPanel, open: false })}
-        filename={errorPanel.filename}
-        rows={errorPanel.ingestionId ? ([] as FailedRow[]) : []}
+        open={detailsPanel.open}
+        onClose={() => setDetailsPanel({ ...detailsPanel, open: false })}
+        filename={detailsPanel.filename}
       >
-        {errorPanel.ingestionId && <ErrorPanelContent ingestionId={errorPanel.ingestionId} />}
+        {detailsPanel.ingestionId && <DetailsContent ingestionId={detailsPanel.ingestionId} />}
       </ErrorSlidePanel>
 
+      {/* Undo confirmation modal */}
+      <AnimatePresence>
+        {undoConfirm.open && (
+          <>
+            <motion.div
+              className="fixed inset-0 bg-black/30 z-50"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setUndoConfirm({ open: false, id: "", filename: "" })}
+            />
+            <motion.div
+              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[420px] max-w-[90vw] bg-surface border border-border rounded-card z-50 p-5"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+            >
+              <div className="flex items-start gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-badge-amber-bg flex items-center justify-center flex-shrink-0">
+                  <Undo2 size={18} className="text-badge-amber-text" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary">Remove upload record?</h3>
+                  <p className="text-xs text-text-secondary mt-1 leading-5">
+                    The upload record for <span className="font-medium text-text-primary">{undoConfirm.filename}</span> will be removed,
+                    allowing the same file to be uploaded again without a duplicate-content quarantine.
+                  </p>
+                  <p className="text-xs text-warning mt-2 font-medium">
+                    Note: Data already loaded into the database by this file will remain.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  onClick={() => setUndoConfirm({ open: false, id: "", filename: "" })}
+                  className="px-4 py-2 text-sm border border-border rounded-btn text-text-secondary hover:bg-nav-hover transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleUndoConfirm}
+                  disabled={forgetMutation.isPending}
+                  className="px-4 py-2 text-sm font-medium text-white bg-accent rounded-btn hover:bg-accent-hover disabled:opacity-50 transition-colors"
+                >
+                  {forgetMutation.isPending ? "Removing…" : "Remove Record"}
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
       {/* Toasts */}
-      <div className="fixed top-4 right-4 z-50 space-y-2">
-        {toasts.map((t) => (
-          <motion.div
-            key={t.id}
-            className="px-4 py-2.5 bg-[#FEF3C7] border border-[#FCD34D] rounded-card text-sm text-[#D97706] shadow-subtle max-w-sm"
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 50 }}
-          >
-            {t.message}
-          </motion.div>
-        ))}
-      </div>
-    </motion.div>
-  );
-}
-
-/* ── Sub-components ─────────────────────────────────────────────────────── */
-
-function ProcessingTrackerWrapper({
-  result,
-  onViewFailures,
-  onQuarantine,
-}: {
-  result: UploadResult;
-  onViewFailures: (filename: string, id: string | null) => void;
-  onQuarantine: (msg: string) => void;
-}) {
-  const enabled = !!result.ingestion_id && result.status !== "classification_failed";
-  const { data: status } = useIngestionStatus(result.ingestion_id, enabled);
-
-  const filename = result.normalized_filename || result.original_filename;
-  const dbStatus = status?.db_status || result.status;
-
-  const steps = buildSteps(dbStatus);
-  const isQuarantined = dbStatus === "quarantined";
-  const isDone = dbStatus === "completed" || dbStatus === "failed" || isQuarantined;
-
-  // Extract summary from error_context
-  const ctx = status?.error_context || {};
-  const loadResults = ctx.load_results || {};
-  let successCount: number | undefined;
-  let failedCount: number | undefined;
-
-  if (typeof loadResults === "object" && !Array.isArray(loadResults)) {
-    successCount = 0;
-    failedCount = 0;
-    for (const v of Object.values(loadResults)) {
-      if (typeof v === "object" && v !== null && "success" in v) {
-        successCount += (v as any).success || 0;
-        failedCount += (v as any).failed || 0;
-      }
-    }
-  }
-  if (ctx.total_successes !== undefined) successCount = ctx.total_successes;
-  if (ctx.total_failures !== undefined) failedCount = ctx.total_failures;
-
-  // Quarantine toast
-  const toastedRef = useRef(false);
-  if (isQuarantined && !toastedRef.current) {
-    toastedRef.current = true;
-    const reason = ctx.reason || "Unknown reason";
-    onQuarantine(`⚠️ ${filename} was quarantined — ${reason}`);
-  }
-
-  return (
-    <ProcessTracker
-      filename={filename}
-      steps={steps}
-      progress={status?.progress?.total ? ((status.progress.current || 0) / status.progress.total) * 100 : undefined}
-      successCount={isDone ? successCount : undefined}
-      failedCount={isDone ? failedCount : undefined}
-      onViewFailures={() => onViewFailures(filename, result.ingestion_id)}
-      errorMessage={dbStatus === "failed" ? ctx.fatal_error : undefined}
-      quarantineReason={isQuarantined ? ctx.reason : undefined}
-    />
-  );
-}
-
-function buildSteps(dbStatus: string): { key: string; label: string; status: "pending" | "active" | "done" | "error" }[] {
-  const base: { key: string; label: string; status: "pending" | "active" | "done" | "error" }[] = [
-    { key: "received", label: "File received", status: "done" },
-    { key: "classified", label: "Classified", status: "done" },
-    { key: "routed", label: "Routed to folder", status: "done" },
-  ];
-
-  if (dbStatus === "pending") {
-    base[2].status = "active";
-    return [...base, { key: "processing", label: "Waiting to process", status: "pending" as const }];
-  }
-
-  if (dbStatus === "processing") {
-    return [...base, { key: "processing", label: "Processing data...", status: "active" as const }];
-  }
-
-  if (dbStatus === "completed") {
-    return [...base, { key: "processing", label: "Processing complete", status: "done" as const }];
-  }
-
-  if (dbStatus === "failed") {
-    return [...base, { key: "processing", label: "Processing failed", status: "error" as const }];
-  }
-
-  if (dbStatus === "quarantined") {
-    base[1].status = "error";
-    return [...base.slice(0, 2), { key: "processing", label: "Quarantined", status: "error" as const }];
-  }
-
-  if (dbStatus === "classification_failed") {
-    base[0].status = "done";
-    base[1].status = "error";
-    return base.slice(0, 2);
-  }
-
-  return [...base, { key: "processing", label: "Processing...", status: "active" as const }];
-}
-
-function ErrorPanelContent({ ingestionId }: { ingestionId: string }) {
-  const errorsQuery = useIngestionErrors(ingestionId);
-
-  if (!errorsQuery.isFetched) {
-    // trigger fetch
-    errorsQuery.refetch();
-  }
-
-  return (
-    <>
-      {errorsQuery.isLoading && (
-        <div className="p-5 space-y-3 animate-pulse">
-          {[...Array(6)].map((_, i) => (
-            <div key={i} className="h-10 bg-nav-hover rounded-btn" />
+      <div className="fixed top-4 right-4 z-[60] space-y-2 w-96 max-w-[90vw]">
+        <AnimatePresence>
+          {toasts.map((t) => (
+            <motion.div
+              key={t.id}
+              className={`flex items-start gap-2 px-4 py-3 border rounded-card text-sm shadow-layer-2 ${toastStyles[t.kind]}`}
+              initial={{ opacity: 0, x: 60 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 60 }}
+              transition={{ type: "spring", damping: 22, stiffness: 260 }}
+            >
+              <span className="flex-1">{t.message}</span>
+              <button
+                onClick={() => setToasts((prev) => prev.filter((x) => x.id !== t.id))}
+                className="opacity-50 hover:opacity-100 transition-opacity"
+              >
+                <X size={14} />
+              </button>
+            </motion.div>
           ))}
-        </div>
-      )}
-      {errorsQuery.data && errorsQuery.data.total_failed === 0 && (
-        <div className="flex flex-col items-center justify-center h-full py-12 text-text-muted">
-          <p className="text-sm">No failure details available</p>
-        </div>
-      )}
-      {errorsQuery.data && errorsQuery.data.failed_rows.length > 0 && (
-        <table className="w-full text-xs">
-          <thead className="sticky top-0 bg-surface border-b border-divider">
-            <tr>
-              <th className="text-left px-4 py-2.5 text-text-muted font-semibold uppercase w-14">Row</th>
-              <th className="text-left px-4 py-2.5 text-text-muted font-semibold uppercase w-20">ID No</th>
-              <th className="text-left px-4 py-2.5 text-text-muted font-semibold uppercase w-24">Field</th>
-              <th className="text-left px-4 py-2.5 text-text-muted font-semibold uppercase">Message</th>
-            </tr>
-          </thead>
-          <tbody>
-            {errorsQuery.data.failed_rows.map((r, i) => (
-              <tr key={i} className="border-b border-divider last:border-0 hover:bg-nav-hover transition-colors">
-                <td className="px-4 py-2 text-text-secondary">{r.row}</td>
-                <td className="px-4 py-2 text-text-primary font-medium">{r.id_no}</td>
-                <td className="px-4 py-2 text-text-secondary">{r.field}</td>
-                <td className="px-4 py-2 text-text-primary">{r.message}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </>
+        </AnimatePresence>
+      </div>
+    </div>
   );
 }

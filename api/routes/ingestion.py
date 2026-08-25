@@ -1,23 +1,84 @@
-"""Ingestion endpoints — multi-file upload, status polling, error details, history."""
+"""Ingestion endpoints — multi-file upload, live status polling,
+processing details, and upload-record removal (forget)."""
 import asyncio
 import shutil
+import threading
 import uuid
 from pathlib import Path
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+from sqlalchemy import select, func
 from sqlalchemy.orm import Session
-from sqlalchemy import select
 
 from api.dependencies import get_db
 from owl.config import settings
 from owl.ingest.progress import get_progress as get_store_progress
 from owl.ingest.manager import IngestionManager
 from owl.ingest.worker import IngestionWorker
+from owl.load.database import get_session
 from owl.load.models import FileIngestionMeta
 
 router = APIRouter(tags=["ingestion"])
 INBOX_DIR = settings.inbox_dir
+
+# ── Stage labels shown in the UI ─────────────────────────────────────────────
+STAGE_LABELS = {
+    "extract": "Extracting data from Excel",
+    "transform": "Transforming and cleaning data",
+    "validate": "Validating rows against contracts",
+    "load": "Loading data into database",
+    "parse": "Parsing leave rows",
+    "row": "Processing employee rows",
+    "start": "Starting…",
+}
+
+
+def _run_worker_background(max_rounds: int = 25) -> None:
+    """Run the ingestion worker until no pending records remain.
+
+    Executed on a daemon thread so the HTTP response can return immediately.
+    """
+    try:
+        worker = IngestionWorker()
+        for _ in range(max_rounds):
+            worker.run_once()
+            with get_session() as session:
+                remaining = session.execute(
+                    select(func.count()).select_from(FileIngestionMeta)
+                    .where(FileIngestionMeta.status == "pending")
+                ).scalar()
+            if not remaining:
+                break
+    except Exception:  # noqa: BLE001 — background thread must never crash the app
+        import logging
+        logging.getLogger("owl.ingest.background").exception("Background worker crashed.")
+
+
+def _stage_info(db_status, progress) -> dict:
+    """Build a normalized stage payload for the frontend."""
+    if db_status == "completed":
+        return {"label": "Processing complete", "percent": 100, "current": None, "total": None}
+    if db_status == "failed":
+        return {"label": "Processing failed", "percent": None, "current": None, "total": None}
+    if db_status == "quarantined":
+        return {"label": "File quarantined", "percent": None, "current": None, "total": None}
+    if db_status == "pending":
+        return {"label": "Waiting for worker…", "percent": None, "current": None, "total": None}
+
+    # processing (or unknown) → derive from progress store
+    if progress and isinstance(progress, dict):
+        stage = progress.get("stage")
+        label = STAGE_LABELS.get(stage, "Processing data")
+        current = progress.get("current")
+        total = progress.get("total")
+        percent = None
+        if isinstance(current, (int, float)) and isinstance(total, (int, float)) and total > 0:
+            percent = round((current / total) * 100)
+            label = f"{label}… {current:,}/{total:,}"
+        return {"label": label, "percent": percent, "current": current, "total": total}
+
+    return {"label": "Processing data", "percent": None, "current": None, "total": None}
 
 
 @router.post("/ingest/upload")
@@ -41,7 +102,6 @@ async def ingest_upload(files: List[UploadFile] = File(..., description="One or 
         manager = IngestionManager()
         await asyncio.to_thread(manager.run_once)
 
-        from owl.load.database import get_session
         with get_session() as session:
             record = session.execute(
                 select(FileIngestionMeta)
@@ -50,10 +110,6 @@ async def ingest_upload(files: List[UploadFile] = File(..., description="One or 
             ).scalars().first()
 
         if record:
-            worker = IngestionWorker()
-            await asyncio.to_thread(worker.run_once)
-
-            session.refresh(record)
             results.append({
                 "ingestion_id": str(record.id),
                 "original_filename": record.original_filename,
@@ -68,26 +124,171 @@ async def ingest_upload(files: List[UploadFile] = File(..., description="One or 
                 "status": "classification_failed",
             })
 
+    # Kick off processing on a daemon thread; HTTP returns immediately so the
+    # frontend can poll per-file stage progress via /ingest/status/{id}.
+    thread = threading.Thread(target=_run_worker_background, daemon=True)
+    thread.start()
+
     return {"results": results, "rejected": rejected}
 
 
 @router.get("/ingest/status/{ingestion_id}")
 def ingest_status(ingestion_id: str, db: Session = Depends(get_db)):
     progress = get_store_progress(ingestion_id)
-    record = db.get(FileIngestionMeta, uuid.UUID(ingestion_id) if ingestion_id else None)
 
     db_status = None
     db_error = None
+    filename = None
+    report_type = None
+    try:
+        record = db.get(FileIngestionMeta, uuid.UUID(ingestion_id))
+    except ValueError:
+        record = None
     if record:
         db_status = record.status
+        filename = record.normalized_filename or record.original_filename
+        report_type = record.report_type
         if record.error_context:
             db_error = record.error_context
 
     return {
         "ingestion_id": ingestion_id,
         "db_status": db_status,
-        "progress": progress,
+        "filename": filename,
+        "report_type": report_type,
+        "stage_info": _stage_info(db_status, progress),
         "error_context": db_error,
+    }
+
+
+def _extract_failed_rows(ctx: dict) -> list[dict]:
+    """Flatten every kind of failure recorded in error_context into row dicts."""
+    failed_rows: list[dict] = []
+    if not isinstance(ctx, dict):
+        return failed_rows
+
+    if ctx.get("fatal_error"):
+        failed_rows.append({"row": "—", "id_no": "—", "field": "fatal", "message": ctx["fatal_error"]})
+
+    for item in ctx.get("failed_id_nos", []) or []:
+        if isinstance(item, dict):
+            failed_rows.append({
+                "row": item.get("row", "?"),
+                "id_no": item.get("id_no", "?"),
+                "field": item.get("field", "—"),
+                "message": item.get("reason") or item.get("message") or str(item),
+            })
+
+    load_results = ctx.get("load_results", {})
+    if isinstance(load_results, dict):
+        for table, counts in load_results.items():
+            if not (isinstance(counts, dict) and counts.get("failed", 0) > 0):
+                continue
+            for fr in counts.get("failed_rows", []) or []:
+                failed_rows.append({
+                    "row": fr.get("row", "?"),
+                    "id_no": fr.get("id_no", "?"),
+                    "field": fr.get("field", table),
+                    "message": fr.get("message", fr.get("error", str(fr))),
+                })
+            if not counts.get("failed_rows"):
+                failed_rows.append({
+                    "row": "—", "id_no": "—", "field": table,
+                    "message": f"{counts['failed']} record(s) failed to load",
+                })
+
+    validation = ctx.get("validation_results", {})
+    if isinstance(validation, dict):
+        for table, errors in (validation.get("errors_by_table", {}) or {}).items():
+            for err in errors or []:
+                failed_rows.append({
+                    "row": err.get("row_index", err.get("row", "?")),
+                    "id_no": err.get("id_no", "—"),
+                    "field": err.get("field", table),
+                    "message": err.get("message", str(err)),
+                })
+
+    for warn in ctx.get("failures", []) or []:
+        if isinstance(warn, dict):
+            failed_rows.append({
+                "row": warn.get("row", warn.get("row_idx", "—")),
+                "id_no": warn.get("staff_id", warn.get("id_no", "—")),
+                "field": warn.get("type", "failure"),
+                "message": warn.get("message", str(warn)),
+            })
+
+    if ctx.get("reason") and not failed_rows:
+        failed_rows.append({"row": "—", "id_no": "—", "field": "reason", "message": ctx["reason"]})
+
+    return failed_rows
+
+
+@router.get("/ingest/{ingestion_id}/details")
+def ingest_details(ingestion_id: str, db: Session = Depends(get_db)):
+    try:
+        uid = uuid.UUID(ingestion_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid ingestion ID")
+
+    record = db.get(FileIngestionMeta, uid)
+    if not record:
+        raise HTTPException(status_code=404, detail="Ingestion not found")
+
+    ctx = record.error_context or {}
+    if not isinstance(ctx, dict):
+        ctx = {}
+
+    tables_breakdown = []
+    rows_loaded = rows_failed = 0
+    load_results = ctx.get("load_results", {})
+    if isinstance(load_results, dict):
+        for table, counts in load_results.items():
+            if isinstance(counts, dict) and ("success" in counts or "failed" in counts):
+                added = counts.get("success", 0) or 0
+                failed = counts.get("failed", 0) or 0
+                tables_breakdown.append({"table": table, "rows_added": added, "rows_failed": failed})
+                rows_loaded += added
+                rows_failed += failed
+
+    validation_rejected = 0
+    validation = ctx.get("validation_results", {})
+    if isinstance(validation, dict):
+        validation_rejected = validation.get("total_rejected", 0) or 0
+
+    duration_seconds = None
+    if record.processed_at and record.created_at:
+        duration_seconds = round((record.processed_at - record.created_at).total_seconds(), 1)
+
+    processor_report = None
+    if any(k in ctx for k in ("total_rows_read", "total_successes", "warnings")):
+        processor_report = {
+            "rows_read": ctx.get("total_rows_read"),
+            "successes": ctx.get("total_successes"),
+            "partial_successes": ctx.get("total_partial_successes"),
+            "failures": ctx.get("total_failures"),
+            "updates": ctx.get("total_updates"),
+            "new_inserts": ctx.get("total_new_inserts"),
+            "warning_count": len(ctx.get("warnings", []) or []),
+            "failure_count": len(ctx.get("failures", []) or []),
+        }
+
+    return {
+        "ingestion_id": ingestion_id,
+        "filename": record.normalized_filename or record.original_filename,
+        "original_filename": record.original_filename,
+        "report_type": record.report_type,
+        "status": record.status,
+        "created_at": record.created_at.isoformat() if record.created_at else None,
+        "processed_at": record.processed_at.isoformat() if record.processed_at else None,
+        "duration_seconds": duration_seconds,
+        "summary": {
+            "rows_loaded": rows_loaded,
+            "rows_failed": rows_failed,
+            "validation_rejected": validation_rejected,
+        },
+        "tables_breakdown": tables_breakdown,
+        "processor_report": processor_report,
+        "failed_rows": _extract_failed_rows(ctx),
     }
 
 
@@ -102,57 +303,34 @@ def ingest_errors(ingestion_id: str, db: Session = Depends(get_db)):
     if not record:
         raise HTTPException(status_code=404, detail="Ingestion not found")
 
-    ctx = record.error_context or {}
-
-    failed_rows = []
-
-    if "fatal_error" in ctx:
-        failed_rows.append({"row": 0, "id_no": "N/A", "field": "fatal", "message": ctx["fatal_error"]})
-
-    if "failed_id_nos" in ctx:
-        for item in ctx["failed_id_nos"]:
-            failed_rows.append({
-                "row": item.get("row", "?"),
-                "id_no": item.get("id_no", "?"),
-                "field": item.get("field", "?"),
-                "message": item.get("reason", str(item)),
-            })
-
-    load_results = ctx.get("load_results", {})
-    if isinstance(load_results, dict):
-        for table, counts in load_results.items():
-            if isinstance(counts, dict) and counts.get("failed", 0) > 0:
-                if "failed_rows" in counts:
-                    for fr in counts["failed_rows"]:
-                        failed_rows.append({
-                            "row": fr.get("row", "?"),
-                            "id_no": fr.get("id_no", "?"),
-                            "field": fr.get("field", table),
-                            "message": fr.get("message", fr.get("error", str(fr))),
-                        })
-                else:
-                    failed_rows.append({
-                        "row": "—",
-                        "id_no": "—",
-                        "field": table,
-                        "message": f"{counts['failed']} records failed",
-                    })
-
-    validation = ctx.get("validation_results", {})
-    if isinstance(validation, dict):
-        for table, errors in validation.get("errors_by_table", {}).items():
-            for err in (errors or []):
-                failed_rows.append({
-                    "row": err.get("row", "?"),
-                    "id_no": err.get("id_no", "?"),
-                    "field": err.get("field", table),
-                    "message": err.get("message", str(err)),
-                })
-
-    if "reason" in ctx and not failed_rows:
-        failed_rows.append({"row": "—", "id_no": "—", "field": "reason", "message": ctx["reason"]})
-
+    failed_rows = _extract_failed_rows(record.error_context or {})
     return {"ingestion_id": ingestion_id, "total_failed": len(failed_rows), "failed_rows": failed_rows}
+
+
+@router.post("/ingest/{ingestion_id}/forget")
+def forget_ingestion(ingestion_id: str, db: Session = Depends(get_db)):
+    """Remove only the upload tracking record so the same file can be re-uploaded.
+
+    Data already loaded into the database is intentionally left untouched.
+    """
+    try:
+        uid = uuid.UUID(ingestion_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid ingestion ID")
+
+    record = db.get(FileIngestionMeta, uid)
+    if not record:
+        raise HTTPException(status_code=404, detail="Ingestion not found")
+
+    filename = record.normalized_filename or record.original_filename
+    db.delete(record)
+    db.commit()
+
+    return {
+        "status": "ok",
+        "filename": filename,
+        "message": f"Upload record removed. '{filename}' can now be re-uploaded.",
+    }
 
 
 @router.get("/ingest/history")

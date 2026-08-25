@@ -110,12 +110,18 @@ class Pipeline:
             frames = self._extract()
             if progress_callback:
                 progress_callback("extract", 1, 1)
-            entities = self._transform(frames)
             if progress_callback:
                 progress_callback("transform", 0, 1)
-            entities, validation_errors = self._validate(entities)
+            entities = self._transform(frames)
             if progress_callback:
                 progress_callback("transform", 1, 1)
+            if progress_callback:
+                progress_callback("validate", 0, 1)
+            entities, validation_errors = self._validate(entities)
+            if progress_callback:
+                progress_callback("validate", 1, 1)
+            if progress_callback:
+                progress_callback("load", 0, 1)
             load_reports = self._load(entities)
             if progress_callback:
                 progress_callback("load", 1, 1)

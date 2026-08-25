@@ -142,9 +142,10 @@ class IngestionWorker:
                 frames   = pipeline._extract()
                 on_progress("extract", 1, 1)
                 entities = pipeline._transform(frames)
-                on_progress("transform", 0, 1)
-                entities, validation_errors = pipeline._validate(entities)
                 on_progress("transform", 1, 1)
+                on_progress("validate", 0, 1)
+                entities, validation_errors = pipeline._validate(entities)
+                on_progress("validate", 1, 1)
 
                 # Commit the dimension inserts NOW so the loader's separate
                 # connection can see the new venue/consultant/location rows
