@@ -7,6 +7,8 @@ export interface UploadResult {
   normalized_filename?: string;
   report_type?: string;
   status: string;
+  quarantine_reason?: string | null;
+  error?: string;
 }
 
 export interface StageInfo {
@@ -30,6 +32,11 @@ export interface FailedRow {
   id_no: string;
   field: string;
   message: string;
+}
+
+export interface FailureBreakdownItem {
+  reason: string;
+  count: number;
 }
 
 export interface TableBreakdown {
@@ -63,8 +70,97 @@ export interface IngestionDetails {
     warning_count?: number | null;
     failure_count?: number | null;
   } | null;
+  failed_rows_total: number;
+  failure_breakdown: FailureBreakdownItem[];
   failed_rows: FailedRow[];
 }
+
+// ── Quarantine ───────────────────────────────────────────────────────────────
+
+export type QuarantineType = "swipes" | "trainings";
+
+export interface QuarantineRow {
+  id: number;
+  row_key: string;
+  employee_name: string | null;
+  location: string | null;
+  venue: string | null;
+  consultant: string | null;
+  title: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  event_time: string | null;
+  quarantined_at: string | null;
+}
+
+export interface QuarantineListResponse {
+  type: QuarantineType;
+  total: number;
+  page: number;
+  size: number;
+  distinct_names: number;
+  rows: QuarantineRow[];
+}
+
+export function useQuarantineList(params: {
+  type: QuarantineType;
+  search: string;
+  startDate: string;
+  endDate: string;
+  page: number;
+  size: number;
+}) {
+  return useQuery({
+    queryKey: ["quarantine", params.type, params.search, params.startDate, params.endDate, params.page, params.size],
+    queryFn: () =>
+      api
+        .get("/api/quarantine", {
+          params: {
+            type: params.type,
+            search: params.search || undefined,
+            start_date: params.startDate || undefined,
+            end_date: params.endDate || undefined,
+            page: params.page,
+            size: params.size,
+          },
+        })
+        .then((r) => r.data as QuarantineListResponse),
+    staleTime: 30_000,
+  });
+}
+
+export function useDeleteQuarantine() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ type, ids }: { type: QuarantineType; ids: number[] }) =>
+      api
+        .delete(`/api/quarantine/${type}`, { data: { ids } })
+        .then((r) => r.data as { status: string; deleted: number }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["quarantine"] }),
+  });
+}
+
+export function useReprocessQuarantine() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ type, ids }: { type: QuarantineType; ids: number[] }) =>
+      api
+        .post(`/api/quarantine/reprocess?type=${type}`, { ids })
+        .then(
+          (r) =>
+            r.data as {
+              status: string;
+              succeeded: number;
+              failed_count: number;
+              failures: { id: number; error: string }[];
+              results: { id: number; ok: boolean; error?: string }[];
+            }
+        ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["quarantine"] }),
+  });
+}
+
+// ── Ingestion ────────────────────────────────────────────────────────────────
 
 export function useUploadFiles() {
   const qc = useQueryClient();

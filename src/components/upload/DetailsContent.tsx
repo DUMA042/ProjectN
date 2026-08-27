@@ -22,7 +22,7 @@ export default function DetailsContent({ ingestionId }: { ingestionId: string })
     );
   }
 
-  const { summary, tables_breakdown, processor_report, failed_rows } = details;
+  const { summary, tables_breakdown, processor_report, failed_rows, failed_rows_total, failure_breakdown } = details;
 
   return (
     <>
@@ -47,6 +47,25 @@ export default function DetailsContent({ ingestionId }: { ingestionId: string })
           <p className="text-[10px] text-text-muted uppercase">Rejected</p>
         </div>
       </div>
+
+      {/* Failure breakdown */}
+      {failure_breakdown.length > 0 && (
+        <div className="px-5 pt-4">
+          <p className="text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
+            Why rows were not processed
+          </p>
+          <div className="border border-border rounded-card divide-y divide-divider">
+            {failure_breakdown.map((b) => (
+              <div key={b.reason} className="flex items-center justify-between px-3 py-2 gap-3">
+                <span className="text-xs text-text-primary flex-1">{b.reason}</span>
+                <span className="text-xs font-bold text-danger whitespace-nowrap">
+                  {b.count.toLocaleString()} row{b.count !== 1 ? "s" : ""}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="px-5 pt-4 space-y-1.5 text-xs">
         <div className="flex justify-between">
@@ -112,8 +131,14 @@ export default function DetailsContent({ ingestionId }: { ingestionId: string })
       {failed_rows.length > 0 && (
         <div className="px-5 pt-4 pb-5">
           <p className="text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
-            Failed Rows ({failed_rows.length})
+            Failed / Skipped Rows
           </p>
+          {failed_rows_total > failed_rows.length && (
+            <p className="text-[11px] text-warning mb-2">
+              Showing first {failed_rows.length} samples of {failed_rows_total.toLocaleString()} total rows.
+              See the breakdown above for the full picture.
+            </p>
+          )}
           <div className="border border-border rounded-card overflow-hidden">
             <table className="w-full text-xs">
               <thead className="bg-nav-hover border-b border-divider">
@@ -135,7 +160,7 @@ export default function DetailsContent({ ingestionId }: { ingestionId: string })
             </table>
             {failed_rows.length > 50 && (
               <p className="px-3 py-2 text-[10px] text-text-muted">
-                Showing first 50 of {failed_rows.length}
+                Showing first 50 of {failed_rows.length} loaded samples ({failed_rows_total.toLocaleString()} total).
               </p>
             )}
           </div>

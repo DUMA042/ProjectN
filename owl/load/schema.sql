@@ -463,6 +463,8 @@ ALTER TABLE IF EXISTS public.employee_trainings
     ON UPDATE NO ACTION
     ON DELETE NO ACTION;
 CREATE INDEX IF NOT EXISTS idx_emp_train_id ON public.employee_trainings(id_no);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_employee_trainings_dedup
+    ON public.employee_trainings (id_no, venue_id, consultant_id, start_date, end_date);
 
 ALTER TABLE IF EXISTS public.employee_trainings
     ADD CONSTRAINT employee_trainings_location_id_fkey FOREIGN KEY (location_id)

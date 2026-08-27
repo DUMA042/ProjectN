@@ -1,8 +1,10 @@
 """Ingestion endpoints — multi-file upload, live status polling,
 processing details, and upload-record removal (forget)."""
 import asyncio
+import re
 import shutil
 import threading
+import time
 import uuid
 from pathlib import Path
 from typing import List
@@ -85,43 +87,62 @@ def _stage_info(db_status, progress) -> dict:
 async def ingest_upload(files: List[UploadFile] = File(..., description="One or more .xlsx files")):
     if not files:
         raise HTTPException(status_code=400, detail="No files provided")
+    if len(files) > 20:
+        raise HTTPException(status_code=400, detail="Maximum 20 files per upload")
 
     results = []
     rejected = []
 
     for file in files:
-        if not file.filename or not file.filename.lower().endswith(".xlsx"):
-            rejected.append({"filename": file.filename, "reason": "Only .xlsx files accepted"})
-            continue
+        original_name = file.filename or "unnamed.xlsx"
+        try:
+            if not original_name.lower().endswith(".xlsx"):
+                rejected.append({"filename": original_name, "reason": "Only .xlsx files accepted"})
+                continue
 
-        INBOX_DIR.mkdir(exist_ok=True)
-        dest = INBOX_DIR / file.filename
-        with open(dest, "wb") as fh:
-            shutil.copyfileobj(file.file, fh)
+            # Sanitise: strip any path components / unsafe chars, prefix timestamp
+            safe_stem = re.sub(r"[^\w\-. ]", "_", Path(original_name).stem).strip() or "file"
+            safe_name = f"{int(time.time())}_{safe_stem}.xlsx"
 
-        manager = IngestionManager()
-        await asyncio.to_thread(manager.run_once)
+            INBOX_DIR.mkdir(exist_ok=True)
+            dest = INBOX_DIR / safe_name
+            with open(dest, "wb") as fh:
+                shutil.copyfileobj(file.file, fh)
 
-        with get_session() as session:
-            record = session.execute(
-                select(FileIngestionMeta)
-                .where(FileIngestionMeta.original_filename == file.filename)
-                .order_by(FileIngestionMeta.created_at.desc())
-            ).scalars().first()
+            manager = IngestionManager()
+            await asyncio.to_thread(manager.run_once)
 
-        if record:
-            results.append({
-                "ingestion_id": str(record.id),
-                "original_filename": record.original_filename,
-                "normalized_filename": record.normalized_filename,
-                "report_type": record.report_type,
-                "status": record.status,
-            })
-        else:
+            # Extract all needed values INSIDE the session — the ORM instance
+            # is expired/detached once the context manager commits and closes.
+            with get_session() as session:
+                record = session.execute(
+                    select(FileIngestionMeta)
+                    .where(FileIngestionMeta.original_filename == safe_name)
+                    .order_by(FileIngestionMeta.created_at.desc())
+                ).scalars().first()
+
+                if record:
+                    results.append({
+                        "ingestion_id": str(record.id),
+                        "original_filename": original_name,
+                        "normalized_filename": record.normalized_filename,
+                        "report_type": record.report_type,
+                        "status": record.status,
+                        "quarantine_reason": (record.error_context or {}).get("reason")
+                            if isinstance(record.error_context, dict) else None,
+                    })
+                else:
+                    results.append({
+                        "ingestion_id": None,
+                        "original_filename": original_name,
+                        "status": "classification_failed",
+                    })
+        except Exception as exc:  # noqa: BLE001 — one bad file must not fail the batch
             results.append({
                 "ingestion_id": None,
-                "original_filename": file.filename,
+                "original_filename": original_name,
                 "status": "classification_failed",
+                "error": str(exc),
             })
 
     # Kick off processing on a daemon thread; HTTP returns immediately so the
@@ -272,6 +293,23 @@ def ingest_details(ingestion_id: str, db: Session = Depends(get_db)):
             "failure_count": len(ctx.get("failures", []) or []),
         }
 
+    # ── Failure rows: breakdown grouping + sample cap (user sampling rule) ──
+    all_failed = _extract_failed_rows(ctx)
+    failed_rows_total = len(all_failed)
+
+    breakdown_map: dict[str, int] = {}
+    for r in all_failed:
+        msg = re.sub(r"\d+", "#", str(r.get("message", "")))[:90]
+        key = f"{r.get('field', '—')} · {msg}"
+        breakdown_map[key] = breakdown_map.get(key, 0) + 1
+    failure_breakdown = [
+        {"reason": k, "count": v}
+        for k, v in sorted(breakdown_map.items(), key=lambda kv: -kv[1])
+    ]
+
+    SAMPLE_CAP = 500
+    failed_rows_sample = all_failed[:SAMPLE_CAP]
+
     return {
         "ingestion_id": ingestion_id,
         "filename": record.normalized_filename or record.original_filename,
@@ -288,7 +326,9 @@ def ingest_details(ingestion_id: str, db: Session = Depends(get_db)):
         },
         "tables_breakdown": tables_breakdown,
         "processor_report": processor_report,
-        "failed_rows": _extract_failed_rows(ctx),
+        "failed_rows_total": failed_rows_total,
+        "failure_breakdown": failure_breakdown,
+        "failed_rows": failed_rows_sample,
     }
 
 

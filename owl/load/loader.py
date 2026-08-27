@@ -45,6 +45,17 @@ def _build_model_map() -> dict[str, type]:
     }
 
 
+# ── Deduplication registry ────────────────────────────────────────────────────
+# Tables whose business columns form a natural unique key. When a table is
+# present here, inserts use ON CONFLICT DO NOTHING against these columns
+# (backed by a matching unique index in the database) instead of the default
+# primary-key upsert — preventing duplicate rows when the same file content
+# is processed again.
+DEDUP_CONFLICT_COLUMNS: dict[str, list[str]] = {
+    "employee_trainings": ["id_no", "venue_id", "consultant_id", "start_date", "end_date"],
+}
+
+
 class DataLoader:
     """Persist normalised entity DataFrames to PostgreSQL.
 
@@ -166,16 +177,27 @@ class DataLoader:
             pass
 
     def _execute_upsert(self, table, pk_cols: list[str], records: list[dict]) -> None:
-        """Helper to execute a PG upsert statement."""
+        """Helper to execute a PG upsert statement.
+
+        Tables listed in DEDUP_CONFLICT_COLUMNS use ON CONFLICT DO NOTHING
+        against their business-key columns (natural dedup); all other tables
+        use the default primary-key upsert behaviour.
+        """
         stmt = pg_insert(table).values(records)
-        update_cols = {
-            col.name: stmt.excluded[col.name]
-            for col in table.columns
-            if col.name not in pk_cols
-        }
-        stmt = stmt.on_conflict_do_update(
-            index_elements=pk_cols,
-            set_=update_cols,
-        )
+        table_name = table.name if hasattr(table, "name") else str(table)
+        dedup_cols = DEDUP_CONFLICT_COLUMNS.get(table_name)
+
+        if dedup_cols:
+            stmt = stmt.on_conflict_do_nothing(index_elements=dedup_cols)
+        else:
+            update_cols = {
+                col.name: stmt.excluded[col.name]
+                for col in table.columns
+                if col.name not in pk_cols
+            }
+            stmt = stmt.on_conflict_do_update(
+                index_elements=pk_cols,
+                set_=update_cols,
+            )
         self._session.execute(stmt)
         # We don't commit here; commit is handled by the caller/pipeline session context.

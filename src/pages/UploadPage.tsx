@@ -1,9 +1,10 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Upload, RotateCcw, Undo2, X } from "lucide-react";
 import FileDropZone from "@/components/ui/FileDropZone";
 import IngestionTrackerCard from "@/components/upload/IngestionTrackerCard";
 import DetailsContent from "@/components/upload/DetailsContent";
+import QuarantineExplorer from "@/components/upload/QuarantineExplorer";
 import ErrorSlidePanel from "@/components/ui/ErrorSlidePanel";
 import {
   useUploadFiles,
@@ -49,6 +50,15 @@ export default function UploadPage() {
     open: false, id: "", filename: "",
   });
   const [toasts, setToasts] = useState<{ id: string; message: string; kind: "success" | "warning" | "error" | "info" }[]>([]);
+
+  // History filters (#9)
+  const [histType, setHistType] = useState("");
+  const [histStatus, setHistStatus] = useState("");
+  const [histSearch, setHistSearch] = useState("");
+
+  // Drag-anywhere overlay (#11)
+  const dragCounter = useRef(0);
+  const [dragActive, setDragActive] = useState(false);
 
   const uploadMutation = useUploadFiles();
   const forgetMutation = useForgetIngestion();
@@ -139,6 +149,91 @@ export default function UploadPage() {
 
   const historyRows = historyQuery.data || [];
 
+  // ── #8: Rehydrate in-flight trackers across page refreshes ──────────────
+  const rehydratedRef = useRef(false);
+  useEffect(() => {
+    if (rehydratedRef.current || !historyQuery.data) return;
+    rehydratedRef.current = true;
+    if (trackers.length > 0) return; // don't clobber live trackers
+    const recent = (historyQuery.data as any[]).filter(
+      (r) =>
+        ["pending", "processing"].includes(r.status) &&
+        r.created_at &&
+        Date.now() - new Date(r.created_at).getTime() < 15 * 60 * 1000
+    );
+    if (recent.length) {
+      setTrackers(
+        recent.map((r) => ({
+          key: r.id,
+          result: {
+            ingestion_id: r.id,
+            original_filename: r.original_filename,
+            normalized_filename: r.normalized_filename,
+            report_type: r.report_type,
+            status: r.status,
+          },
+        }))
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [historyQuery.data]);
+
+  // ── #11: Drag-anywhere overlay ────────────────────────────────────────────
+  useEffect(() => {
+    const hasFiles = (e: DragEvent) =>
+      Array.from(e.dataTransfer?.types || []).includes("Files");
+
+    const onDragEnter = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      dragCounter.current += 1;
+      setDragActive(true);
+    };
+    const onDragLeave = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      dragCounter.current -= 1;
+      if (dragCounter.current <= 0) setDragActive(false);
+    };
+    const onDragOver = (e: DragEvent) => {
+      if (hasFiles(e)) e.preventDefault();
+    };
+    const onDrop = (e: DragEvent) => {
+      dragCounter.current = 0;
+      setDragActive(false);
+      if (!e.dataTransfer?.files?.length) return;
+      e.preventDefault();
+      const files = Array.from(e.dataTransfer.files).filter((f) =>
+        f.name.toLowerCase().endsWith(".xlsx")
+      );
+      if (files.length) handleFilesAdded(files);
+    };
+
+    window.addEventListener("dragenter", onDragEnter);
+    window.addEventListener("dragleave", onDragLeave);
+    window.addEventListener("dragover", onDragOver);
+    window.addEventListener("drop", onDrop);
+    return () => {
+      window.removeEventListener("dragenter", onDragEnter);
+      window.removeEventListener("dragleave", onDragLeave);
+      window.removeEventListener("dragover", onDragOver);
+      window.removeEventListener("drop", onDrop);
+    };
+  }, [handleFilesAdded]);
+
+  // ── #9: Client-side history filtering ────────────────────────────────────
+  const histTypes = Array.from(
+    new Set(historyRows.map((r: any) => r.report_type).filter(Boolean))
+  ) as string[];
+  const filteredHistory = historyRows.filter((r: any) => {
+    if (histType && r.report_type !== histType) return false;
+    if (histStatus && r.status !== histStatus) return false;
+    if (histSearch) {
+      const name = (r.normalized_filename || r.original_filename || "").toLowerCase();
+      if (!name.includes(histSearch.toLowerCase())) return false;
+    }
+    return true;
+  });
+
   const toastStyles: Record<string, string> = {
     success: "bg-badge-green-bg border-success/40 text-[#389E0D]",
     warning: "bg-badge-amber-bg border-warning/40 text-badge-amber-text",
@@ -209,7 +304,7 @@ export default function UploadPage() {
 
       {/* History */}
       <div>
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
           <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
             Upload History
           </h3>
@@ -221,6 +316,45 @@ export default function UploadPage() {
             Refresh
           </button>
         </div>
+
+        {/* Filters */}
+        {historyRows.length > 0 && (
+          <div className="card-container p-2.5 mb-3 flex items-center gap-2 flex-wrap">
+            <input
+              type="text"
+              placeholder="Search filename…"
+              value={histSearch}
+              onChange={(e) => setHistSearch(e.target.value)}
+              className="flex-1 min-w-[160px] max-w-[240px] px-3 py-1.5 text-xs border border-border rounded-input bg-surface text-text-primary placeholder-text-muted focus:outline-none focus:border-accent"
+            />
+            <select
+              value={histType}
+              onChange={(e) => setHistType(e.target.value)}
+              className="px-2 py-1.5 text-xs border border-border rounded-input bg-surface text-text-secondary cursor-pointer"
+            >
+              <option value="">All Types</option>
+              {histTypes.map((t) => (<option key={t} value={t}>{t}</option>))}
+            </select>
+            <select
+              value={histStatus}
+              onChange={(e) => setHistStatus(e.target.value)}
+              className="px-2 py-1.5 text-xs border border-border rounded-input bg-surface text-text-secondary cursor-pointer"
+            >
+              <option value="">All Statuses</option>
+              {["completed", "failed", "pending", "processing", "quarantined"].map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+            {(histType || histStatus || histSearch) && (
+              <button
+                onClick={() => { setHistType(""); setHistStatus(""); setHistSearch(""); }}
+                className="text-xs text-text-muted hover:text-danger transition-colors"
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+        )}
 
         {historyQuery.isLoading ? (
           <div className="space-y-2 animate-pulse">
@@ -248,7 +382,7 @@ export default function UploadPage() {
                 </tr>
               </thead>
               <tbody>
-                {historyRows.map((row: any) => (
+                {filteredHistory.map((row: any) => (
                   <tr key={row.id} className="border-b border-divider last:border-0 hover:bg-nav-hover transition-colors group">
                     <td className="px-4 py-2.5 text-text-primary max-w-[220px] truncate" title={row.normalized_filename || row.original_filename}>
                       {row.normalized_filename || row.original_filename}
@@ -349,6 +483,34 @@ export default function UploadPage() {
               </div>
             </motion.div>
           </>
+        )}
+      </AnimatePresence>
+
+      {/* Quarantine Explorer */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
+            Quarantine
+          </h3>
+        </div>
+        <QuarantineExplorer onToast={addToast} />
+      </div>
+
+      {/* Drag-anywhere overlay (#11) */}
+      <AnimatePresence>
+        {dragActive && (
+          <motion.div
+            className="fixed inset-0 z-[70] bg-accent/10 backdrop-blur-sm pointer-events-none flex items-center justify-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <div className="border-2 border-dashed border-accent bg-surface/95 rounded-card px-16 py-12 text-center">
+              <Upload size={48} className="mx-auto mb-3 text-accent" strokeWidth={1.5} />
+              <p className="text-base font-semibold text-text-primary">Drop files anywhere</p>
+              <p className="text-xs text-text-secondary mt-1">.xlsx files will be added to the queue</p>
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
 
