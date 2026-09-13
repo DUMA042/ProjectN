@@ -1,13 +1,18 @@
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
+import type { SortingState } from "@tanstack/react-table";
 import { Users, Target, TrendingUp, BarChart3, Layers, MapPin } from "lucide-react";
+import { api } from "@/lib/api";
+import { exportToCSV } from "@/lib/csvExport";
 import KpiCard from "@/components/ui/KpiCard";
 import DonutChartCard from "@/components/charts/DonutChartCard";
 import DeptAttendanceChart from "@/components/charts/DeptAttendanceChart";
 import EarliestCheckinsCard from "@/components/ui/EarliestCheckinsCard";
+import type { CheckinMode } from "@/components/ui/EarliestCheckinsCard";
 import ArrivalTimeChart from "@/components/charts/ArrivalTimeChart";
 import DataTable from "@/components/ui/DataTable";
 import DateRangePicker, { getDefaultDateRange } from "@/components/ui/DateRangePicker";
+import EmployeeDetailSheet from "@/components/ui/EmployeeDetailSheet";
 import type { DateRange } from "@/components/ui/DateRangePicker";
 import {
   useDashboardSummary,
@@ -54,12 +59,55 @@ export default function DashboardPage() {
   const [arrivalTimeDateRange, setArrivalTimeDateRange] = useState<DateRange>(getLastMonthRange());
   const [arrivalTimeDepartment, setArrivalTimeDepartment] = useState("");
   const [empSummaryDateRange, setEmpSummaryDateRange] = useState<DateRange>(getDefaultDateRange());
+  const [checkinMode, setCheckinMode] = useState<CheckinMode>("avg_checkin");
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
+
+  // Employee Summary — server-side table state
+  const [empPage, setEmpPage] = useState(1);
+  const [empPageSize, setEmpPageSize] = useState(25);
+  const [empSearchInput, setEmpSearchInput] = useState("");
+  const [empSearch, setEmpSearch] = useState("");
+  const [empSorting, setEmpSorting] = useState<SortingState>([{ id: "full_name", desc: false }]);
+  const [empColumnFilters, setEmpColumnFilters] = useState<Record<string, Set<string>>>({});
+
+  // Debounce the search input so we don't hit the server on every keystroke
+  useEffect(() => {
+    const id = window.setTimeout(() => setEmpSearch(empSearchInput), 350);
+    return () => window.clearTimeout(id);
+  }, [empSearchInput]);
+
+  const empSortBy = empSorting[0]?.id ?? "full_name";
+  const empSortDir: "asc" | "desc" = empSorting[0]?.desc ? "desc" : "asc";
+  const empFilters = useMemo(() => {
+    const out: Record<string, string[]> = {};
+    for (const [k, set] of Object.entries(empColumnFilters)) {
+      if (set.size > 0) out[k] = [...set];
+    }
+    return out;
+  }, [empColumnFilters]);
+
+  // Reset to page 1 whenever the query inputs (location/date/search/sort/filters/size) change
+  useEffect(() => {
+    setEmpPage(1);
+  }, [
+    selectedLocation,
+    empSummaryDateRange.startDate,
+    empSummaryDateRange.endDate,
+    empSearch,
+    empSortBy,
+    empSortDir,
+    empFilters,
+    empPageSize,
+  ]);
 
   // Reset department filters if top-level location changes
   const handleLocationChange = (newLoc: string) => {
     setSelectedLocation(newLoc);
     setWorkforceDepartment("");
     setArrivalTimeDepartment("");
+    setEmpSearchInput("");
+    setEmpSearch("");
+    setEmpColumnFilters({});
   };
 
   const { data: workforce, isLoading: workforceLoading } = useWorkforceStatus(
@@ -74,11 +122,12 @@ export default function DashboardPage() {
     "",
     selectedLocation
   );
-  const { data: checkins, isLoading: checkinsLoading } = useEarliestCheckins(
+  const { data: checkins, isLoading: checkinsLoading, isFetching: checkinsFetching } = useEarliestCheckins(
     checkinDateRange.startDate,
     checkinDateRange.endDate,
     checkinLimit,
-    selectedLocation
+    selectedLocation,
+    checkinMode
   );
   const { data: arrivalTime, isLoading: arrivalTimeLoading } = useArrivalTime(
     arrivalTimeDateRange.startDate,
@@ -86,11 +135,42 @@ export default function DashboardPage() {
     arrivalTimeDepartment,
     selectedLocation
   );
-  const { data: empSummary, isLoading: empLoading } = useEmployeeSummary(
-    empSummaryDateRange.startDate,
-    empSummaryDateRange.endDate,
-    selectedLocation
-  );
+  const { data: empSummaryData, isLoading: empLoading, isFetching: empFetching } = useEmployeeSummary({
+    startDate: empSummaryDateRange.startDate,
+    endDate: empSummaryDateRange.endDate,
+    location: selectedLocation,
+    page: empPage,
+    pageSize: empPageSize,
+    search: empSearch,
+    sortBy: empSortBy,
+    sortDir: empSortDir,
+    filters: empFilters,
+  });
+  const empSummary = empSummaryData?.items ?? [];
+  const empTotal = empSummaryData?.total ?? 0;
+  const empFilterOptions = empSummaryData?.filter_options ?? {};
+
+  // CSV export: fetch the full filtered set (same search/filters/sort, no pagination)
+  const handleEmpExport = async () => {
+    try {
+      const res = await api.get("/api/dashboard/employee-summary", {
+        params: {
+          start_date: empSummaryDateRange.startDate,
+          end_date: empSummaryDateRange.endDate,
+          location: selectedLocation,
+          page: 1,
+          page_size: 0,
+          search: empSearch,
+          sort_by: empSortBy,
+          sort_dir: empSortDir,
+          filters: JSON.stringify(empFilters),
+        },
+      });
+      exportToCSV(res.data?.items || [], "employee_summary_report", empSummaryDateRange);
+    } catch {
+      /* ignore export errors */
+    }
+  };
 
   const workforceDonut = (workforce || []).map((w: any) => ({
     name: w.status,
@@ -100,8 +180,8 @@ export default function DashboardPage() {
   }));
 
   const empTableColumns = [
-    { key: "full_name", header: "Full Name" },
-    { key: "id_no", header: "ID No" },
+    { key: "full_name", header: "Full Name", sticky: true, width: 220 },
+    { key: "id_no", header: "ID No", sticky: true, width: 110 },
     { key: "department", header: "Department" },
     { key: "grade_level", header: "Grade Level" },
     {
@@ -110,14 +190,38 @@ export default function DashboardPage() {
       cell: (row: any) => <span className="font-medium text-success">{row.days_present ?? "—"}</span>,
     },
     {
-      key: "leave_records_count",
-      header: "Leave Records",
-      cell: (row: any) => <span className="font-medium text-warning">{row.leave_records_count ?? "—"}</span>,
+      key: "absent_days",
+      header: "Absent",
+      cell: (row: any) => <span className="font-medium text-danger">{row.absent_days ?? "—"}</span>,
     },
     {
-      key: "training_records_count",
-      header: "Training Records",
-      cell: (row: any) => <span className="font-medium text-info">{row.training_records_count ?? "—"}</span>,
+      key: "attendance_rate",
+      header: "Attendance Rate",
+      cell: (row: any) => {
+        const rate = row.attendance_rate ?? 0;
+        const color = rate >= 90 ? "text-success" : rate >= 70 ? "text-warning" : "text-danger";
+        return <span className={`font-medium ${color}`}>{rate}%</span>;
+      },
+    },
+    {
+      key: "avg_checkin",
+      header: "Avg Check-in",
+      cell: (row: any) => <span className="font-mono text-text-secondary">{row.avg_checkin ?? "—"}</span>,
+    },
+    {
+      key: "avg_checkout",
+      header: "Avg Check-out",
+      cell: (row: any) => <span className="font-mono text-text-secondary">{row.avg_checkout ?? "—"}</span>,
+    },
+    {
+      key: "leave_days",
+      header: "Leave Days",
+      cell: (row: any) => <span className="font-medium text-warning">{row.leave_days ?? "—"}</span>,
+    },
+    {
+      key: "training_days",
+      header: "Training Days",
+      cell: (row: any) => <span className="font-medium text-info">{row.training_days ?? "—"}</span>,
     },
   ];
 
@@ -186,6 +290,9 @@ export default function DashboardPage() {
           limit={checkinLimit}
           onLimitChange={setCheckinLimit}
           loading={checkinsLoading}
+          isFetching={checkinsFetching}
+          mode={checkinMode}
+          onModeChange={setCheckinMode}
         />
       </div>
 
@@ -224,8 +331,42 @@ export default function DashboardPage() {
           </div>
           <DateRangePicker value={empSummaryDateRange} onChange={setEmpSummaryDateRange} />
         </div>
-        <DataTable title="Employee Summary Report" columns={empTableColumns} data={empSummary || []} loading={empLoading} searchable />
+        <DataTable
+          title="Employee Summary Report"
+          columns={empTableColumns}
+          data={empSummary}
+          loading={empLoading}
+          isFetching={empFetching}
+          searchable
+          enableColumnFilters
+          serverSide
+          total={empTotal}
+          page={empPage}
+          pageSize={empPageSize}
+          onPageChange={setEmpPage}
+          onPageSizeChange={(n) => { setEmpPageSize(n); setEmpPage(1); }}
+          sorting={empSorting}
+          onSortingChange={setEmpSorting}
+          search={empSearchInput}
+          onSearchChange={setEmpSearchInput}
+          columnFilters={empColumnFilters}
+          onColumnFiltersChange={setEmpColumnFilters}
+          filterOptions={empFilterOptions}
+          onRowClick={(row: any) => setSelectedEmployeeId(row.id_no)}
+          dateRange={empSummaryDateRange}
+          csvExportName="employee_summary_report"
+          onExport={handleEmpExport}
+        />
       </div>
+
+      {/* Employee Detail Sheet */}
+      {selectedEmployeeId && (
+        <EmployeeDetailSheet
+          employeeId={selectedEmployeeId}
+          onClose={() => setSelectedEmployeeId(null)}
+          defaultDateRange={empSummaryDateRange}
+        />
+      )}
     </motion.div>
   );
 }

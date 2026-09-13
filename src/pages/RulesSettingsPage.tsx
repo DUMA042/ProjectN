@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { Save, RotateCcw, Plus, X, ToggleLeft, ToggleRight } from "lucide-react";
+import { Save, RotateCcw, Plus, X, ToggleLeft, ToggleRight, AlertCircle } from "lucide-react";
 import { useRules, useUpdateRule, useSeedRules } from "@/hooks/useRules";
 
 const DAYS = [
@@ -57,6 +57,8 @@ export default function RulesSettingsPage() {
   const [newHoliday, setNewHoliday] = useState("");
   const [eligibleStatuses, setEligibleStatuses] = useState<string[]>(["Active"]);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const debounceRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!rules) return;
@@ -66,20 +68,42 @@ export default function RulesSettingsPage() {
     setEligibleStatuses(rules["eligible_statuses"]?.statuses ?? ["Active"]);
   }, [rules]);
 
+  // Persist a single rule key immediately; surface errors instead of swallowing them.
+  const persist = (key: string, value: any) => {
+    updateRule.mutate(
+      { key, value },
+      {
+        onSuccess: () => {
+          setSaveError(null);
+          setSaved(true);
+          setTimeout(() => setSaved(false), 1500);
+        },
+        onError: () => setSaveError("Failed to save changes. Please try again."),
+      }
+    );
+  };
+
+  // Debounced persist for high-frequency edits (time/number inputs).
+  const schedulePersist = (key: string, value: any) => {
+    if (debounceRef.current) window.clearTimeout(debounceRef.current);
+    debounceRef.current = window.setTimeout(() => persist(key, value), 500);
+  };
+
   const toggleDay = (day: string) => {
     const current = workingHours[day];
-    if (current === null) {
-      const isFri = day === "friday";
-      setWorkingHours((prev) => ({
-        ...prev,
-        [day]: {
-          checkin: { ...defaultTimes },
-          checkout: isFri ? { ...defaultCheckoutFri } : { ...defaultCheckoutMonThu },
-        },
-      }));
-    } else {
-      setWorkingHours((prev) => ({ ...prev, [day]: null }));
-    }
+    const isFri = day === "friday";
+    const next =
+      current === null || current === undefined
+        ? {
+            ...workingHours,
+            [day]: {
+              checkin: { ...defaultTimes },
+              checkout: isFri ? { ...defaultCheckoutFri } : { ...defaultCheckoutMonThu },
+            },
+          }
+        : { ...workingHours, [day]: null };
+    setWorkingHours(next);
+    persist("working_hours", next);
   };
 
   const updateDayTime = (
@@ -88,28 +112,32 @@ export default function RulesSettingsPage() {
     field: keyof TimeFields,
     value: string
   ) => {
-    setWorkingHours((prev) => {
-      const current = prev[day];
-      if (!current) return prev;
-      return {
-        ...prev,
-        [day]: {
-          ...current,
-          [category]: { ...current[category], [field]: value },
-        },
-      };
-    });
+    const current = workingHours[day];
+    if (!current) return;
+    const next = {
+      ...workingHours,
+      [day]: {
+        ...current,
+        [category]: { ...current[category], [field]: value },
+      },
+    };
+    setWorkingHours(next);
+    schedulePersist("working_hours", next);
   };
 
   const addHoliday = () => {
     if (newHoliday && !holidays.includes(newHoliday)) {
-      setHolidays((prev) => [...prev, newHoliday].sort());
+      const next = [...holidays, newHoliday].sort();
+      setHolidays(next);
       setNewHoliday("");
+      persist("holidays", { dates: next });
     }
   };
 
   const removeHoliday = (date: string) => {
-    setHolidays((prev) => prev.filter((d) => d !== date));
+    const next = holidays.filter((d) => d !== date);
+    setHolidays(next);
+    persist("holidays", { dates: next });
   };
 
   const handleSaveAll = async () => {
@@ -118,13 +146,20 @@ export default function RulesSettingsPage() {
       await updateRule.mutateAsync({ key: "incomplete_threshold", value: { hours: incompleteHours } });
       await updateRule.mutateAsync({ key: "holidays", value: { dates: holidays } });
       await updateRule.mutateAsync({ key: "eligible_statuses", value: { statuses: eligibleStatuses } });
+      setSaveError(null);
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
-    } catch {}
+    } catch {
+      setSaveError("Failed to save changes. Please try again.");
+    }
   };
 
   const handleReset = async () => {
-    await seedRules.mutateAsync();
+    try {
+      await seedRules.mutateAsync();
+    } catch {
+      setSaveError("Failed to reset defaults. Please try again.");
+    }
   };
 
   const TimeInputRow = ({
@@ -266,7 +301,11 @@ export default function RulesSettingsPage() {
             max={8}
             step={0.5}
             value={incompleteHours}
-            onChange={(e) => setIncompleteHours(Number(e.target.value))}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              setIncompleteHours(v);
+              schedulePersist("incomplete_threshold", { hours: v });
+            }}
             className="w-20 px-2 py-1 border border-border rounded-input bg-surface text-text-primary text-sm text-center"
           />
           <span className="text-sm text-text-secondary">hour(s)</span>
@@ -319,28 +358,32 @@ export default function RulesSettingsPage() {
         </p>
         <div className="flex flex-wrap gap-2">
           {eligibleStatuses.map((status, i) => (
-            <span
-              key={i}
-              className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-nav-hover text-text-primary font-medium"
-            >
-              {status}
-              <button
-                onClick={() =>
-                  setEligibleStatuses((prev) => prev.filter((_, j) => j !== i))
-                }
-                className="text-text-muted hover:text-danger transition-colors"
+              <span
+                key={i}
+                className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-nav-hover text-text-primary font-medium"
               >
-                <X size={12} />
-              </button>
-            </span>
-          ))}
-          <button
-            onClick={() => {
-              const name = prompt("Enter status name:");
-              if (name && name.trim() && !eligibleStatuses.includes(name.trim())) {
-                setEligibleStatuses((prev) => [...prev, name.trim()]);
-              }
-            }}
+                {status}
+                <button
+                  onClick={() => {
+                    const next = eligibleStatuses.filter((_, j) => j !== i);
+                    setEligibleStatuses(next);
+                    persist("eligible_statuses", { statuses: next });
+                  }}
+                  className="text-text-muted hover:text-danger transition-colors"
+                >
+                  <X size={12} />
+                </button>
+              </span>
+            ))}
+            <button
+              onClick={() => {
+                const name = prompt("Enter status name:");
+                if (name && name.trim() && !eligibleStatuses.includes(name.trim())) {
+                  const next = [...eligibleStatuses, name.trim()];
+                  setEligibleStatuses(next);
+                  persist("eligible_statuses", { statuses: next });
+                }
+              }}
             className="flex items-center gap-1 px-3 py-1 text-xs border border-dashed border-text-muted rounded-full text-text-muted hover:text-text-secondary hover:border-text-secondary transition-colors"
           >
             <Plus size={12} />
@@ -349,26 +392,37 @@ export default function RulesSettingsPage() {
         </div>
       </div>
       {/* Footer */}
-      <div className="card-container p-4 flex items-center justify-between">
-        <p className="text-xs text-text-muted">
-          Changes take effect immediately for all future calculations.
-        </p>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleReset}
-            className="px-4 py-2 text-sm border border-border rounded-btn text-text-secondary hover:bg-nav-hover transition-colors"
-          >
-            Reset Defaults
-          </button>
-          <button
-            onClick={handleSaveAll}
-            disabled={updateRule.isPending}
-            className={`px-5 py-2 text-sm rounded-btn text-white font-medium transition-colors ${
-              saved ? "bg-success" : "bg-accent hover:bg-accent-hover"
-            }`}
-          >
-            {saved ? "Saved!" : "Save All"}
-          </button>
+      <div className="card-container p-4">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <p className="text-xs text-text-muted">
+            {saveError ? (
+              <span className="inline-flex items-center gap-1.5 text-danger font-medium">
+                <AlertCircle size={13} />
+                {saveError}
+              </span>
+            ) : saved ? (
+              <span className="text-success font-medium">Saved!</span>
+            ) : (
+              "Changes are saved automatically."
+            )}
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleReset}
+              className="px-4 py-2 text-sm border border-border rounded-btn text-text-secondary hover:bg-nav-hover transition-colors"
+            >
+              Reset Defaults
+            </button>
+            <button
+              onClick={handleSaveAll}
+              disabled={updateRule.isPending}
+              className={`px-5 py-2 text-sm rounded-btn text-white font-medium transition-colors ${
+                saved ? "bg-success" : "bg-accent hover:bg-accent-hover"
+              }`}
+            >
+              {saved ? "Saved!" : "Save All"}
+            </button>
+          </div>
         </div>
       </div>
     </motion.div>

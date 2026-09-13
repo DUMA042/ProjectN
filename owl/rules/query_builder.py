@@ -81,6 +81,20 @@ def get_eligible_statuses() -> list:
     return es.get("statuses", ["Active"])
 
 
+def get_active_statuses() -> list:
+    """Configured eligible statuses; falls back to ['Active'] when empty."""
+    raw = get_eligible_statuses() or []
+    cleaned = [str(s).strip() for s in raw if s is not None and str(s).strip()]
+    return cleaned or ["Active"]
+
+
+def build_status_filter(alias: str = "s") -> str:
+    """Case-insensitive IN clause against an employee_statuses alias."""
+    names = get_active_statuses()
+    quoted = ", ".join(f"'{n.lower()}'" for n in names)
+    return f"LOWER({alias}.status_name) IN ({quoted})"
+
+
 def build_eligible_statuses_filter() -> str:
     statuses = get_eligible_statuses()
     if not statuses:

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   BarChart,
   Bar,
@@ -8,15 +9,18 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
+import { Download } from "lucide-react";
 import DateRangePicker from "@/components/ui/DateRangePicker";
+import PercentCountToggle from "@/components/ui/PercentCountToggle";
 import { useClickableLegend } from "@/lib/chartUtils";
+import { exportToCSV } from "@/lib/csvExport";
 import type { DateRange } from "@/components/ui/DateRangePicker";
 
 const SEGMENTS = [
-  { key: "attendance_pct", label: "Attendance", color: "#52C41A" },
-  { key: "absent_pct", label: "Absent", color: "#FF4D4F" },
-  { key: "leave_pct", label: "Leave", color: "#FAAD14" },
-  { key: "training_pct", label: "Training", color: "#1677FF" },
+  { id: "attendance", label: "Attendance", color: "#52C41A", pctKey: "attendance_pct", countKey: "attendance_count" },
+  { id: "absent", label: "Absent", color: "#FF4D4F", pctKey: "absent_pct", countKey: "absent_count" },
+  { id: "leave", label: "Leave", color: "#FAAD14", pctKey: "leave_pct", countKey: "leave_count" },
+  { id: "training", label: "Training", color: "#1677FF", pctKey: "training_pct", countKey: "training_count" },
 ];
 
 interface DeptAttendanceChartProps {
@@ -37,6 +41,7 @@ export default function DeptAttendanceChart({
   loading,
 }: DeptAttendanceChartProps) {
   const { isHidden, toggle } = useClickableLegend();
+  const [mode, setMode] = useState<"pct" | "count">("pct");
 
   if (loading) {
     return (
@@ -50,31 +55,79 @@ export default function DeptAttendanceChart({
     );
   }
 
-  const chartData = (data || []).map((d) => ({
-    name: d.department_name?.length > 14
-      ? d.department_name.slice(0, 14) + "…"
-      : d.department_name,
-    fullName: d.department_name,
-    attendance_pct: d.attendance_pct ?? 0,
-    absent_pct: d.absent_pct ?? 0,
-    leave_pct: d.leave_pct ?? 0,
-    training_pct: d.training_pct ?? 0,
-    total: d.total_staff,
-  }));
+  const chartData = (data || []).map((d) => {
+    const row: Record<string, any> = {
+      name: d.department_name?.length > 14
+        ? d.department_name.slice(0, 14) + "…"
+        : d.department_name,
+      fullName: d.department_name,
+      total: d.total_staff,
+    };
+    for (const seg of SEGMENTS) {
+      row[seg.pctKey] = d[seg.pctKey] ?? 0;
+      row[seg.countKey] = d[seg.countKey] ?? 0;
+    }
+    return row;
+  });
 
   const handleLegendClick = (entry: any) => {
     const seg = SEGMENTS.find((s) => s.label === entry.value);
-    if (seg) toggle(seg.key);
+    if (seg) toggle(seg.id);
   };
+
+  if (!data || data.length === 0) {
+    return (
+      <div className="card-container p-5 h-[440px] flex flex-col">
+        <div className="flex items-center justify-between mb-2 flex-wrap gap-2 flex-shrink-0">
+          <div>
+            <h3 className="text-sm font-semibold text-text-primary">{title}</h3>
+            <p className="text-xs text-text-secondary mt-0.5">Clustered breakdown for all {location} departments</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <PercentCountToggle value={mode} onChange={setMode} />
+            <button
+              onClick={() => exportToCSV(data || [], "department_attendance_perf", dateRange)}
+              title="Export CSV"
+              aria-label="Export CSV"
+              className="p-2 rounded-btn text-text-muted hover:text-accent hover:bg-nav-hover transition-colors"
+            >
+              <Download size={14} />
+            </button>
+            <DateRangePicker value={dateRange} onChange={onDateChange} />
+          </div>
+        </div>
+        <div className="flex-1 flex flex-col items-center justify-center text-text-muted gap-2">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" opacity={0.4}>
+            <rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18M9 21V9" />
+          </svg>
+          <p className="text-sm font-medium">No attendance data</p>
+          <p className="text-xs">Try selecting a different date range or location</p>
+        </div>
+      </div>
+    );
+  }
+
+  const isPct = mode === "pct";
 
   return (
     <div className="card-container p-5 h-[440px] flex flex-col justify-between">
-      <div className="flex items-center justify-between mb-2 flex-shrink-0">
+      <div className="flex items-center justify-between mb-2 flex-wrap gap-2 flex-shrink-0">
         <div>
           <h3 className="text-sm font-semibold text-text-primary">{title}</h3>
           <p className="text-xs text-text-secondary mt-0.5">Clustered breakdown for all {location} departments</p>
         </div>
-        <DateRangePicker value={dateRange} onChange={onDateChange} />
+        <div className="flex items-center gap-2">
+          <PercentCountToggle value={mode} onChange={setMode} />
+          <button
+            onClick={() => exportToCSV(data, "department_attendance_perf", dateRange)}
+            title="Export CSV"
+            aria-label="Export CSV"
+            className="p-2 rounded-btn text-text-muted hover:text-accent hover:bg-nav-hover transition-colors"
+          >
+            <Download size={14} />
+          </button>
+          <DateRangePicker value={dateRange} onChange={onDateChange} />
+        </div>
       </div>
 
       <div className="flex-1 min-h-0 pt-2">
@@ -92,25 +145,26 @@ export default function DeptAttendanceChart({
             />
             <YAxis
               tick={{ fontSize: 11, fill: "#94A3B8" }}
-              unit="%"
+              unit={isPct ? "%" : undefined}
               axisLine={false}
               tickLine={false}
             />
             <Tooltip
               contentStyle={{ borderRadius: 8, border: "1px solid #EAECF0", boxShadow: "0px 4px 12px rgba(0,0,0,0.06)" }}
-              formatter={(value: number, name: string) => [`${value}%`, name]}
+              formatter={(value: number, name: string) => [isPct ? `${value}%` : value.toLocaleString(), name]} 
               labelFormatter={(label, payload) => payload?.[0]?.payload?.fullName || label}
             />
             <Legend
               onClick={handleLegendClick}
               iconType="square"
               iconSize={10}
-              payload={SEGMENTS.map((s) => ({ value: s.label, color: isHidden(s.key) ? "#CBD5E1" : s.color, type: "square" as const }))}
+              payload={SEGMENTS.map((s) => ({ value: s.label, color: isHidden(s.id) ? "#CBD5E1" : s.color, type: "square" as const }))}
               wrapperStyle={{ cursor: "pointer", paddingTop: 16 }}
             formatter={(value: string) => {
-              const segKey = SEGMENTS.find(s => s.label === value)?.key || value;
+              const seg = SEGMENTS.find((s) => s.label === value);
+              const key = seg ? seg.id : value;
               return (
-                <span className={isHidden(segKey) ? "opacity-40" : ""} style={{ color: "#64748B", fontSize: 12 }}>
+                <span className={isHidden(key) ? "opacity-40" : ""} style={{ color: "#64748B", fontSize: 12 }}>
                   {value}
                 </span>
               );
@@ -118,10 +172,10 @@ export default function DeptAttendanceChart({
             />
             {SEGMENTS.map((seg) => (
               <Bar
-                key={seg.key}
-                dataKey={seg.key}
+                key={seg.id}
+                dataKey={isPct ? seg.pctKey : seg.countKey}
                 name={seg.label}
-                fill={isHidden(seg.key) ? "transparent" : seg.color}
+                fill={isHidden(seg.id) ? "transparent" : seg.color}
                 radius={[3, 3, 0, 0]}
               />
             ))}

@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { getDefaultDateRange } from "@/components/ui/DateRangePicker";
 
@@ -85,14 +85,15 @@ export function useEarliestCheckins(
   startDate: string = today.startDate,
   endDate: string = today.endDate,
   limit: number = 10,
-  location: string = ""
+  location: string = "",
+  mode: string = "avg_checkin"
 ) {
   return useQuery({
-    queryKey: ["earliest-checkins", startDate, endDate, limit, location],
+    queryKey: ["earliest-checkins", startDate, endDate, limit, location, mode],
     queryFn: () =>
       api
         .get("/api/dashboard/earliest-checkins", {
-          params: { start_date: startDate, end_date: endDate, limit, location },
+          params: { start_date: startDate, end_date: endDate, limit, location, mode },
         })
         .then((r) => r.data),
     refetchInterval: 30_000,
@@ -119,19 +120,51 @@ export function useArrivalTime(
   });
 }
 
-export function useEmployeeSummary(
-  startDate: string = "",
-  endDate: string = "",
-  location: string = ""
-) {
-  return useQuery({
-    queryKey: ["employee-summary", startDate, endDate, location],
+export interface EmployeeSummaryParams {
+  startDate: string;
+  endDate: string;
+  location: string;
+  page: number;
+  pageSize: number;
+  search: string;
+  sortBy: string;
+  sortDir: "asc" | "desc";
+  filters: Record<string, string[]>;
+}
+
+export interface EmployeeSummaryResponse {
+  items: any[];
+  total: number;
+  page: number;
+  page_size: number;
+  filter_options: Record<string, string[]>;
+}
+
+export function useEmployeeSummary(params: EmployeeSummaryParams) {
+  const { startDate, endDate, location, page, pageSize, search, sortBy, sortDir, filters } = params;
+  const filtersKey = JSON.stringify(filters);
+  return useQuery<EmployeeSummaryResponse>({
+    queryKey: [
+      "employee-summary",
+      startDate, endDate, location, page, pageSize, search, sortBy, sortDir, filtersKey,
+    ],
     queryFn: () =>
       api
         .get("/api/dashboard/employee-summary", {
-          params: { start_date: startDate, end_date: endDate, location },
+          params: {
+            start_date: startDate,
+            end_date: endDate,
+            location,
+            page,
+            page_size: pageSize,
+            search,
+            sort_by: sortBy,
+            sort_dir: sortDir,
+            filters: filtersKey,
+          },
         })
         .then((r) => r.data),
+    placeholderData: keepPreviousData,
     refetchInterval: 120_000,
     staleTime: 60_000,
   });

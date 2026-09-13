@@ -1,5 +1,6 @@
-"""Staff endpoints — paginated directory + employee profile."""
+"""Staff endpoints — paginated directory + employee profile + attendance stats."""
 
+from datetime import date, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -199,4 +200,179 @@ def employee_detail(id_no: str, db: Session = Depends(get_db)):
             }
             for t in trainings
         ],
+    }
+
+
+@router.get("/employees/{id_no}/attendance-stats")
+def employee_attendance_stats(
+    id_no: str,
+    start_date: str = Query("", description="Start date YYYY-MM-DD"),
+    end_date: str = Query("", description="End date YYYY-MM-DD"),
+    db: Session = Depends(get_db),
+):
+    emp = db.execute(
+        text("""
+            SELECT e.id_no, e.full_name, e.sex, e.geographical_zone,
+                   d.department_name, r.rank_name, gl.gl_name,
+                   es.status_name, et.emp_type_name,
+                   e.phone_number
+            FROM employees e
+            LEFT JOIN departments d ON e.department_id = d.department_id
+            LEFT JOIN ranks r ON e.rank_id = r.rank_id
+            LEFT JOIN grade_levels gl ON e.gl_id = gl.gl_id
+            LEFT JOIN employee_statuses es ON e.status_id = es.status_id
+            LEFT JOIN employment_types et ON e.emp_type_id = et.emp_type_id
+            WHERE e.id_no = :id_no
+        """),
+        {"id_no": id_no},
+    ).fetchone()
+
+    if not emp:
+        raise HTTPException(status_code=404, detail="Employee not found")
+
+    today = date.today()
+    if start_date and end_date:
+        try:
+            sd = date.fromisoformat(start_date)
+            ed = date.fromisoformat(end_date)
+        except ValueError:
+            raise HTTPException(status_code=422, detail="Invalid date format, expected YYYY-MM-DD")
+        if sd > ed:
+            raise HTTPException(status_code=422, detail="start_date must be <= end_date")
+    elif start_date or end_date:
+        raise HTTPException(status_code=422, detail="Both start_date and end_date must be provided together")
+    else:
+        sd = today.replace(day=1)
+        ed = today
+
+    swipes_raw = db.execute(
+        text("""
+            SELECT DATE(swipe_time) AS swipe_date, MIN(swipe_time) AS checkin, MAX(swipe_time) AS checkout
+            FROM employee_card_swipes
+            WHERE id_no = :id_no AND swipe_time::date BETWEEN :sd AND :ed
+            GROUP BY DATE(swipe_time)
+        """),
+        {"id_no": id_no, "sd": sd, "ed": ed},
+    ).fetchall()
+
+    leave_raw = db.execute(
+        text("""
+            SELECT start_date, COALESCE(end_date, start_date) AS end_date
+            FROM leave_records
+            WHERE id_no = :id_no AND start_date <= :ed AND COALESCE(end_date, start_date) >= :sd
+        """),
+        {"id_no": id_no, "sd": sd, "ed": ed},
+    ).fetchall()
+
+    training_raw = db.execute(
+        text("""
+            SELECT start_date, end_date
+            FROM employee_trainings
+            WHERE id_no = :id_no AND start_date <= :ed AND end_date >= :sd
+        """),
+        {"id_no": id_no, "sd": sd, "ed": ed},
+    ).fetchall()
+
+    swipe_dates = {r[0] for r in swipes_raw}
+    leave_ranges = [(r[0], r[1]) for r in leave_raw]
+    training_ranges = [(r[0], r[1]) for r in training_raw]
+
+    # User-configured holidays from rules_settings (only source)
+    try:
+        from owl.rules.engine import get_rule as _get_rule
+        _holiday_dates = _get_rule("holidays", {}).get("dates", [])
+    except Exception:
+        _holiday_dates = []
+    holiday_set: set[date] = set()
+    for _d in _holiday_dates:
+        try:
+            holiday_set.add(date.fromisoformat(str(_d)))
+        except ValueError:
+            pass
+
+    # Determine if employee is active (eligible to be absent) per configured eligible statuses
+    from owl.rules.query_builder import get_active_statuses
+    emp_status_raw = str(emp[7] or "").strip().lower()
+    active_statuses = {s.lower() for s in get_active_statuses()}
+    is_active = emp_status_raw in active_statuses
+
+    daily_attendance = []
+    counts = {"present": 0, "absent": 0, "leave": 0, "training": 0}
+    current = sd
+    while current <= ed:
+        wd = current.weekday()
+        # Weekend always wins → holiday on weekend is ignored
+        if wd >= 5:
+            daily_attendance.append({
+                "date": current.isoformat(),
+                "status": "weekend",
+                "checkin_time": None,
+                "checkout_time": None,
+            })
+            current += timedelta(days=1)
+            continue
+        if current in holiday_set:
+            daily_attendance.append({
+                "date": current.isoformat(),
+                "status": "holiday",
+                "checkin_time": None,
+                "checkout_time": None,
+            })
+            current += timedelta(days=1)
+            continue
+        status = None
+        for ls, le in leave_ranges:
+            if ls <= current <= le:
+                status = "leave"
+                break
+        if not status:
+            for ts, te in training_ranges:
+                if ts <= current <= te:
+                    status = "training"
+                    break
+        if not status and current in swipe_dates:
+            status = "present"
+        if not status:
+            if not is_active:
+                status = "inactive"
+            elif current >= today:
+                status = "upcoming"
+            else:
+                status = "absent"
+        if status in counts:
+            counts[status] += 1
+
+        checkin_time = None
+        checkout_time = None
+        for r in swipes_raw:
+            if r[0] == current:
+                if r[1]:
+                    checkin_time = r[1].strftime("%H:%M")
+                if r[2]:
+                    checkout_time = r[2].strftime("%H:%M")
+                break
+
+        daily_attendance.append({
+            "date": current.isoformat(),
+            "status": status,
+            "checkin_time": checkin_time,
+            "checkout_time": checkout_time,
+        })
+        current += timedelta(days=1)
+
+    return {
+        "employee": {
+            "id_no": emp[0],
+            "full_name": emp[1],
+            "sex": emp[2],
+            "geographical_zone": emp[3],
+            "department": emp[4],
+            "rank": emp[5],
+            "grade_level": emp[6],
+            "status": emp[7],
+            "employment_type": emp[8],
+            "phone_number": emp[9],
+        },
+        "summary": counts,
+        "daily_attendance": daily_attendance,
     }

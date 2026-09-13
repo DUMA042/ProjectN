@@ -4,12 +4,27 @@ from sqlalchemy import text
 from owl.load.database import get_session
 
 
+def _parse_value(raw):
+    """Normalise a jsonb cell to a Python object.
+
+    Newer rows store proper jsonb objects (psycopg2 returns dict/list). Older rows
+    were double-encoded (a JSON string nested inside the jsonb), so they come back
+    as a ``str`` — decode those here for backward compatibility.
+    """
+    if isinstance(raw, str):
+        try:
+            return json.loads(raw)
+        except (ValueError, TypeError):
+            return raw
+    return raw
+
+
 def load_rules() -> dict:
     with get_session() as s:
         rows = s.execute(
             text("SELECT rule_key, rule_value FROM rules_settings")
         ).fetchall()
-    return {r[0]: r[1] for r in rows}
+    return {r[0]: _parse_value(r[1]) for r in rows}
 
 
 @lru_cache(maxsize=1)
@@ -31,9 +46,10 @@ def save_rule(key: str, value: dict | list | str | bool) -> None:
         s.execute(
             text("""
                 INSERT INTO rules_settings (rule_key, rule_value)
-                VALUES (:key, :value)
-                ON CONFLICT (rule_key) DO UPDATE SET rule_value = :value, updated_at = NOW()
+                VALUES (:key, CAST(:value AS jsonb))
+                ON CONFLICT (rule_key) DO UPDATE SET rule_value = CAST(:value AS jsonb), updated_at = NOW()
             """),
+            # CAST(:value AS jsonb) parses the JSON exactly once (avoids double-encoding).
             {"key": key, "value": json.dumps(value)},
         )
         s.commit()
@@ -46,7 +62,7 @@ def seed_defaults(defaults: dict) -> None:
             s.execute(
                 text("""
                     INSERT INTO rules_settings (rule_key, rule_value)
-                    VALUES (:key, :value)
+                    VALUES (:key, CAST(:value AS jsonb))
                     ON CONFLICT (rule_key) DO NOTHING
                 """),
                 {"key": key, "value": json.dumps(value)},
