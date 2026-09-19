@@ -1,12 +1,16 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, User, Phone, MapPin, Briefcase, Shield, TrendingUp, Calendar, Award } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
+import { X, Building2, User, Briefcase, Clock, Check } from "lucide-react";
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine,
+} from "recharts";
+import type { SortingState } from "@tanstack/react-table";
 import { api } from "@/lib/api";
-import DateRangePicker from "@/components/ui/DateRangePicker";
-import { getDefaultDateRange } from "@/components/ui/DateRangePicker";
+import DateRangePicker, { getDefaultDateRange } from "@/components/ui/DateRangePicker";
 import type { DateRange } from "@/components/ui/DateRangePicker";
+import DataTable from "@/components/ui/DataTable";
+import { useEmployeeRecords } from "@/hooks/useDashboard";
 
 interface EmployeeDetailSheetProps {
   employeeId: string;
@@ -14,50 +18,46 @@ interface EmployeeDetailSheetProps {
   defaultDateRange?: DateRange;
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  present: "#52C41A",
-  leave: "#FAAD14",
-  absent: "#FF4D4F",
-  training: "#1677FF",
-  inactive: "#BFBFBF",
-  weekend: "transparent",
-  holiday: "#FFF7E6",
-  upcoming: "#F5F5F5",
+type TabKey = "attendance" | "leave" | "training";
+
+interface TabState {
+  page: number;
+  pageSize: number;
+  searchInput: string;
+  search: string;
+  sorting: SortingState;
+  filters: Record<string, Set<string>>;
+}
+
+const DEFAULT_SORT: Record<TabKey, string> = {
+  attendance: "day_date",
+  leave: "start_date",
+  training: "start_date",
 };
 
-const STATUS_BG: Record<string, string> = {
-  present: "#F0FDF4",
-  leave: "#FFFBE6",
-  absent: "#FFF2F0",
-  training: "#F0F5FF",
-  inactive: "#F5F5F5",
-  upcoming: "#F5F5F5",
-};
+function makeTabState(sortId: string): TabState {
+  return { page: 1, pageSize: 10, searchInput: "", search: "", sorting: [{ id: sortId, desc: true }], filters: {} };
+}
 
 // Full 24h Y-axis ticks every 4 hours
 const FULL_DAY_TICKS = [0, 240, 480, 720, 960, 1200, 1440];
 
 function parseTimeMinutes(s: string): number {
-  const [h, m] = s.split(":").map(String).join(":").split(":").map(Number);
+  const [h, m] = s.split(":").map(Number);
   return (h || 0) * 60 + (m || 0);
 }
 
-// Resolve day-name for a date string
 function dayNameOf(dateStr: string): string {
   const d = new Date(dateStr + "T12:00:00");
   return ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"][d.getDay()];
 }
 
-// Pick target + thresholds for a set of working dates
 function resolveDayThresholds(workingHours: any, dates: string[], kind: "checkin" | "checkout") {
   if (!workingHours) return null;
-  // Prefer the most common weekday in the range; fallback to first available
   for (const ds of dates) {
-    const dn = dayNameOf(ds);
-    const wh = workingHours[dn];
+    const wh = workingHours[dayNameOf(ds)];
     if (wh && wh[kind]) return wh[kind];
   }
-  // Fallback: first non-null day in working_hours
   for (const dn of ["monday", "tuesday", "wednesday", "thursday", "friday"]) {
     const wh = workingHours[dn];
     if (wh && wh[kind]) return wh[kind];
@@ -66,72 +66,89 @@ function resolveDayThresholds(workingHours: any, dates: string[], kind: "checkin
 }
 
 function colorForTime(minutes: number, thresholds: any): string {
-  if (!thresholds) return thresholds === null ? "#1677FF" : "#1677FF";
+  if (!thresholds) return "#1677FF";
   const earlyBefore = thresholds.early_before ? parseTimeMinutes(thresholds.early_before) : null;
   const lateAfter = thresholds.late_after ? parseTimeMinutes(thresholds.late_after) : null;
-  if (earlyBefore !== null && minutes < earlyBefore) return "#52C41A"; // early
-  if (lateAfter !== null && minutes > lateAfter) return "#FF4D4F"; // late
-  return "#1677FF"; // normal
+  if (earlyBefore !== null && minutes < earlyBefore) return "#52C41A";
+  if (lateAfter !== null && minutes > lateAfter) return "#FF4D4F";
+  return "#1677FF";
 }
 
-type HeatmapDay = { day: string; status: string; date: string } | null;
-type HeatmapWeek = HeatmapDay[];
-
-const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
-
-function buildHeatmapWeeks(daily: { date: string; status: string }[]): HeatmapWeek[] {
-  if (!daily.length) return [];
-  const byDate = new Map(daily.map((d) => [d.date, d.status]));
-  const startDate = new Date(daily[0].date + "T00:00:00");
-  const endDate = new Date(daily[daily.length - 1].date + "T00:00:00");
-  const weeks: HeatmapWeek[] = [];
-  let currentWeek: HeatmapWeek = [null, null, null, null, null, null, null]; // Mon..Sun slots
-  const current = new Date(startDate);
-  while (current <= endDate) {
-    const wd = (current.getDay() + 6) % 7; // Mon=0 ... Sun=6
-    // Local date key (must match backend's local date strings, not UTC)
-    const dateStr = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, "0")}-${String(current.getDate()).padStart(2, "0")}`;
-    let status = byDate.get(dateStr) || "absent";
-    // Never render weekends/holidays as absent
-    if (wd >= 5) status = "weekend";
-    currentWeek[wd] = { day: DAY_NAMES[wd], status, date: dateStr };
-    if (wd === 6 || current.getTime() === endDate.getTime()) {
-      weeks.push(currentWeek);
-      currentWeek = [null, null, null, null, null, null, null];
-    }
-    current.setDate(current.getDate() + 1);
-  }
-  if (currentWeek.some(Boolean)) weeks.push(currentWeek);
-  return weeks;
-}
-
-function heatmapCellStyle(status: string): React.CSSProperties {
-  if (status === "weekend") {
-    return { backgroundColor: "transparent", border: "1px solid #EAECF0", opacity: 1 };
-  }
-  if (status === "holiday") {
-    return { backgroundColor: "#FFF7E6", border: "1px solid #FFD666", opacity: 1 };
-  }
-  if (status === "upcoming") {
-    return { backgroundColor: "#F5F5F5", border: "1px solid #EAECF0", opacity: 1 };
-  }
-  if (status === "inactive") {
-    return { backgroundColor: STATUS_COLORS.inactive, opacity: 0.6 };
-  }
-  return { backgroundColor: STATUS_COLORS[status] || "#F0F0F0", opacity: 0.85 };
-}
-
-function ProfileTile({ icon: Icon, label, value }: { icon: any; label: string; value: string | null }) {
+function AttrRow({ icon: Icon, label, value }: { icon: any; label: string; value: string | null }) {
   return (
-    <div className="flex items-center gap-2 p-2 rounded-btn bg-nav-hover">
-      <Icon size={14} className="text-accent flex-shrink-0" />
-      <div className="min-w-0">
-        <p className="text-[10px] text-text-muted leading-tight">{label}</p>
-        <p className="text-xs font-medium text-text-primary truncate">{value || "—"}</p>
-      </div>
+    <div className="flex items-center gap-3">
+      <Icon size={15} className="text-text-muted flex-shrink-0" />
+      <span className="text-xs text-text-secondary">{label}</span>
+      <span className="flex-1 border-b border-dashed border-divider" />
+      <span className="text-xs font-medium text-text-primary truncate max-w-[55%] text-right">{value || "—"}</span>
     </div>
   );
 }
+
+function checkinCell(status: string) {
+  if (!status) return <span className="text-text-muted">—</span>;
+  const color = status === "Early Arrival" ? "text-success" : status === "Late Arrival" ? "text-danger" : "text-info";
+  return <span className={`font-medium ${color}`}>{status}</span>;
+}
+
+function checkoutCell(status: string) {
+  if (!status) return <span className="text-text-muted">—</span>;
+  const color =
+    status === "Late Departure" ? "text-success"
+    : status === "Early Departure" ? "text-danger"
+    : status === "Incomplete" ? "text-text-secondary"
+    : "text-info";
+  return <span className={`font-medium ${color}`}>{status}</span>;
+}
+
+const ATTENDANCE_COLUMNS = [
+  { key: "day_date", header: "Day / Date" },
+  { key: "checkin_time", header: "Check-in" },
+  { key: "checkin_status", header: "Check-in Status", cell: (r: any) => checkinCell(r.checkin_status) },
+  { key: "checkout_time", header: "Check-out" },
+  { key: "checkout_status", header: "Check-out Status", cell: (r: any) => checkoutCell(r.checkout_status) },
+  {
+    key: "attendance_status",
+    header: "Attendance Status",
+    cell: (r: any) =>
+      r.attendance_status ? (
+        <span className="font-medium text-success">{r.attendance_status}</span>
+      ) : (
+        <span className="text-text-muted">—</span>
+      ),
+  },
+];
+
+const LEAVE_COLUMNS = [
+  { key: "start_date", header: "Start Date" },
+  { key: "end_date", header: "End Date" },
+  { key: "leave_type", header: "Leave Type" },
+  {
+    key: "status",
+    header: "Status",
+    cell: (r: any) =>
+      r.status === "Current" ? (
+        <span className="font-medium text-warning">Current</span>
+      ) : (
+        <span className="text-text-secondary">Taken</span>
+      ),
+  },
+];
+
+const TRAINING_COLUMNS = [
+  { key: "venue", header: "Venue" },
+  { key: "consultant", header: "Consultant" },
+  { key: "location", header: "Location" },
+  { key: "start_date", header: "Start Date" },
+  { key: "end_date", header: "End Date" },
+  { key: "title", header: "Title" },
+];
+
+const TABS: { key: TabKey; label: string }[] = [
+  { key: "attendance", label: "Attendance" },
+  { key: "leave", label: "Leave" },
+  { key: "training", label: "Training" },
+];
 
 export default function EmployeeDetailSheet({ employeeId, onClose, defaultDateRange }: EmployeeDetailSheetProps) {
   const [data, setData] = useState<any>(null);
@@ -139,6 +156,12 @@ export default function EmployeeDetailSheet({ employeeId, onClose, defaultDateRa
   const [error, setError] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState<DateRange>(defaultDateRange || getDefaultDateRange());
   const [workingHours, setWorkingHours] = useState<any>(null);
+  const [tab, setTab] = useState<TabKey>("attendance");
+  const [tabStates, setTabStates] = useState<Record<TabKey, TabState>>({
+    attendance: makeTabState("day_date"),
+    leave: makeTabState("start_date"),
+    training: makeTabState("start_date"),
+  });
 
   // Body scroll lock + Escape handler
   useEffect(() => {
@@ -152,11 +175,9 @@ export default function EmployeeDetailSheet({ employeeId, onClose, defaultDateRa
     };
   }, [onClose]);
 
-  // Fetch target thresholds from rules (non-blocking — chart still renders without them)
+  // Target thresholds for the graphs
   useEffect(() => {
-    api.get("/api/rules").then((r) => {
-      setWorkingHours(r.data?.working_hours ?? null);
-    }).catch(() => {});
+    api.get("/api/rules").then((r) => setWorkingHours(r.data?.working_hours ?? null)).catch(() => {});
   }, []);
 
   const fetchData = useCallback(() => {
@@ -173,12 +194,55 @@ export default function EmployeeDetailSheet({ employeeId, onClose, defaultDateRa
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  const updateTab = (key: TabKey, patch: Partial<TabState>) =>
+    setTabStates((prev) => ({ ...prev, [key]: { ...prev[key], ...patch } }));
+
+  // Debounce the search input for the active tab
+  const activeSearchInput = tabStates[tab].searchInput;
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      setTabStates((prev) => ({
+        ...prev,
+        [tab]: { ...prev[tab], search: prev[tab].searchInput, page: 1 },
+      }));
+    }, 350);
+    return () => window.clearTimeout(id);
+  }, [activeSearchInput, tab]);
+
+  // Reset all tables to page 1 when the date range changes
+  const handleDateChange = (range: DateRange) => {
+    setDateRange(range);
+    setTabStates((prev) => ({
+      attendance: { ...prev.attendance, page: 1 },
+      leave: { ...prev.leave, page: 1 },
+      training: { ...prev.training, page: 1 },
+    }));
+  };
+
+  const active = tabStates[tab];
+  const filtersForApi = useMemo(() => {
+    const out: Record<string, string[]> = {};
+    for (const [k, set] of Object.entries(active.filters)) if (set.size > 0) out[k] = [...set];
+    return out;
+  }, [active.filters]);
+
+  const { data: records, isLoading: recordsLoading, isFetching: recordsFetching } = useEmployeeRecords({
+    idNo: employeeId,
+    type: tab,
+    startDate: dateRange.startDate,
+    endDate: dateRange.endDate,
+    page: active.page,
+    pageSize: active.pageSize,
+    search: active.search,
+    sortBy: active.sorting[0]?.id ?? DEFAULT_SORT[tab],
+    sortDir: active.sorting[0]?.desc ? "desc" : "asc",
+    filters: filtersForApi,
+  });
+
   const employee = data?.employee;
   const summary = data?.summary;
   const daily = data?.daily_attendance || [];
-  const heatmapWeeks = buildHeatmapWeeks(daily);
 
-  // Enrich chart data with weekday label + computed color
   const checkinThresholds = useMemo(() => {
     const dates = daily.filter((d: any) => d.checkin_time).map((d: any) => d.date);
     return resolveDayThresholds(workingHours, dates, "checkin");
@@ -188,14 +252,14 @@ export default function EmployeeDetailSheet({ employeeId, onClose, defaultDateRa
     return resolveDayThresholds(workingHours, dates, "checkout");
   }, [workingHours, daily]);
 
-  const checkinTargetMinutes = useMemo(() => {
-    if (!checkinThresholds?.normal_start) return null;
-    return parseTimeMinutes(checkinThresholds.normal_start);
-  }, [checkinThresholds]);
-  const checkoutTargetMinutes = useMemo(() => {
-    if (!checkoutThresholds?.normal_start) return null;
-    return parseTimeMinutes(checkoutThresholds.normal_start);
-  }, [checkoutThresholds]);
+  const checkinTargetMinutes = useMemo(
+    () => (checkinThresholds?.normal_start ? parseTimeMinutes(checkinThresholds.normal_start) : null),
+    [checkinThresholds]
+  );
+  const checkoutTargetMinutes = useMemo(
+    () => (checkoutThresholds?.normal_start ? parseTimeMinutes(checkoutThresholds.normal_start) : null),
+    [checkoutThresholds]
+  );
 
   const weekdayShort = (dateStr: string) => {
     const d = new Date(dateStr + "T12:00:00");
@@ -205,27 +269,19 @@ export default function EmployeeDetailSheet({ employeeId, onClose, defaultDateRa
   const checkinChartData = daily
     .filter((d: any) => d.checkin_time)
     .map((d: any) => {
-      const [h, m] = d.checkin_time.split(":").map(Number);
-      const minutes = h * 60 + m;
-      return {
-        label: `${weekdayShort(d.date)} ${d.date.slice(5)}`,
-        minutes,
-        color: colorForTime(minutes, checkinThresholds),
-      };
+      const minutes = parseTimeMinutes(d.checkin_time);
+      return { label: `${weekdayShort(d.date)} ${d.date.slice(5)}`, minutes, color: colorForTime(minutes, checkinThresholds) };
     });
   const checkoutChartData = daily
     .filter((d: any) => d.checkout_time)
     .map((d: any) => {
-      const [h, m] = d.checkout_time.split(":").map(Number);
-      const minutes = h * 60 + m;
-      // Checkout early is bad (red), late is good (green) — mirror checkin logic for late_after
+      const minutes = parseTimeMinutes(d.checkout_time);
       let color = "#722ED1";
       if (checkoutThresholds) {
-        const earlyBefore = checkoutThresholds.early_before ? parseTimeMinutes(checkoutThresholds.early_before) : null;
-        const lateAfter = checkoutThresholds.late_after ? parseTimeMinutes(checkoutThresholds.late_after) : null;
-        if (earlyBefore !== null && minutes < earlyBefore) color = "#FF4D4F";
-        else if (lateAfter !== null && minutes > lateAfter) color = "#52C41A";
-        else color = "#722ED1";
+        const eb = checkoutThresholds.early_before ? parseTimeMinutes(checkoutThresholds.early_before) : null;
+        const la = checkoutThresholds.late_after ? parseTimeMinutes(checkoutThresholds.late_after) : null;
+        if (eb !== null && minutes < eb) color = "#FF4D4F";
+        else if (la !== null && minutes > la) color = "#52C41A";
       }
       return { label: `${weekdayShort(d.date)} ${d.date.slice(5)}`, minutes, color };
     });
@@ -237,15 +293,18 @@ export default function EmployeeDetailSheet({ employeeId, onClose, defaultDateRa
   };
 
   const initials = employee?.full_name?.split(" ").map((n: string) => n[0]).slice(0, 2).join("").toUpperCase() || "?";
+  const isActive = Boolean(employee?.is_active);
 
-  const summaryCards = [
-    { label: "Present", count: summary?.present ?? 0, color: STATUS_COLORS.present, bg: STATUS_BG.present },
-    { label: "Absent", count: summary?.absent ?? 0, color: STATUS_COLORS.absent, bg: STATUS_BG.absent },
-    { label: "Leave", count: summary?.leave ?? 0, color: STATUS_COLORS.leave, bg: STATUS_BG.leave },
-    { label: "Training", count: summary?.training ?? 0, color: STATUS_COLORS.training, bg: STATUS_BG.training },
+  const metrics = [
+    { label: "Total Present Days", value: summary?.present ?? 0 },
+    { label: "Total Absent Days", value: summary?.absent ?? 0 },
+    { label: "Total Leave Days", value: summary?.leave ?? 0 },
+    { label: "Total Training Days", value: summary?.training ?? 0 },
   ];
 
-  const sheet = (
+  const tableColumns = tab === "attendance" ? ATTENDANCE_COLUMNS : tab === "leave" ? LEAVE_COLUMNS : TRAINING_COLUMNS;
+
+  const modal = (
     <AnimatePresence mode="wait">
       <div className="fixed inset-0 z-50">
         <motion.div
@@ -254,165 +313,192 @@ export default function EmployeeDetailSheet({ employeeId, onClose, defaultDateRa
           onClick={onClose}
         />
         <motion.div
-          className="absolute left-0 right-0 bottom-0 bg-surface rounded-t-xl shadow-2xl overflow-hidden"
-          style={{ maxHeight: "85vh" }}
-          initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+          className="absolute left-0 right-0 bottom-0 bg-surface border-t border-border shadow-2xl overflow-hidden flex flex-col rounded-t-xl"
+          style={{ height: "85vh" }}
+          initial={{ y: "100%" }}
+          animate={{ y: 0 }}
+          exit={{ y: "100%" }}
           transition={{ type: "spring", damping: 30, stiffness: 300 }}
         >
-          <div className="flex justify-center pt-3 pb-1">
+          {/* Drag handle */}
+          <div className="flex justify-center pt-2.5 pb-1 flex-shrink-0">
             <div className="w-10 h-1 rounded-full bg-border" />
           </div>
 
-          <div className="flex items-center justify-between px-6 pb-4 border-b border-divider flex-wrap gap-2">
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-full bg-accent flex items-center justify-center text-white font-semibold text-sm">
-                {initials}
-              </div>
-              <div>
-                <h2 className="text-base font-semibold text-text-primary">{employee?.full_name || "—"}</h2>
-                <p className="text-xs text-text-secondary">ID: {employee?.id_no} · {employee?.department} · {employee?.grade_level}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <DateRangePicker value={dateRange} onChange={setDateRange} />
-              <button onClick={onClose} aria-label="Close" className="p-2 rounded-btn text-text-muted hover:text-text-primary hover:bg-nav-hover transition-colors">
-                <X size={18} />
-              </button>
-            </div>
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 h-[56px] border-b border-divider flex-shrink-0">
+            <h2 className="text-[12px] font-semibold tracking-wide text-text-primary uppercase">
+              Employee Attendance Details
+            </h2>
+            <button
+              onClick={onClose}
+              aria-label="Close"
+              className="w-6 h-6 flex items-center justify-center text-text-secondary hover:text-text-primary rounded hover:bg-nav-hover transition-colors"
+            >
+              <X size={16} />
+            </button>
           </div>
 
           {loading ? (
-            <div className="flex items-center justify-center h-40 text-text-muted text-sm">Loading...</div>
+            <div className="flex-1 flex items-center justify-center text-text-muted text-sm">Loading...</div>
           ) : error ? (
-            <div className="flex items-center justify-center h-40 text-danger text-sm">{error}</div>
+            <div className="flex-1 flex items-center justify-center text-danger text-sm">{error}</div>
           ) : (
-            <div className="overflow-y-auto" style={{ maxHeight: "calc(85vh - 80px)" }}>
-              <div className="p-6 space-y-5">
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  <ProfileTile icon={User} label="Sex" value={employee?.sex} />
-                  <ProfileTile icon={Phone} label="Phone" value={employee?.phone_number} />
-                  <ProfileTile icon={Briefcase} label="Department" value={employee?.department} />
-                  <ProfileTile icon={Award} label="Grade" value={employee?.grade_level} />
-                  <ProfileTile icon={Shield} label="Rank" value={employee?.rank} />
-                  <ProfileTile icon={TrendingUp} label="Status" value={employee?.status} />
-                  <ProfileTile icon={Calendar} label="Emp. Type" value={employee?.employment_type} />
-                  <ProfileTile icon={MapPin} label="Zone" value={employee?.geographical_zone} />
+            <div className="flex-1 overflow-y-auto">
+              {/* Employee information */}
+              <div className="p-5 grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="rounded-card bg-canvas border border-border p-4 flex items-center gap-4">
+                  <div className="relative flex-shrink-0">
+                    <div className="w-14 h-14 rounded-full bg-accent text-white flex items-center justify-center font-semibold text-lg">
+                      {initials}
+                    </div>
+                    <span
+                      className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white"
+                      style={{ backgroundColor: isActive ? "#52C41A" : "#8C8C8C" }}
+                    />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-[16px] font-semibold text-text-primary truncate">{employee?.full_name || "—"}</h3>
+                      <span
+                        className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full ${
+                          isActive ? "bg-badge-green-bg text-badge-green-text" : "bg-nav-hover text-text-secondary"
+                        }`}
+                      >
+                        {isActive && <Check size={11} />}
+                        {employee?.status || "—"}
+                      </span>
+                    </div>
+                    <p className="text-xs text-text-muted mt-1">ID: {employee?.id_no}</p>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {summaryCards.map((s) => (
-                    <div key={s.label} className="rounded-card border border-border p-3 text-center" style={{ backgroundColor: s.bg }}>
-                      <p className="text-lg font-bold" style={{ color: s.color }}>{s.count}</p>
-                      <p className="text-xs text-text-secondary mt-0.5">{s.label}</p>
+                <div className="rounded-card border border-border p-4 space-y-3">
+                  <AttrRow icon={Building2} label="Department" value={employee?.department} />
+                  <AttrRow icon={User} label="Role" value={employee?.rank} />
+                  <AttrRow icon={Briefcase} label="Employment" value={employee?.employment_type} />
+                  <AttrRow icon={Clock} label="Avg. Work Hours" value={data?.avg_work_hours} />
+                </div>
+              </div>
+
+              {/* Attendance Summary */}
+              <div className="px-5 pb-5">
+                <h4 className="text-[14px] font-semibold text-text-primary mb-3">Attendance Summary</h4>
+                <div className="rounded-card border border-border grid grid-cols-2 sm:grid-cols-4 divide-x divide-divider">
+                  {metrics.map((m) => (
+                    <div key={m.label} className="p-4 text-center">
+                      <p className="text-xs text-text-secondary">{m.label}</p>
+                      <p className="text-xl font-bold text-text-primary mt-1.5">{m.value}</p>
                     </div>
                   ))}
                 </div>
+              </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  <div className="rounded-card border border-border p-4">
-                    <h4 className="text-xs font-semibold text-text-primary mb-1">Check-in Times</h4>
-                    {checkinTargetMinutes !== null && (
-                      <p className="text-[11px] text-text-muted mb-2">Target: {formatMinutes(checkinTargetMinutes)} · <span style={{ color: "#52C41A" }}>Early</span> / <span style={{ color: "#1677FF" }}>Normal</span> / <span style={{ color: "#FF4D4F" }}>Late</span></p>
-                    )}
-                    {checkinChartData.length > 0 ? (
-                      <ResponsiveContainer width="100%" height={200}>
-                        <LineChart data={checkinChartData} margin={{ left: 0, right: 10, top: 4, bottom: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
-                          <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#94A3B8" }} interval="preserveStartEnd" />
-                          <YAxis ticks={FULL_DAY_TICKS} tick={{ fontSize: 10, fill: "#94A3B8" }} tickFormatter={formatMinutes} domain={[0, 1440]} />
-                          <Tooltip formatter={(v: number) => formatMinutes(v)} labelFormatter={(l) => String(l)} contentStyle={{ borderRadius: 8, border: "1px solid #EAECF0", fontSize: 12 }} />
-                          {checkinTargetMinutes !== null && (
-                            <ReferenceLine y={checkinTargetMinutes} stroke="#FAAD14" strokeDasharray="6 3" label={{ value: `Target ${formatMinutes(checkinTargetMinutes)}`, fill: "#8C6D1F", fontSize: 10, position: "insideTopRight" }} />
-                          )}
-                          <Line type="monotone" dataKey="minutes" stroke="#1677FF" strokeWidth={2} dot={(props: any) => {
-                            const { cx, cy, payload } = props;
-                            return <circle key={`${payload.label}-${payload.minutes}`} cx={cx} cy={cy} r={4} fill={payload.color} stroke="#fff" strokeWidth={1} />;
-                          }} />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <p className="text-xs text-text-muted text-center py-8">No check-in data</p>
-                    )}
-                  </div>
-                  <div className="rounded-card border border-border p-4">
-                    <h4 className="text-xs font-semibold text-text-primary mb-1">Check-out Times</h4>
-                    {checkoutTargetMinutes !== null && (
-                      <p className="text-[11px] text-text-muted mb-2">Target: {formatMinutes(checkoutTargetMinutes)} · <span style={{ color: "#722ED1" }}>Normal</span> / <span style={{ color: "#52C41A" }}>Late</span> / <span style={{ color: "#FF4D4F" }}>Early</span></p>
-                    )}
-                    {checkoutChartData.length > 0 ? (
-                      <ResponsiveContainer width="100%" height={200}>
-                        <LineChart data={checkoutChartData} margin={{ left: 0, right: 10, top: 4, bottom: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
-                          <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#94A3B8" }} interval="preserveStartEnd" />
-                          <YAxis ticks={FULL_DAY_TICKS} tick={{ fontSize: 10, fill: "#94A3B8" }} tickFormatter={formatMinutes} domain={[0, 1440]} />
-                          <Tooltip formatter={(v: number) => formatMinutes(v)} labelFormatter={(l) => String(l)} contentStyle={{ borderRadius: 8, border: "1px solid #EAECF0", fontSize: 12 }} />
-                          {checkoutTargetMinutes !== null && (
-                            <ReferenceLine y={checkoutTargetMinutes} stroke="#FAAD14" strokeDasharray="6 3" label={{ value: `Target ${formatMinutes(checkoutTargetMinutes)}`, fill: "#8C6D1F", fontSize: 10, position: "insideTopRight" }} />
-                          )}
-                          <Line type="monotone" dataKey="minutes" stroke="#722ED1" strokeWidth={2} dot={(props: any) => {
-                            const { cx, cy, payload } = props;
-                            return <circle key={`${payload.label}-${payload.minutes}`} cx={cx} cy={cy} r={4} fill={payload.color} stroke="#fff" strokeWidth={1} />;
-                          }} />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <p className="text-xs text-text-muted text-center py-8">No check-out data</p>
-                    )}
-                  </div>
+              {/* Graphs */}
+              <div className="px-5 pb-5 grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="rounded-card border border-border p-4">
+                  <h4 className="text-xs font-semibold text-text-primary mb-1">Check-in Times</h4>
+                  {checkinTargetMinutes !== null && (
+                    <p className="text-[11px] text-text-muted mb-2">
+                      Target: {formatMinutes(checkinTargetMinutes)} ·{" "}
+                      <span style={{ color: "#52C41A" }}>Early</span> / <span style={{ color: "#1677FF" }}>Normal</span> /{" "}
+                      <span style={{ color: "#FF4D4F" }}>Late</span>
+                    </p>
+                  )}
+                  {checkinChartData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={180}>
+                      <LineChart data={checkinChartData} margin={{ left: 0, right: 10, top: 4, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
+                        <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#94A3B8" }} interval="preserveStartEnd" />
+                        <YAxis ticks={FULL_DAY_TICKS} tick={{ fontSize: 10, fill: "#94A3B8" }} tickFormatter={formatMinutes} domain={[0, 1440]} />
+                        <Tooltip formatter={(v: number) => formatMinutes(v)} contentStyle={{ borderRadius: 8, border: "1px solid #EAECF0", fontSize: 12 }} />
+                        {checkinTargetMinutes !== null && (
+                          <ReferenceLine y={checkinTargetMinutes} stroke="#FAAD14" strokeDasharray="6 3" />
+                        )}
+                        <Line type="monotone" dataKey="minutes" stroke="#1677FF" strokeWidth={2} dot={(props: any) => {
+                          const { cx, cy, payload } = props;
+                          return <circle key={`${payload.label}-${payload.minutes}`} cx={cx} cy={cy} r={4} fill={payload.color} stroke="#fff" strokeWidth={1} />;
+                        }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <p className="text-xs text-text-muted text-center py-8">No check-in data</p>
+                  )}
                 </div>
 
                 <div className="rounded-card border border-border p-4">
-                  <h4 className="text-xs font-semibold text-text-primary mb-3">Activity Heatmap</h4>
-                  {heatmapWeeks.length > 0 ? (
-                    <div className="overflow-x-auto">
-                      {/* Weekday headers */}
-                      <div className="flex gap-1 mb-1">
-                        {["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"].map((wd) => (
-                          <div key={wd} className="w-[18px] text-center text-[9px] font-medium text-text-muted">{wd}</div>
-                        ))}
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        {heatmapWeeks.map((week, wi) => (
-                          <div key={wi} className="flex gap-1">
-                            {week.map((day, di) =>
-                              day ? (
-                                <div key={di} title={`${day.date}: ${day.status}`} className="w-[18px] h-[18px] rounded-[3px] transition-colors" style={heatmapCellStyle(day.status)} />
-                              ) : (
-                                <div key={di} className="w-[18px] h-[18px]" />
-                              )
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                      <div className="flex items-center gap-3 mt-3 pt-2 border-t border-divider flex-wrap">
-                        {Object.entries(STATUS_COLORS).filter(([k]) => !["inactive", "weekend", "holiday", "upcoming"].includes(k)).map(([k, c]) => (
-                          <div key={k} className="flex items-center gap-1">
-                            <div className="w-2.5 h-2.5 rounded-[2px]" style={{ backgroundColor: c as string }} />
-                            <span className="text-[10px] text-text-muted capitalize">{k}</span>
-                          </div>
-                        ))}
-                        <div className="flex items-center gap-1">
-                          <div className="w-2.5 h-2.5 rounded-[2px] border border-border" style={{ backgroundColor: "transparent" }} />
-                          <span className="text-[10px] text-text-muted">Weekend</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <div className="w-2.5 h-2.5 rounded-[2px] border" style={{ backgroundColor: "#FFF7E6", borderColor: "#FFD666" }} />
-                          <span className="text-[10px] text-text-muted">Holiday</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <div className="w-2.5 h-2.5 rounded-[2px]" style={{ backgroundColor: "#BFBFBF" }} />
-                          <span className="text-[10px] text-text-muted">Inactive</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <div className="w-2.5 h-2.5 rounded-[2px] border border-border" style={{ backgroundColor: "#F5F5F5" }} />
-                          <span className="text-[10px] text-text-muted">Upcoming</span>
-                        </div>
-                      </div>
-                    </div>
+                  <h4 className="text-xs font-semibold text-text-primary mb-1">Check-out Times</h4>
+                  {checkoutTargetMinutes !== null && (
+                    <p className="text-[11px] text-text-muted mb-2">
+                      Target: {formatMinutes(checkoutTargetMinutes)} ·{" "}
+                      <span style={{ color: "#722ED1" }}>Normal</span> / <span style={{ color: "#52C41A" }}>Late</span> /{" "}
+                      <span style={{ color: "#FF4D4F" }}>Early</span>
+                    </p>
+                  )}
+                  {checkoutChartData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={180}>
+                      <LineChart data={checkoutChartData} margin={{ left: 0, right: 10, top: 4, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
+                        <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#94A3B8" }} interval="preserveStartEnd" />
+                        <YAxis ticks={FULL_DAY_TICKS} tick={{ fontSize: 10, fill: "#94A3B8" }} tickFormatter={formatMinutes} domain={[0, 1440]} />
+                        <Tooltip formatter={(v: number) => formatMinutes(v)} contentStyle={{ borderRadius: 8, border: "1px solid #EAECF0", fontSize: 12 }} />
+                        {checkoutTargetMinutes !== null && (
+                          <ReferenceLine y={checkoutTargetMinutes} stroke="#FAAD14" strokeDasharray="6 3" />
+                        )}
+                        <Line type="monotone" dataKey="minutes" stroke="#722ED1" strokeWidth={2} dot={(props: any) => {
+                          const { cx, cy, payload } = props;
+                          return <circle key={`${payload.label}-${payload.minutes}`} cx={cx} cy={cy} r={4} fill={payload.color} stroke="#fff" strokeWidth={1} />;
+                        }} />
+                      </LineChart>
+                    </ResponsiveContainer>
                   ) : (
-                    <p className="text-xs text-text-muted text-center py-6">No activity data for this range</p>
+                    <p className="text-xs text-text-muted text-center py-8">No check-out data</p>
                   )}
                 </div>
+              </div>
+
+              {/* Segmented control + date selector + table */}
+              <div className="px-5 pb-6">
+                <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+                  <div className="flex items-center gap-1 bg-nav-hover rounded-btn p-0.5">
+                    {TABS.map((t) => (
+                      <button
+                        key={t.key}
+                        onClick={() => setTab(t.key)}
+                        className={`px-3 py-1 text-xs font-medium rounded-[5px] transition-all ${
+                          tab === t.key ? "bg-surface text-accent shadow-sm" : "text-text-secondary hover:text-text-primary"
+                        }`}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                  <DateRangePicker value={dateRange} onChange={handleDateChange} />
+                </div>
+
+                <DataTable
+                  title={tab === "attendance" ? "Attendance" : tab === "leave" ? "Leave" : "Training"}
+                  columns={tableColumns as any}
+                  data={records?.items || []}
+                  loading={recordsLoading}
+                  isFetching={recordsFetching}
+                  searchable
+                  enableColumnFilters
+                  serverSide
+                  total={records?.total ?? 0}
+                  page={active.page}
+                  pageSize={active.pageSize}
+                  pageSizeOptions={[10, 25, 50]}
+                  onPageChange={(p) => updateTab(tab, { page: p })}
+                  onPageSizeChange={(n) => updateTab(tab, { pageSize: n, page: 1 })}
+                  sorting={active.sorting}
+                  onSortingChange={(s) => updateTab(tab, { sorting: s, page: 1 })}
+                  search={active.searchInput}
+                  onSearchChange={(s) => updateTab(tab, { searchInput: s })}
+                  columnFilters={active.filters}
+                  onColumnFiltersChange={(f) => updateTab(tab, { filters: f, page: 1 })}
+                  filterOptions={records?.filter_options || {}}
+                />
               </div>
             </div>
           )}
@@ -421,9 +507,8 @@ export default function EmployeeDetailSheet({ employeeId, onClose, defaultDateRa
     </AnimatePresence>
   );
 
-  // Portal to body so fixed positioning isn't clipped by page's overflow
   if (typeof document !== "undefined") {
-    return createPortal(sheet, document.body);
+    return createPortal(modal, document.body);
   }
-  return sheet;
+  return modal;
 }

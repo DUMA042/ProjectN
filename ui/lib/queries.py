@@ -1,5 +1,5 @@
 from ui.lib.db import run_query
-from owl.rules.query_builder import build_checkin_classification, build_checkout_classification, build_status_filter, get_active_statuses, get_rule
+from owl.rules.query_builder import build_checkin_classification, build_checkout_classification, build_status_filter, get_active_statuses, get_rule, get_working_weekdays
 
 
 def get_dashboard_summary():
@@ -470,8 +470,10 @@ def get_earliest_checkins_top_arrivals(start_date: str, end_date: str, limit: in
                 MIN(cs.swipe_time) AS earliest_time
             FROM employee_card_swipes cs
             JOIN employees e ON cs.id_no = e.id_no
+            JOIN employee_statuses es ON e.status_id = es.status_id
             LEFT JOIN locations l ON e.location_id = l.location_id
             WHERE cs.swipe_time::date BETWEEN :start_date AND :end_date
+              AND {build_status_filter('es')}
               {loc_clause}
             GROUP BY cs.id_no, cs.swipe_time::date
         ),
@@ -531,9 +533,11 @@ def get_earliest_checkins(start_date: str, end_date: str, limit: int = 10, locat
                 TO_CHAR(MIN(cs.swipe_time), 'HH12:MI AM') AS swipe_time
             FROM employee_card_swipes cs
             JOIN employees e ON cs.id_no = e.id_no
+            JOIN employee_statuses es ON e.status_id = es.status_id
             LEFT JOIN departments d ON e.department_id = d.department_id
             LEFT JOIN locations l ON e.location_id = l.location_id
             WHERE cs.swipe_time::date = :start_date
+              AND {build_status_filter('es')}
               {loc_clause}
             GROUP BY cs.id_no, e.full_name, d.department_name
             ORDER BY MIN(cs.swipe_time) ASC
@@ -562,11 +566,12 @@ def _get_avg_checkin_attendance(start_date, end_date, limit, loc_clause, params)
         except Exception:
             pass
 
+    working_dows = set(get_working_weekdays())
     working_days = set()
     cur = date.fromisoformat(start_date)
     end = date.fromisoformat(end_date)
     while cur <= end:
-        if cur.weekday() < 5 and cur not in holiday_set:
+        if (cur.weekday() + 1) in working_dows and cur not in holiday_set:
             working_days.add(cur)
         cur += timedelta(days=1)
 
@@ -576,8 +581,10 @@ def _get_avg_checkin_attendance(start_date, end_date, limit, loc_clause, params)
                EXTRACT(EPOCH FROM MIN(cs.swipe_time)::time) / 60 AS first_min
         FROM employee_card_swipes cs
         JOIN employees e ON cs.id_no = e.id_no
+        JOIN employee_statuses es ON e.status_id = es.status_id
         LEFT JOIN locations l ON e.location_id = l.location_id
         WHERE cs.swipe_time::date BETWEEN :start_date AND :end_date
+          AND {build_status_filter('es')}
           {loc_clause}
         GROUP BY cs.id_no, cs.swipe_time::date
     """, params)
@@ -599,11 +606,15 @@ def _get_avg_checkin_attendance(start_date, end_date, limit, loc_clause, params)
           {loc_clause}
     """, params)
 
-    # Employee name/department lookup
-    emp_where = loc_clause[4:].strip() if loc_clause else "TRUE"
+    # Employee name/department lookup (same eligibility + location scope)
+    emp_filters = [build_status_filter('es')]
+    if loc_clause:
+        emp_filters.append(loc_clause[4:].strip())
+    emp_where = " AND ".join(emp_filters)
     emps = run_query(f"""
         SELECT e.id_no, e.full_name, COALESCE(d.department_name, 'Unknown') AS dept
         FROM employees e
+        JOIN employee_statuses es ON e.status_id = es.status_id
         LEFT JOIN departments d ON e.department_id = d.department_id
         LEFT JOIN locations l ON e.location_id = l.location_id
         WHERE {emp_where}
@@ -678,6 +689,15 @@ def get_arrival_time(start_date: str, end_date: str, department: str = "", locat
         dept_clause = "AND LOWER(d.department_name) = LOWER(:department)"
         params["department"] = department
 
+    # Restrict to configured working weekdays and exclude configured holidays
+    working_dows = get_working_weekdays()
+    working_clause = "AND EXTRACT(ISODOW FROM ecs.swipe_time) IN (" + ", ".join(str(d) for d in working_dows) + ")"
+    holiday_dates = (get_rule("holidays", {}) or {}).get("dates", []) or []
+    holiday_clause = (
+        "AND ds.swipe_date NOT IN (" + ", ".join(f"'{d}'" for d in holiday_dates) + ")"
+        if holiday_dates else ""
+    )
+
     if not is_specific_dept:
             rules = get_rule
             checkin_sql = build_checkin_classification("check_in_time", "swipe_date")
@@ -706,6 +726,7 @@ def get_arrival_time(start_date: str, end_date: str, department: str = "", locat
                     FROM employee_card_swipes ecs
                     WHERE ecs.id_no IN (SELECT id_no FROM loc_active_staff)
                       AND ecs.swipe_time::date BETWEEN :start_date AND :end_date
+                      {working_clause}
                     GROUP BY ecs.id_no, ecs.swipe_time::date
                 ),
                 filtered_swipes AS (
@@ -722,6 +743,7 @@ def get_arrival_time(start_date: str, end_date: str, department: str = "", locat
                         WHERE et.id_no = ds.id_no
                           AND ds.swipe_date BETWEEN et.start_date AND et.end_date
                     )
+                    {holiday_clause}
                 ),
                 classified AS (
                     SELECT
@@ -772,6 +794,7 @@ def get_arrival_time(start_date: str, end_date: str, department: str = "", locat
                 FROM employee_card_swipes ecs
                 WHERE ecs.id_no IN (SELECT id_no FROM loc_dept_staff)
                   AND ecs.swipe_time::date BETWEEN :start_date AND :end_date
+                  {working_clause}
                 GROUP BY ecs.id_no, ecs.swipe_time::date
             ),
             filtered_swipes AS (
@@ -788,6 +811,7 @@ def get_arrival_time(start_date: str, end_date: str, department: str = "", locat
                     WHERE et.id_no = ds.id_no
                       AND ds.swipe_date BETWEEN et.start_date AND et.end_date
                 )
+                {holiday_clause}
             ),
             classified AS (
                 SELECT
@@ -897,14 +921,16 @@ def get_employee_summary(
             except Exception:
                 pass
         from datetime import timedelta
+        working_dows = set(get_working_weekdays())
         working_days = set()
         cur = _to_date(start_date)
         end = _to_date(end_date)
         while cur <= end:
-            if cur.weekday() < 5 and cur not in holiday_set:
+            if (cur.weekday() + 1) in working_dows and cur not in holiday_set:
                 working_days.add(cur)
             cur += timedelta(days=1)
         total_working = len(working_days)
+        leave_overrides_training = bool(get_rule("leave_overrides_training", True))
 
         # Group by employee
         from collections import defaultdict
@@ -938,19 +964,23 @@ def get_employee_summary(
         rows = []
         for rec in base.itertuples():
             eid = rec.id_no
-            covered = set(present_days.get(eid, set()))
             leave_days = set()
             for ls, le in leave_ranges.get(eid, []):
                 for d in working_days:
                     if ls <= d <= le:
-                        covered.add(d)
                         leave_days.add(d)
             train_days = set()
             for ts, te in train_ranges.get(eid, []):
                 for d in working_days:
                     if ts <= d <= te:
-                        covered.add(d)
                         train_days.add(d)
+            # Resolve leave/training overlap per the configured rule
+            both = leave_days & train_days
+            if leave_overrides_training:
+                train_days -= both
+            else:
+                leave_days -= both
+            covered = set(present_days.get(eid, set())) | leave_days | train_days
             present = len(present_days.get(eid, set()))
             absent = total_working - len(covered)
             rate = round(present * 100.0 / total_working, 1) if total_working else 0.0

@@ -78,17 +78,8 @@ def _run_query(
 # All queries target the actual schema (employees, departments, leave_records, etc.)
 # — no star-schema tables (dim_*, fact_*) are assumed.
 
-_SQL_DASHBOARD_SUMMARY = """
-    SELECT
-        (SELECT COUNT(*) FROM employees) AS total_employees,
-        (SELECT COUNT(*) FROM employees e
-         JOIN employee_statuses s ON e.status_id = s.status_id
-         WHERE LOWER(s.status_name) = 'active') AS active_employees,
-        (SELECT COUNT(DISTINCT lr.id_no) FROM leave_records lr
-         WHERE CURRENT_DATE BETWEEN lr.start_date AND COALESCE(lr.end_date, lr.start_date)) AS staff_on_leave,
-        (SELECT COUNT(DISTINCT et.id_no) FROM employee_trainings et
-         WHERE CURRENT_DATE BETWEEN et.start_date AND et.end_date) AS staff_in_training
-"""
+# NOTE: the dashboard summary KPI lives in ui/lib/queries.get_dashboard_summary so it
+# honours the configurable eligible_statuses rule (no hardcoded 'active').
 
 _SQL_DEPARTMENT_DISTRIBUTION = """
     SELECT
@@ -138,12 +129,6 @@ _SQL_STATUS_DISTRIBUTION = """
 
 
 # ── Public query functions ────────────────────────────────────────────────────
-
-def get_dashboard_summary(session: Session) -> pd.DataFrame:
-    """Return single-row dashboard KPIs: total, active, on leave, in training."""
-    log.info("Running dashboard summary query.")
-    return _run_query(session, _SQL_DASHBOARD_SUMMARY)
-
 
 def get_department_distribution(session: Session) -> pd.DataFrame:
     """Return employee count per department, ordered by count descending."""

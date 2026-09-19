@@ -5,19 +5,20 @@ from sqlalchemy.orm import Session
 
 from api.dependencies import get_db
 from owl.analyze.sql_queries import (
-    get_dashboard_summary,
     get_department_distribution,
     get_leave_breakdown_by_type,
     get_recent_ingestions,
     get_status_distribution,
 )
+from ui.lib.queries import get_dashboard_summary as get_rule_aware_dashboard_summary
 
 router = APIRouter(tags=["analytics"])
 
 
 @router.get("/analytics/summary")
 def analytics_summary(db: Session = Depends(get_db)):
-    df = get_dashboard_summary(db)
+    # Rule-aware KPI: honours eligible_statuses (and other settings), not a hardcoded 'active'.
+    df = get_rule_aware_dashboard_summary()
     return df.to_dict(orient="records")[0] if not df.empty else {}
 
 

@@ -37,7 +37,7 @@ export default function DonutChartCard({
   onDepartmentChange,
   departments = [],
   loading,
-  height = 240,
+  height = 270,
 }: DonutChartCardProps) {
   const { isHidden, toggle } = useClickableLegend();
   const [mode, setMode] = useState<"pct" | "count">("pct");
@@ -149,8 +149,8 @@ export default function DonutChartCard({
               data={visibleData}
               cx="50%"
               cy="50%"
-              innerRadius={65}
-              outerRadius={100}
+              innerRadius={60}
+              outerRadius={92}
               paddingAngle={2}
               dataKey="value"
               strokeWidth={0}
@@ -175,7 +175,7 @@ export default function DonutChartCard({
             <Legend
               onClick={handleLegendClick}
               payload={data.map((d) => ({ value: d.name, color: isHidden(d.name) ? "#CBD5E1" : d.color, type: "square" as const }))}
-              wrapperStyle={{ cursor: "pointer", paddingTop: 16 }}
+              wrapperStyle={{ cursor: "pointer", paddingTop: 28 }}
               formatter={(value: string) => {
                 const seg = data.find((d) => d.name === value);
                 const label =

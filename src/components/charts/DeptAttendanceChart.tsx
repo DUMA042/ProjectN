@@ -132,7 +132,7 @@ export default function DeptAttendanceChart({
 
       <div className="flex-1 min-h-0 pt-2">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={chartData} margin={{ left: -15, right: 10, top: 10, bottom: 45 }}>
+          <BarChart data={chartData} margin={{ left: -15, right: 10, top: 10, bottom: 55 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
             <XAxis
               dataKey="name"
@@ -159,7 +159,7 @@ export default function DeptAttendanceChart({
               iconType="square"
               iconSize={10}
               payload={SEGMENTS.map((s) => ({ value: s.label, color: isHidden(s.id) ? "#CBD5E1" : s.color, type: "square" as const }))}
-              wrapperStyle={{ cursor: "pointer", paddingTop: 16 }}
+              wrapperStyle={{ cursor: "pointer", paddingTop: 28 }}
             formatter={(value: string) => {
               const seg = SEGMENTS.find((s) => s.label === value);
               const key = seg ? seg.id : value;

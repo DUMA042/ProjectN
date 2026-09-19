@@ -382,6 +382,20 @@ CREATE TABLE IF NOT EXISTS public.rules_settings
     CONSTRAINT rules_settings_pkey PRIMARY KEY (rule_key)
 );
 
+-- Notify listeners (the app's in-memory rules cache) whenever rules change,
+-- so the cache is refreshed only when the underlying data actually changes.
+CREATE OR REPLACE FUNCTION notify_rules_change() RETURNS trigger AS $$
+BEGIN
+  PERFORM pg_notify('rules_changed', COALESCE(NEW.rule_key, OLD.rule_key));
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_rules_changed ON public.rules_settings;
+CREATE TRIGGER trg_rules_changed
+AFTER INSERT OR UPDATE OR DELETE ON public.rules_settings
+FOR EACH ROW EXECUTE FUNCTION notify_rules_change();
+
 -- ============================================================================
 -- 8. FOREIGN KEY CONSTRAINTS
 -- ============================================================================

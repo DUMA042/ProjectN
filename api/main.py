@@ -11,9 +11,34 @@ from owl.config import settings
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup sweep + shutdown hooks."""
+    """Startup sweep + rules cache listener; shutdown hooks."""
     _sweep_stuck_jobs()
-    yield
+    _start_rules_cache()
+    try:
+        yield
+    finally:
+        _stop_rules_cache()
+
+
+def _start_rules_cache() -> None:
+    """Ensure the rules NOTIFY trigger exists and start the cache listener."""
+    try:
+        from owl.rules.engine import ensure_rules_trigger, start_rules_listener
+
+        ensure_rules_trigger()
+        start_rules_listener()
+    except Exception:  # noqa: BLE001 — startup must never crash because of the listener
+        import logging
+        logging.getLogger("owl.startup").exception("Rules cache startup failed.")
+
+
+def _stop_rules_cache() -> None:
+    try:
+        from owl.rules.engine import stop_rules_listener
+
+        stop_rules_listener()
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def _sweep_stuck_jobs() -> None:

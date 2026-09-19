@@ -24,6 +24,15 @@ export function useDepartments(location: string = "") {
   });
 }
 
+export function useAllStatuses() {
+  return useQuery({
+    queryKey: ["statuses-list-all"],
+    queryFn: () =>
+      api.get("/api/statuses").then((r) => (r.data as string[]) || []),
+    staleTime: 300_000,
+  });
+}
+
 export function useDashboardSummary() {
   return useQuery({
     queryKey: ["dashboard-summary"],
@@ -167,6 +176,57 @@ export function useEmployeeSummary(params: EmployeeSummaryParams) {
     placeholderData: keepPreviousData,
     refetchInterval: 120_000,
     staleTime: 60_000,
+  });
+}
+
+export interface EmployeeRecordsParams {
+  idNo: string;
+  type: "attendance" | "leave" | "training";
+  startDate: string;
+  endDate: string;
+  page: number;
+  pageSize: number;
+  search: string;
+  sortBy: string;
+  sortDir: "asc" | "desc";
+  filters: Record<string, string[]>;
+}
+
+export interface EmployeeRecordsResponse {
+  items: any[];
+  total: number;
+  page: number;
+  page_size: number;
+  filter_options: Record<string, string[]>;
+}
+
+export function useEmployeeRecords(params: EmployeeRecordsParams) {
+  const { idNo, type, startDate, endDate, page, pageSize, search, sortBy, sortDir, filters } = params;
+  const filtersKey = JSON.stringify(filters);
+  return useQuery<EmployeeRecordsResponse>({
+    queryKey: [
+      "employee-records",
+      idNo, type, startDate, endDate, page, pageSize, search, sortBy, sortDir, filtersKey,
+    ],
+    queryFn: () =>
+      api
+        .get(`/api/employees/${idNo}/attendance-records`, {
+          params: {
+            start_date: startDate,
+            end_date: endDate,
+            type,
+            page,
+            page_size: pageSize,
+            search,
+            sort_by: sortBy,
+            sort_dir: sortDir,
+            filters: filtersKey,
+          },
+        })
+        .then((r) => r.data),
+    placeholderData: keepPreviousData,
+    staleTime: 60_000,
+    enabled: !!idNo,
   });
 }
 

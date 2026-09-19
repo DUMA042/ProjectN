@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Save, RotateCcw, Plus, X, ToggleLeft, ToggleRight, AlertCircle } from "lucide-react";
 import { useRules, useUpdateRule, useSeedRules } from "@/hooks/useRules";
+import { useAllStatuses } from "@/hooks/useDashboard";
 
 const DAYS = [
   { key: "monday", label: "Monday" },
@@ -46,10 +47,51 @@ const defaultCheckoutFri: TimeFields = {
   late_after: "17:00",
 };
 
+function toMin(t: string): number {
+  const [h, m] = String(t).split(":").map(Number);
+  return (h || 0) * 60 + (m || 0);
+}
+
+function validateTimes(times: TimeFields): string[] {
+  const errs: string[] = [];
+  const eb = toMin(times.early_before);
+  const ns = toMin(times.normal_start);
+  const ne = toMin(times.normal_end);
+  const la = toMin(times.late_after);
+  if (eb > ns) errs.push("Early must be at or before Normal start");
+  if (ns >= ne) errs.push("Normal start must be before Normal end");
+  if (ne > la) errs.push("Normal end must be at or after Late");
+  return errs;
+}
+
+// Returns a map of day key -> list of problems for active days.
+function collectWorkingHoursErrors(
+  workingHours: Record<string, DayWorkingHours | null>
+): Record<string, string[]> {
+  const map: Record<string, string[]> = {};
+  for (const day of DAYS) {
+    const dh = workingHours[day.key];
+    if (!dh) continue;
+    const errs: string[] = [];
+    for (const e of validateTimes(dh.checkin)) errs.push(`Check-in: ${e}`);
+    for (const e of validateTimes(dh.checkout)) errs.push(`Check-out: ${e}`);
+    if (toMin(dh.checkin.late_after) > toMin(dh.checkout.early_before)) {
+      errs.push("Check-in must end before check-out starts");
+    }
+    if (errs.length) map[day.key] = errs;
+  }
+  return map;
+}
+
+function hasWorkingHoursErrors(workingHours: Record<string, DayWorkingHours | null>): boolean {
+  return Object.keys(collectWorkingHoursErrors(workingHours)).length > 0;
+}
+
 export default function RulesSettingsPage() {
   const { data: rules, isLoading } = useRules();
   const updateRule = useUpdateRule();
   const seedRules = useSeedRules();
+  const { data: allStatuses } = useAllStatuses();
 
   const [workingHours, setWorkingHours] = useState<Record<string, DayWorkingHours | null>>({});
   const [incompleteHours, setIncompleteHours] = useState(1);
@@ -67,6 +109,14 @@ export default function RulesSettingsPage() {
     setHolidays(rules["holidays"]?.dates ?? []);
     setEligibleStatuses(rules["eligible_statuses"]?.statuses ?? ["Active"]);
   }, [rules]);
+
+  const validationErrors = useMemo(() => collectWorkingHoursErrors(workingHours), [workingHours]);
+  const hasErrors = Object.keys(validationErrors).length > 0;
+
+  const availableStatuses = useMemo(
+    () => (allStatuses || []).filter((s) => !eligibleStatuses.includes(s)),
+    [allStatuses, eligibleStatuses]
+  );
 
   // Persist a single rule key immediately; surface errors instead of swallowing them.
   const persist = (key: string, value: any) => {
@@ -103,7 +153,7 @@ export default function RulesSettingsPage() {
           }
         : { ...workingHours, [day]: null };
     setWorkingHours(next);
-    persist("working_hours", next);
+    if (!hasWorkingHoursErrors(next)) persist("working_hours", next);
   };
 
   const updateDayTime = (
@@ -122,7 +172,8 @@ export default function RulesSettingsPage() {
       },
     };
     setWorkingHours(next);
-    schedulePersist("working_hours", next);
+    // Block auto-save while any day's time range is impossible.
+    if (!hasWorkingHoursErrors(next)) schedulePersist("working_hours", next);
   };
 
   const addHoliday = () => {
@@ -141,6 +192,10 @@ export default function RulesSettingsPage() {
   };
 
   const handleSaveAll = async () => {
+    if (hasErrors) {
+      setSaveError("Not saved — fix the highlighted time ranges first.");
+      return;
+    }
     try {
       await updateRule.mutateAsync({ key: "working_hours", value: workingHours });
       await updateRule.mutateAsync({ key: "incomplete_threshold", value: { hours: incompleteHours } });
@@ -155,8 +210,12 @@ export default function RulesSettingsPage() {
   };
 
   const handleReset = async () => {
+    if (!window.confirm("Reset all rules to defaults? This overwrites your current settings.")) return;
     try {
-      await seedRules.mutateAsync();
+      await seedRules.mutateAsync(true);
+      setSaveError(null);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
     } catch {
       setSaveError("Failed to reset defaults. Please try again.");
     }
@@ -278,6 +337,16 @@ export default function RulesSettingsPage() {
                       day={day.key}
                       times={dayRules.checkout}
                     />
+                    {validationErrors[day.key] && (
+                      <div className="mt-2 ml-2 flex items-start gap-1.5 text-xs text-danger">
+                        <AlertCircle size={13} className="mt-0.5 flex-shrink-0" />
+                        <div className="space-y-0.5">
+                          {validationErrors[day.key].map((msg, i) => (
+                            <p key={i}>{msg}</p>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -340,7 +409,11 @@ export default function RulesSettingsPage() {
           />
           <button
             onClick={addHoliday}
-            className="flex items-center gap-1 px-3 py-1.5 text-sm border border-border rounded-btn text-text-secondary hover:bg-nav-hover transition-colors"
+            className={`flex items-center gap-1 px-3 py-1.5 text-sm border rounded-btn transition-colors ${
+              newHoliday
+                ? "bg-accent border-accent text-white hover:bg-accent-hover"
+                : "border-border text-text-secondary hover:bg-nav-hover"
+            }`}
           >
             <Plus size={14} />
             Add
@@ -375,27 +448,38 @@ export default function RulesSettingsPage() {
                 </button>
               </span>
             ))}
-            <button
-              onClick={() => {
-                const name = prompt("Enter status name:");
-                if (name && name.trim() && !eligibleStatuses.includes(name.trim())) {
-                  const next = [...eligibleStatuses, name.trim()];
+            <select
+              value=""
+              onChange={(e) => {
+                const name = e.target.value;
+                if (name && !eligibleStatuses.includes(name)) {
+                  const next = [...eligibleStatuses, name];
                   setEligibleStatuses(next);
                   persist("eligible_statuses", { statuses: next });
                 }
               }}
-            className="flex items-center gap-1 px-3 py-1 text-xs border border-dashed border-text-muted rounded-full text-text-muted hover:text-text-secondary hover:border-text-secondary transition-colors"
-          >
-            <Plus size={12} />
-            Add status
-          </button>
+              disabled={availableStatuses.length === 0}
+              className="px-3 py-1 text-xs border border-dashed border-text-muted rounded-full text-text-secondary bg-surface cursor-pointer hover:border-text-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <option value="">
+                {availableStatuses.length === 0 ? "No more statuses" : "Add status…"}
+              </option>
+              {availableStatuses.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
         </div>
       </div>
       {/* Footer */}
       <div className="card-container p-4">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <p className="text-xs text-text-muted">
-            {saveError ? (
+            {hasErrors ? (
+              <span className="inline-flex items-center gap-1.5 text-danger font-medium">
+                <AlertCircle size={13} />
+                Not saved — fix the highlighted time ranges first.
+              </span>
+            ) : saveError ? (
               <span className="inline-flex items-center gap-1.5 text-danger font-medium">
                 <AlertCircle size={13} />
                 {saveError}
@@ -415,10 +499,11 @@ export default function RulesSettingsPage() {
             </button>
             <button
               onClick={handleSaveAll}
-              disabled={updateRule.isPending}
+              disabled={updateRule.isPending || hasErrors}
+              title={hasErrors ? "Fix the highlighted time ranges first" : undefined}
               className={`px-5 py-2 text-sm rounded-btn text-white font-medium transition-colors ${
                 saved ? "bg-success" : "bg-accent hover:bg-accent-hover"
-              }`}
+              } disabled:opacity-40 disabled:cursor-not-allowed`}
             >
               {saved ? "Saved!" : "Save All"}
             </button>

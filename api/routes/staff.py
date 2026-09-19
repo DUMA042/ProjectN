@@ -1,5 +1,6 @@
 """Staff endpoints — paginated directory + employee profile + attendance stats."""
 
+import json
 from datetime import date, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -8,6 +9,142 @@ from sqlalchemy import text
 from api.dependencies import get_db
 
 router = APIRouter(tags=["staff"])
+
+
+@router.get("/statuses")
+def list_statuses():
+    """All distinct employee statuses in the database (full lookup list)."""
+    from ui.lib.queries import get_statuses
+
+    return get_statuses()
+
+
+DAY_NAMES = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+WEEKDAY_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+
+def _hm_to_min(t):
+    try:
+        h, m = str(t).split(":")[:2]
+        return int(h) * 60 + int(m)
+    except Exception:
+        return None
+
+
+def _classify_day(d, leave_ranges, training_ranges, swipe_dates, holiday_set, is_active, today,
+                  working_dows, leave_overrides_training):
+    if (d.weekday() + 1) not in working_dows:
+        return "weekend"
+    if d in holiday_set:
+        return "holiday"
+    on_leave = any(ls <= d <= le for ls, le in leave_ranges)
+    on_training = any(ts <= d <= te for ts, te in training_ranges)
+    if on_leave and on_training:
+        return "leave" if leave_overrides_training else "training"
+    if on_leave:
+        return "leave"
+    if on_training:
+        return "training"
+    if d in swipe_dates:
+        return "present"
+    if not is_active:
+        return "inactive"
+    if d >= today:
+        return "upcoming"
+    return "absent"
+
+
+def _classify_checkin(t, wh):
+    if not t or not wh or not wh.get("checkin"):
+        return None
+    ci = wh["checkin"]
+    tm = _hm_to_min(t)
+    if tm is None:
+        return None
+    eb = _hm_to_min(ci.get("early_before", "08:30"))
+    ns = _hm_to_min(ci.get("normal_start", "08:30"))
+    ne = _hm_to_min(ci.get("normal_end", "09:00"))
+    la = _hm_to_min(ci.get("late_after", "09:00"))
+    if eb is not None and tm < eb:
+        return "Early Arrival"
+    if ns is not None and ne is not None and ns <= tm < ne:
+        return "Normal Arrival"
+    if la is not None and tm >= la:
+        return "Late Arrival"
+    return "Unclassified"
+
+
+def _classify_checkout(checkin_t, checkout_t, wh, incomplete_hours):
+    if not checkout_t or not wh or not wh.get("checkout"):
+        return None
+    co = wh["checkout"]
+    tm = _hm_to_min(checkout_t)
+    if tm is None:
+        return None
+    if checkin_t:
+        cim = _hm_to_min(checkin_t)
+        if cim is not None and (tm - cim) < (incomplete_hours * 60):
+            return "Incomplete"
+    eb = _hm_to_min(co.get("early_before", "17:00"))
+    ns = _hm_to_min(co.get("normal_start", "17:00"))
+    ne = _hm_to_min(co.get("normal_end", "18:00"))
+    la = _hm_to_min(co.get("late_after", "18:00"))
+    if eb is not None and tm < eb:
+        return "Early Departure"
+    if ns is not None and ne is not None and ns <= tm < ne:
+        return "Normal Departure"
+    if la is not None and tm >= la:
+        return "Late Departure"
+    return "Unclassified"
+
+
+def _fmt_hours(minutes):
+    if minutes is None:
+        return None
+    h = int(minutes // 60)
+    m = int(round(minutes % 60))
+    if h and m:
+        return f"{h}h {m:02d}m"
+    if h:
+        return f"{h}h"
+    return f"{m}m"
+
+
+def _paginate_records(rows, columns, numeric_columns, page, page_size, search, sort_by, sort_dir, filters):
+    filter_options = {}
+    for col in columns:
+        filter_options[col] = sorted(
+            {str(r[col]) for r in rows if r.get(col) not in (None, "")},
+            key=lambda s: s.lower(),
+        )
+    for col, selected in (filters or {}).items():
+        if not selected:
+            continue
+        sel = {str(v) for v in selected}
+        rows = [r for r in rows if str(r.get(col)) in sel]
+    if search and search.strip():
+        q = search.strip().lower()
+        rows = [r for r in rows if any(q in str(v).lower() for v in r.values())]
+    if sort_by not in columns:
+        sort_by = columns[0]
+    reverse = str(sort_dir).lower() == "desc"
+    non_null = [r for r in rows if r.get(sort_by) not in (None, "")]
+    nulls = [r for r in rows if r.get(sort_by) in (None, "")]
+    if sort_by in numeric_columns:
+        non_null.sort(key=lambda r: float(r[sort_by]), reverse=reverse)
+    else:
+        non_null.sort(key=lambda r: str(r[sort_by]).lower(), reverse=reverse)
+    rows = non_null + nulls
+    total = len(rows)
+    if page_size and page_size > 0:
+        total_pages = max(1, (total + page_size - 1) // page_size)
+        page = max(1, min(page, total_pages))
+        items = rows[(page - 1) * page_size:(page - 1) * page_size + page_size]
+    else:
+        page = 1
+        items = rows
+    return {"items": items, "total": total, "page": page, "page_size": page_size, "filter_options": filter_options}
 
 
 @router.get("/staff")
@@ -291,74 +428,61 @@ def employee_attendance_stats(
             pass
 
     # Determine if employee is active (eligible to be absent) per configured eligible statuses
-    from owl.rules.query_builder import get_active_statuses
+    from owl.rules.query_builder import get_active_statuses, get_working_weekdays
+    from owl.rules.engine import get_rule
     emp_status_raw = str(emp[7] or "").strip().lower()
     active_statuses = {s.lower() for s in get_active_statuses()}
     is_active = emp_status_raw in active_statuses
 
+    working_hours = get_rule("working_hours", {}) or {}
+    incomplete_hours = (get_rule("incomplete_threshold", {"hours": 1}) or {}).get("hours", 1)
+    working_dows = set(get_working_weekdays())
+    leave_overrides_training = bool(get_rule("leave_overrides_training", True))
+
+    swipe_map = {r[0]: r for r in swipes_raw}
+
     daily_attendance = []
     counts = {"present": 0, "absent": 0, "leave": 0, "training": 0}
+    work_minutes = []
     current = sd
     while current <= ed:
         wd = current.weekday()
-        # Weekend always wins → holiday on weekend is ignored
-        if wd >= 5:
-            daily_attendance.append({
-                "date": current.isoformat(),
-                "status": "weekend",
-                "checkin_time": None,
-                "checkout_time": None,
-            })
-            current += timedelta(days=1)
-            continue
-        if current in holiday_set:
-            daily_attendance.append({
-                "date": current.isoformat(),
-                "status": "holiday",
-                "checkin_time": None,
-                "checkout_time": None,
-            })
-            current += timedelta(days=1)
-            continue
-        status = None
-        for ls, le in leave_ranges:
-            if ls <= current <= le:
-                status = "leave"
-                break
-        if not status:
-            for ts, te in training_ranges:
-                if ts <= current <= te:
-                    status = "training"
-                    break
-        if not status and current in swipe_dates:
-            status = "present"
-        if not status:
-            if not is_active:
-                status = "inactive"
-            elif current >= today:
-                status = "upcoming"
-            else:
-                status = "absent"
+        status = _classify_day(current, leave_ranges, training_ranges, swipe_dates, holiday_set,
+                               is_active, today, working_dows, leave_overrides_training)
         if status in counts:
             counts[status] += 1
 
         checkin_time = None
         checkout_time = None
-        for r in swipes_raw:
-            if r[0] == current:
-                if r[1]:
-                    checkin_time = r[1].strftime("%H:%M")
-                if r[2]:
-                    checkout_time = r[2].strftime("%H:%M")
-                break
+        row = swipe_map.get(current)
+        if row is not None:
+            if row[1]:
+                checkin_time = row[1].strftime("%H:%M")
+            if row[2]:
+                checkout_time = row[2].strftime("%H:%M")
+
+        wh = working_hours.get(DAY_NAMES[wd]) if wd < 7 else None
+        checkin_status = _classify_checkin(checkin_time, wh)
+        checkout_status = _classify_checkout(checkin_time, checkout_time, wh, incomplete_hours)
+
+        # Avg work hours: present days with both times, excluding leave/training
+        if checkin_time and checkout_time and status not in ("leave", "training"):
+            cim = _hm_to_min(checkin_time)
+            com = _hm_to_min(checkout_time)
+            if cim is not None and com is not None and com >= cim:
+                work_minutes.append(com - cim)
 
         daily_attendance.append({
             "date": current.isoformat(),
             "status": status,
             "checkin_time": checkin_time,
             "checkout_time": checkout_time,
+            "checkin_status": checkin_status,
+            "checkout_status": checkout_status,
         })
         current += timedelta(days=1)
+
+    avg_work_minutes = (sum(work_minutes) / len(work_minutes)) if work_minutes else None
 
     return {
         "employee": {
@@ -372,7 +496,197 @@ def employee_attendance_stats(
             "status": emp[7],
             "employment_type": emp[8],
             "phone_number": emp[9],
+            "is_active": is_active,
         },
         "summary": counts,
+        "avg_work_hours": _fmt_hours(avg_work_minutes),
         "daily_attendance": daily_attendance,
     }
+
+
+@router.get("/employees/{id_no}/attendance-records")
+def employee_attendance_records(
+    id_no: str,
+    start_date: str = Query(""),
+    end_date: str = Query(""),
+    type: str = Query("attendance", description="attendance | leave | training"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=0, le=1000),
+    search: str = Query(""),
+    sort_by: str = Query(""),
+    sort_dir: str = Query("asc"),
+    filters: str = Query(""),
+    db: Session = Depends(get_db),
+):
+    try:
+        parsed_filters = json.loads(filters) if filters else {}
+    except Exception:
+        parsed_filters = {}
+
+    emp = db.execute(
+        text("""
+            SELECT e.id_no, e.status_id, es.status_name
+            FROM employees e
+            LEFT JOIN employee_statuses es ON e.status_id = es.status_id
+            WHERE e.id_no = :id_no
+        """),
+        {"id_no": id_no},
+    ).fetchone()
+    if not emp:
+        raise HTTPException(status_code=404, detail="Employee not found")
+
+    today = date.today()
+    if start_date and end_date:
+        try:
+            sd = date.fromisoformat(start_date)
+            ed = date.fromisoformat(end_date)
+        except ValueError:
+            raise HTTPException(status_code=422, detail="Invalid date format, expected YYYY-MM-DD")
+        if sd > ed:
+            raise HTTPException(status_code=422, detail="start_date must be <= end_date")
+    else:
+        sd = today.replace(day=1)
+        ed = today
+
+    from owl.rules.query_builder import get_active_statuses, get_working_weekdays
+    from owl.rules.engine import get_rule
+    is_active = str(emp[2] or "").strip().lower() in {s.lower() for s in get_active_statuses()}
+    working_dows = set(get_working_weekdays())
+    leave_overrides_training = bool(get_rule("leave_overrides_training", True))
+
+    if type == "leave":
+        rows_df = db.execute(
+            text("""
+                SELECT lr.start_date, COALESCE(lr.end_date, lr.start_date) AS end_date,
+                       COALESCE(lt.leave_type_name, 'Unknown') AS leave_type
+                FROM leave_records lr
+                LEFT JOIN leave_types lt ON lr.leave_type_id = lt.leave_type_id
+                WHERE lr.id_no = :id_no AND lr.start_date <= :ed
+                  AND COALESCE(lr.end_date, lr.start_date) >= :sd
+                ORDER BY lr.start_date DESC
+            """),
+            {"id_no": id_no, "sd": sd, "ed": ed},
+        ).fetchall()
+        rows = []
+        for r in rows_df:
+            s, e = r[0], r[1]
+            status = "Current" if (s and e and s <= today <= e) else "Taken"
+            rows.append({
+                "start_date": s.isoformat() if s else None,
+                "end_date": e.isoformat() if e else None,
+                "leave_type": r[2],
+                "status": status,
+            })
+        columns = ["start_date", "end_date", "leave_type", "status"]
+        numeric = []
+        default_sort = "start_date"
+
+    elif type == "training":
+        rows_df = db.execute(
+            text("""
+                SELECT COALESCE(v.venue_name, 'Unknown') AS venue,
+                       COALESCE(c.consultant_name, 'Unknown') AS consultant,
+                       COALESCE(l.location_name, 'Unknown') AS location,
+                       et.start_date, et.end_date, et.title
+                FROM employee_trainings et
+                LEFT JOIN venues v ON et.venue_id = v.venue_id
+                LEFT JOIN consultants c ON et.consultant_id = c.consultant_id
+                LEFT JOIN locations l ON et.location_id = l.location_id
+                WHERE et.id_no = :id_no AND et.start_date <= :ed AND et.end_date >= :sd
+                ORDER BY et.start_date DESC
+            """),
+            {"id_no": id_no, "sd": sd, "ed": ed},
+        ).fetchall()
+        rows = [
+            {
+                "venue": r[0], "consultant": r[1], "location": r[2],
+                "start_date": r[3].isoformat() if r[3] else None,
+                "end_date": r[4].isoformat() if r[4] else None,
+                "title": r[5] or "",
+            }
+            for r in rows_df
+        ]
+        columns = ["venue", "consultant", "location", "start_date", "end_date", "title"]
+        numeric = []
+        default_sort = "start_date"
+
+    else:
+        # attendance — every weekday in range (weekends excluded)
+        swipes_raw = db.execute(
+            text("""
+                SELECT DATE(swipe_time) AS swipe_date, MIN(swipe_time) AS checkin, MAX(swipe_time) AS checkout
+                FROM employee_card_swipes
+                WHERE id_no = :id_no AND swipe_time::date BETWEEN :sd AND :ed
+                GROUP BY DATE(swipe_time)
+            """),
+            {"id_no": id_no, "sd": sd, "ed": ed},
+        ).fetchall()
+        swipe_dates = {r[0] for r in swipes_raw}
+        swipe_map = {r[0]: r for r in swipes_raw}
+        leave_raw = db.execute(
+            text("""
+                SELECT start_date, COALESCE(end_date, start_date) AS end_date
+                FROM leave_records
+                WHERE id_no = :id_no AND start_date <= :ed AND COALESCE(end_date, start_date) >= :sd
+            """),
+            {"id_no": id_no, "sd": sd, "ed": ed},
+        ).fetchall()
+        training_raw = db.execute(
+            text("""
+                SELECT start_date, end_date FROM employee_trainings
+                WHERE id_no = :id_no AND start_date <= :ed AND end_date >= :sd
+            """),
+            {"id_no": id_no, "sd": sd, "ed": ed},
+        ).fetchall()
+        leave_ranges = [(r[0], r[1]) for r in leave_raw]
+        training_ranges = [(r[0], r[1]) for r in training_raw]
+
+        try:
+            holiday_dates = get_rule("holidays", {}).get("dates", [])
+        except Exception:
+            holiday_dates = []
+        holiday_set = set()
+        for _d in holiday_dates:
+            try:
+                holiday_set.add(date.fromisoformat(str(_d)))
+            except ValueError:
+                pass
+
+        working_hours = get_rule("working_hours", {}) or {}
+        incomplete_hours = (get_rule("incomplete_threshold", {"hours": 1}) or {}).get("hours", 1)
+
+        rows = []
+        current = sd
+        while current <= ed:
+            if (current.weekday() + 1) in working_dows:  # configured working days only
+                checkin_time = None
+                checkout_time = None
+                row = swipe_map.get(current)
+                if row is not None:
+                    if row[1]:
+                        checkin_time = row[1].strftime("%H:%M")
+                    if row[2]:
+                        checkout_time = row[2].strftime("%H:%M")
+                wh = working_hours.get(DAY_NAMES[current.weekday()])
+                checkin_status = _classify_checkin(checkin_time, wh)
+                checkout_status = _classify_checkout(checkin_time, checkout_time, wh, incomplete_hours)
+                day_status = _classify_day(
+                    current, leave_ranges, training_ranges, swipe_dates, holiday_set,
+                    is_active, today, working_dows, leave_overrides_training
+                )
+                rows.append({
+                    "day_date": f"{WEEKDAY_SHORT[current.weekday()]}, {current.day} {MONTH_SHORT[current.month - 1]} {current.year}",
+                    "checkin_time": checkin_time or "",
+                    "checkin_status": checkin_status or "",
+                    "checkout_time": checkout_time or "",
+                    "checkout_status": checkout_status or "",
+                    "attendance_status": day_status.capitalize() if checkin_time else "",
+                })
+            current += timedelta(days=1)
+        columns = ["day_date", "checkin_time", "checkin_status", "checkout_time", "checkout_status", "attendance_status"]
+        numeric = []
+        default_sort = "day_date"
+
+    if not sort_by:
+        sort_by = default_sort
+    return _paginate_records(rows, columns, numeric, page, page_size, search, sort_by, sort_dir, parsed_filters)

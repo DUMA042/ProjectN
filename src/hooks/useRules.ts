@@ -21,7 +21,8 @@ export function useUpdateRule() {
 export function useSeedRules() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () => api.post("/api/rules/seed"),
+    mutationFn: (reset: boolean = false) =>
+      api.post("/api/rules/seed", null, { params: { reset } }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["rules"] }),
   });
 }

@@ -65,15 +65,20 @@ def build_holidays_filter(date_col: str = "swipe_date") -> str:
     return f"AND {date_col} NOT IN ({date_list})"
 
 
-def build_working_days_filter(date_col: str = "swipe_date") -> str:
+def get_working_weekdays() -> list:
+    """ISO weekday numbers (1=Mon … 7=Sun) configured as working days.
+
+    A weekday is a working day when its ``working_hours`` entry is not ``null``.
+    Falls back to Mon–Fri if nothing is configured.
+    """
     wh = get_rule("working_hours", {})
-    active_dows = []
-    for dow, day_name in sorted(DAYS_MAP.items()):
-        if wh.get(day_name) is not None:
-            active_dows.append(str(dow))
-    if not active_dows:
-        return "AND EXTRACT(ISODOW FROM swipe_date) BETWEEN 1 AND 5"
-    return f"AND EXTRACT(ISODOW FROM {date_col}) IN ({','.join(active_dows)})"
+    dows = [dow for dow, day_name in sorted(DAYS_MAP.items()) if wh.get(day_name) is not None]
+    return dows or [1, 2, 3, 4, 5]
+
+
+def build_working_days_filter(date_col: str = "swipe_date") -> str:
+    dows = get_working_weekdays()
+    return f"AND EXTRACT(ISODOW FROM {date_col}) IN ({','.join(str(d) for d in dows)})"
 
 
 def get_eligible_statuses() -> list:
