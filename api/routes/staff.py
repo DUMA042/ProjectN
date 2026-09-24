@@ -19,96 +19,27 @@ def list_statuses():
     return get_statuses()
 
 
-DAY_NAMES = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
-WEEKDAY_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-
-
-def _hm_to_min(t):
-    try:
-        h, m = str(t).split(":")[:2]
-        return int(h) * 60 + int(m)
-    except Exception:
-        return None
+from owl.analytics.classification import (
+    DAY_NAMES,
+    WEEKDAY_SHORT,
+    MONTH_SHORT,
+    classify_checkin as _classify_checkin,
+    classify_checkout as _classify_checkout,
+    classify_day as _classify_day_shared,
+    fmt_hours as _fmt_hours,
+    hm_to_min as _hm_to_min,
+)
 
 
 def _classify_day(d, leave_ranges, training_ranges, swipe_dates, holiday_set, is_active, today,
                   working_dows, leave_overrides_training):
-    if (d.weekday() + 1) not in working_dows:
-        return "weekend"
-    if d in holiday_set:
-        return "holiday"
-    on_leave = any(ls <= d <= le for ls, le in leave_ranges)
-    on_training = any(ts <= d <= te for ts, te in training_ranges)
-    if on_leave and on_training:
-        return "leave" if leave_overrides_training else "training"
-    if on_leave:
-        return "leave"
-    if on_training:
-        return "training"
-    if d in swipe_dates:
-        return "present"
-    if not is_active:
-        return "inactive"
-    if d >= today:
-        return "upcoming"
-    return "absent"
-
-
-def _classify_checkin(t, wh):
-    if not t or not wh or not wh.get("checkin"):
-        return None
-    ci = wh["checkin"]
-    tm = _hm_to_min(t)
-    if tm is None:
-        return None
-    eb = _hm_to_min(ci.get("early_before", "08:30"))
-    ns = _hm_to_min(ci.get("normal_start", "08:30"))
-    ne = _hm_to_min(ci.get("normal_end", "09:00"))
-    la = _hm_to_min(ci.get("late_after", "09:00"))
-    if eb is not None and tm < eb:
-        return "Early Arrival"
-    if ns is not None and ne is not None and ns <= tm < ne:
-        return "Normal Arrival"
-    if la is not None and tm >= la:
-        return "Late Arrival"
-    return "Unclassified"
-
-
-def _classify_checkout(checkin_t, checkout_t, wh, incomplete_hours):
-    if not checkout_t or not wh or not wh.get("checkout"):
-        return None
-    co = wh["checkout"]
-    tm = _hm_to_min(checkout_t)
-    if tm is None:
-        return None
-    if checkin_t:
-        cim = _hm_to_min(checkin_t)
-        if cim is not None and (tm - cim) < (incomplete_hours * 60):
-            return "Incomplete"
-    eb = _hm_to_min(co.get("early_before", "17:00"))
-    ns = _hm_to_min(co.get("normal_start", "17:00"))
-    ne = _hm_to_min(co.get("normal_end", "18:00"))
-    la = _hm_to_min(co.get("late_after", "18:00"))
-    if eb is not None and tm < eb:
-        return "Early Departure"
-    if ns is not None and ne is not None and ns <= tm < ne:
-        return "Normal Departure"
-    if la is not None and tm >= la:
-        return "Late Departure"
-    return "Unclassified"
-
-
-def _fmt_hours(minutes):
-    if minutes is None:
-        return None
-    h = int(minutes // 60)
-    m = int(round(minutes % 60))
-    if h and m:
-        return f"{h}h {m:02d}m"
-    if h:
-        return f"{h}h"
-    return f"{m}m"
+    """Backwards-compatible wrapper around the shared classifier."""
+    ctx = {
+        "working_dows": working_dows,
+        "holiday_set": holiday_set,
+        "leave_overrides_training": leave_overrides_training,
+    }
+    return _classify_day_shared(d, leave_ranges, training_ranges, swipe_dates, ctx, is_active, today)
 
 
 def _paginate_records(rows, columns, numeric_columns, page, page_size, search, sort_by, sort_dir, filters):

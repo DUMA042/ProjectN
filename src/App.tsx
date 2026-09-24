@@ -1,12 +1,9 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import Sidebar from "./components/layout/Sidebar";
 import Header from "./components/layout/Header";
 import StatusBar from "./components/layout/StatusBar";
 import DashboardPage from "./pages/DashboardPage";
-import EmployeesPage from "./pages/EmployeesPage";
-import AttendancePage from "./pages/AttendancePage";
-import LeavePage from "./pages/LeavePage";
-import TrainingPage from "./pages/TrainingPage";
+import ManagementPage from "./pages/ManagementPage";
 import UploadPage from "./pages/UploadPage";
 import AdminPage from "./pages/AdminPage";
 import ReportsPage from "./pages/ReportsPage";
@@ -22,10 +19,12 @@ export default function App() {
         <main className="flex-1 overflow-y-auto">
           <Routes>
             <Route path="/" element={<DashboardPage />} />
-            <Route path="/employees" element={<EmployeesPage />} />
-            <Route path="/attendance" element={<AttendancePage />} />
-            <Route path="/leave" element={<LeavePage />} />
-            <Route path="/training" element={<TrainingPage />} />
+            <Route path="/management" element={<ManagementPage />} />
+            {/* Legacy Management routes now live inside the unified workspace */}
+            <Route path="/employees" element={<Navigate to="/management" replace />} />
+            <Route path="/attendance" element={<Navigate to="/management" replace />} />
+            <Route path="/leave" element={<Navigate to="/management" replace />} />
+            <Route path="/training" element={<Navigate to="/management" replace />} />
             <Route path="/upload" element={<UploadPage />} />
             <Route path="/admin" element={<AdminPage />} />
             <Route path="/reports" element={<ReportsPage />} />

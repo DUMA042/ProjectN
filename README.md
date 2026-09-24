@@ -1,3 +1,32 @@
+# Flow — Workforce Attendance Management
+
+A Windows desktop HR/attendance application (Tauri 2 shell, React + TypeScript frontend) backed by a FastAPI service and PostgreSQL. Flow ingests raw HR Excel exports (card swipes, leave, training, nominal roll) into a normalized, rule-driven store and surfaces attendance analytics.
+
+## What it does
+- **ETL pipeline** that routes, validates, and loads Excel files into PostgreSQL, quarantining bad rows instead of dropping them — with dedup and idempotent upserts.
+- **Rules Settings** (per-day working hours, holidays, eligible statuses, incomplete threshold, leave-overrides-training) applied everywhere: working-day determination, absence/expected days, and early/normal/late + incomplete classification.
+- **Dashboard** with at-a-glance KPIs and infographics.
+- A unified **Management analytical workspace** (`/management`): **Overview · Employees · Attendance · Leave · Training** — a filterable, drill-down workspace with trends, comparisons, heatmaps, rankings, and coverage-aware rates, all scoped by a global filter bar + date range.
+
+## Stack
+- Desktop: **Tauri 2** + **React 18** + **TypeScript** + **Vite** + **Tailwind** + **Recharts** + **TanStack Query/Table**
+- Backend: **FastAPI** + **SQLAlchemy**
+- Data: **PostgreSQL** (3NF) + a rule-driven **daily attendance fact table** (`attendance_daily`)
+- Pipeline: **Python** (Pandas, openpyxl, Pydantic v2)
+
+## Layout
+- `src/` — React/Tauri UI (pages, components, hooks)
+- `api/` — FastAPI service (routers: dashboard, staff, analytics, rules, ingestion…)
+- `owl/` — ETL pipeline (`load`, `transform`, `extract`), the rules engine, and the `owl/analytics` engine
+- `owl/load/schema.sql` — idempotent DDL (source of truth)
+
+## Running locally
+- **API:** `python -m uvicorn api.main:app --port 8001 --host 127.0.0.1 --reload`
+- **UI dev:** `npm run dev` → `http://localhost:1420`
+- Configure via `.env` (see `.env.example`, notably `DATABASE_URL`).
+
+---
+
 # owl 🦉 — Attendance Data Pipeline
 
 > **Extract → Transform (3NF) → Load (PostgreSQL) → Analyse**

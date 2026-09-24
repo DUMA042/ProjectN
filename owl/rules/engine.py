@@ -138,6 +138,31 @@ def ensure_rules_trigger() -> None:
 _listener_thread: threading.Thread | None = None
 _listener_stop = threading.Event()
 
+# Debounced analytics fact-table rebuild (rule changes affect attendance classification)
+_rebuild_thread: threading.Thread | None = None
+_rebuild_pending = threading.Event()
+
+
+def _rebuild_worker() -> None:
+    while not _listener_stop.is_set():
+        _rebuild_pending.wait(timeout=1)
+        if not _rebuild_pending.is_set():
+            continue
+        time.sleep(5)  # debounce rapid rule edits
+        _rebuild_pending.clear()
+        try:
+            from owl.analytics.fact import rebuild_attendance_daily
+
+            rebuild_attendance_daily()
+            log.info("attendance_daily rebuilt after rule change")
+        except Exception as exc:  # noqa: BLE001
+            log.warning(f"Analytics fact rebuild failed: {exc}")
+
+
+def schedule_fact_rebuild() -> None:
+    """Request a debounced analytics fact-table rebuild."""
+    _rebuild_pending.set()
+
 
 def _listener_loop() -> None:
     while not _listener_stop.is_set():
@@ -158,6 +183,7 @@ def _listener_loop() -> None:
                         note = conn.notifies.pop(0)
                         log.info(f"Rules changed (notify: {note.payload}) — invalidating cache")
                         invalidate_rules_cache()
+                        schedule_fact_rebuild()
         except Exception as exc:  # noqa: BLE001
             log.warning(f"Rules listener error: {exc}; reconnecting in 2s")
             time.sleep(2)
@@ -170,12 +196,15 @@ def _listener_loop() -> None:
 
 
 def start_rules_listener() -> None:
-    global _listener_thread
+    global _listener_thread, _rebuild_thread
     if _listener_thread is not None and _listener_thread.is_alive():
         return
     _listener_stop.clear()
     _listener_thread = threading.Thread(target=_listener_loop, name="rules-listener", daemon=True)
     _listener_thread.start()
+    if _rebuild_thread is None or not _rebuild_thread.is_alive():
+        _rebuild_thread = threading.Thread(target=_rebuild_worker, name="rules-rebuild", daemon=True)
+        _rebuild_thread.start()
 
 
 def stop_rules_listener() -> None:

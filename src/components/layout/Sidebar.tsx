@@ -57,10 +57,7 @@ export default function Sidebar() {
     {
       label: "Management",
       items: [
-        { icon: <Users size={20} />, label: "Employees", path: "/employees" },
-        { icon: <Clock size={20} />, label: "Attendance", path: "/attendance" },
-        { icon: <Umbrella size={20} />, label: "Leave", path: "/leave" },
-        { icon: <GraduationCap size={20} />, label: "Training", path: "/training" },
+        { icon: <Users size={20} />, label: "Management", path: "/management" },
       ],
     },
     {

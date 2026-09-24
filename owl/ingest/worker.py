@@ -222,6 +222,13 @@ class IngestionWorker:
             session.execute(stmt)
             session.commit()
         log.info(f"Job {ingestion_id} finished.")
+        # Refresh the analytics fact table so Management analytics reflect the new data.
+        try:
+            from owl.rules.engine import schedule_fact_rebuild
+
+            schedule_fact_rebuild()
+        except Exception:  # noqa: BLE001
+            log.warning("Could not schedule analytics fact rebuild after ingestion.")
 
     def _mark_failed(self, ingestion_id: str, error: str) -> None:
         """Mark record as failed on critical pipeline crash."""

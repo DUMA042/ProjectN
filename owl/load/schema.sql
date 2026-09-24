@@ -397,6 +397,29 @@ AFTER INSERT OR UPDATE OR DELETE ON public.rules_settings
 FOR EACH ROW EXECUTE FUNCTION notify_rules_change();
 
 -- ============================================================================
+-- 7b. ANALYTICS FACT TABLE
+-- One row per employee per calendar day, classified per the rule settings.
+-- Rebuilt on data load / rule change; powers the Management analytics.
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS public.attendance_daily
+(
+    id_no character varying(64) COLLATE pg_catalog."default" NOT NULL,
+    work_date date NOT NULL,
+    status character varying(20) COLLATE pg_catalog."default",
+    checkin_time time without time zone,
+    checkout_time time without time zone,
+    checkin_status character varying(30) COLLATE pg_catalog."default",
+    checkout_status character varying(30) COLLATE pg_catalog."default",
+    minutes_worked integer,
+    is_working_day boolean DEFAULT false,
+    CONSTRAINT attendance_daily_pkey PRIMARY KEY (id_no, work_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_attendance_daily_date ON public.attendance_daily (work_date);
+CREATE INDEX IF NOT EXISTS idx_attendance_daily_id ON public.attendance_daily (id_no);
+CREATE INDEX IF NOT EXISTS idx_attendance_daily_status ON public.attendance_daily (status);
+
+-- ============================================================================
 -- 8. FOREIGN KEY CONSTRAINTS
 -- ============================================================================
 
