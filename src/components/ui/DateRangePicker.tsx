@@ -10,6 +10,9 @@ export interface DateRange {
 interface DateRangePickerProps {
   value: DateRange;
   onChange: (range: DateRange) => void;
+  /** Inclusive bounds (ISO dates) — days outside are disabled and presets clamp. */
+  minDate?: string;
+  maxDate?: string;
 }
 
 export function getDefaultDateRange(): DateRange {
@@ -100,18 +103,25 @@ function formatDisplay(d: string) {
 }
 
 // ── Single-month calendar sub-component ─────────────────────────────────────
-function MonthCalendar({
+export function MonthCalendar({
   year, month,
   customStart, customEnd,
+  minDate, maxDate,
   onPrev, onNext, onDayClick,
 }: {
   year: number; month: number;
   customStart: string; customEnd: string;
+  minDate?: string; maxDate?: string;
   onPrev: () => void; onNext: () => void;
   onDayClick: (y: number, m: number, d: number) => void;
 }) {
   const weeks = buildMonthGrid(year, month);
   const monthName = new Date(year, month).toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+
+  const iso = (y: number, m: number, d: number) =>
+    `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  const outOfBounds = (y: number, m: number, d: number) =>
+    (minDate ? iso(y, m, d) < minDate : false) || (maxDate ? iso(y, m, d) > maxDate : false);
 
   const isBetween = (y: number, m: number, d: number) => {
     if (!customStart || !customEnd) return false;
@@ -152,14 +162,17 @@ function MonthCalendar({
             const between = isBetween(year, month, day);
             const s = isStart(year, month, day);
             const e = isEnd(year, month, day);
+            const disabled = outOfBounds(year, month, day);
             return (
               <button
                 key={di}
-                onClick={() => onDayClick(year, month, day)}
+                onClick={() => !disabled && onDayClick(year, month, day)}
+                disabled={disabled}
                 className={`h-7 text-[11px] rounded-md transition-colors
                   ${s || e ? "bg-accent text-white font-semibold" : ""}
                   ${between && !s && !e ? "bg-accent/10 text-accent" : ""}
-                  ${!s && !e && !between ? "text-text-secondary hover:bg-nav-hover" : ""}`}
+                  ${!s && !e && !between ? "text-text-secondary hover:bg-nav-hover" : ""}
+                  ${disabled ? "text-text-muted/40 cursor-not-allowed hover:bg-transparent" : ""}`}
               >
                 {day}
               </button>
@@ -172,7 +185,7 @@ function MonthCalendar({
 }
 
 // ── Main picker ─────────────────────────────────────────────────────────────
-export default function DateRangePicker({ value, onChange }: DateRangePickerProps) {
+export default function DateRangePicker({ value, onChange, minDate, maxDate }: DateRangePickerProps) {
   const [open, setOpen] = useState(false);
   const [customStart, setCustomStart] = useState(value.startDate);
   const [customEnd, setCustomEnd] = useState(value.endDate);
@@ -239,7 +252,12 @@ export default function DateRangePicker({ value, onChange }: DateRangePickerProp
   }, [open, positionPopover]);
 
   const handlePreset = (preset: typeof PRESETS[0]) => {
-    const { start, end } = preset.getRange();
+    let { start, end } = preset.getRange();
+    // Clamp presets into the selectable bounds
+    if (minDate && start < minDate) start = minDate;
+    if (maxDate && end > maxDate) end = maxDate;
+    if (minDate && end < minDate) end = minDate;
+    if (maxDate && start > maxDate) start = maxDate;
     setCustomStart(start);
     setCustomEnd(end);
     setActivePreset(preset.label);
@@ -363,6 +381,7 @@ export default function DateRangePicker({ value, onChange }: DateRangePickerProp
                 <MonthCalendar
                   year={calMonth.year} month={calMonth.month}
                   customStart={customStart} customEnd={customEnd}
+                  minDate={minDate} maxDate={maxDate}
                   onPrev={calPrev} onNext={calNext} onDayClick={handleDayClick}
                 />
               </div>

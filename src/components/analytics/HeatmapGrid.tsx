@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { ChevronDown } from "lucide-react";
+import { readableFg } from "@/lib/analyticsColors";
 
 interface DimOption {
   key: string;
@@ -19,18 +20,22 @@ interface HeatmapGridProps {
   onCellClick?: (row: string, col: string) => void;
   suffix?: string;
   loading?: boolean;
+  /** Semantic fill (e.g. blue↔red); falls back to a sequential accent ramp. */
+  cellColor?: (v: number) => { bg: string; fg: string };
+  /** Distinct choices for the column dimension (defaults to dimOptions). */
+  colDimOptions?: DimOption[];
 }
 
-function colorFor(v: number, min: number, max: number): string {
-  if (max <= min) return "rgba(22,119,255,0.25)";
+function defaultColorFor(v: number, min: number, max: number): { bg: string; fg: string } {
+  if (max <= min) return { bg: "rgba(22,119,255,0.25)", fg: "#0F172A" };
   const t = (v - min) / (max - min);
-  // light blue -> strong blue
-  return `rgba(22,119,255,${0.12 + t * 0.78})`;
+  const bg = `rgba(22,119,255,${0.12 + t * 0.78})`;
+  return { bg, fg: t > 0.55 ? "#FFFFFF" : "#0F172A" };
 }
 
 export default function HeatmapGrid({
   title, rowDim, colDim, dimOptions, onRowDimChange, onColDimChange,
-  rowValues, colValues, value, onCellClick, suffix = "", loading,
+  rowValues, colValues, value, onCellClick, suffix = "", loading, cellColor, colDimOptions,
 }: HeatmapGridProps) {
   const { min, max } = useMemo(() => {
     let mn = Infinity, mx = -Infinity;
@@ -42,14 +47,14 @@ export default function HeatmapGrid({
     return { min: mn, max: mx };
   }, [rowValues, colValues, value]);
 
-  const Select = ({ value: v, onChange }: { value: string; onChange: (k: string) => void }) => (
+  const Select = ({ value: v, onChange, options }: { value: string; onChange: (k: string) => void; options?: DimOption[] }) => (
     <div className="relative">
       <select
         value={v}
         onChange={(e) => onChange(e.target.value)}
         className="appearance-none pl-2 pr-6 py-1 text-[11px] border border-border rounded-btn bg-surface text-text-secondary cursor-pointer hover:bg-nav-hover"
       >
-        {dimOptions.map((d) => (
+        {(options || dimOptions).map((d) => (
           <option key={d.key} value={d.key}>{d.label}</option>
         ))}
       </select>
@@ -64,7 +69,7 @@ export default function HeatmapGrid({
         <div className="flex items-center gap-1.5 text-[11px] text-text-muted">
           <Select value={rowDim} onChange={onRowDimChange} />
           <span>×</span>
-          <Select value={colDim} onChange={onColDimChange} />
+          <Select value={colDim} onChange={onColDimChange} options={colDimOptions} />
         </div>
       </div>
       {loading ? (
@@ -88,13 +93,18 @@ export default function HeatmapGrid({
                   <td className="sticky left-0 bg-surface z-10 pr-2 text-right font-medium text-text-secondary whitespace-nowrap">{r}</td>
                   {colValues.map((c) => {
                     const v = value(r, c);
+                    const fill = v == null
+                      ? { bg: "#F5F5F5", fg: "#94A3B8" }
+                      : cellColor
+                        ? cellColor(v)
+                        : defaultColorFor(v, min, max);
                     return (
                       <td
                         key={c}
                         title={`${r} · ${c}: ${v == null ? "—" : `${v}${suffix}`}`}
                         onClick={() => v != null && onCellClick?.(r, c)}
                         className={`w-9 h-7 rounded-[3px] text-center align-middle ${onCellClick && v != null ? "cursor-pointer" : ""}`}
-                        style={{ backgroundColor: v == null ? "#F5F5F5" : colorFor(v, min, max), color: v != null && v > (min + max) / 2 ? "#fff" : "#0F172A" }}
+                        style={{ backgroundColor: fill.bg, color: fill.fg }}
                       >
                         {v == null ? "" : v}
                       </td>

@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import {
   useReactTable,
   getCoreRowModel,
@@ -10,14 +10,20 @@ import {
   type SortingState,
   type Updater,
 } from "@tanstack/react-table";
-import { ChevronUp, ChevronDown, ChevronsUpDown, Search, Download, X, Filter } from "lucide-react";
+import { ChevronUp, ChevronDown, ChevronsUpDown, Search, Download, X, Filter, ChevronLeft, ChevronRight } from "lucide-react";
 import { exportToCSV } from "@/lib/csvExport";
 import ColumnFilterDropdown from "@/components/ui/ColumnFilterDropdown";
+import { MonthCalendar } from "@/components/ui/DateRangePicker";
 import type { DateRange } from "@/components/ui/DateRangePicker";
+
+export interface DateFilterValue {
+  start: string;
+  end: string;
+}
 
 interface DataTableProps<T extends object> {
   title?: string;
-  columns: { key: string; header: string; cell?: (row: T) => React.ReactNode; sticky?: boolean; width?: number }[];
+  columns: { key: string; header: string; cell?: (row: T) => React.ReactNode; sticky?: boolean; width?: number; filter?: "values" | "date"; filterable?: boolean }[];
   data: T[];
   loading?: boolean;
   searchable?: boolean;
@@ -40,6 +46,11 @@ interface DataTableProps<T extends object> {
   columnFilters?: Record<string, Set<string>>;
   onColumnFiltersChange?: (filters: Record<string, Set<string>>) => void;
   filterOptions?: Record<string, string[]>;
+  /** Date-range filters keyed by column (columns with filter: "date"). */
+  dateFilters?: Record<string, DateFilterValue | undefined>;
+  onDateFiltersChange?: (filters: Record<string, DateFilterValue | undefined>) => void;
+  /** Selectable bounds for date filters (e.g. the page's overall range). */
+  dateFilterBounds?: { min?: string; max?: string };
   isFetching?: boolean;
   onExport?: () => void;
 }
@@ -68,6 +79,9 @@ export default function DataTable<T extends object>({
   columnFilters: filtersProp,
   onColumnFiltersChange,
   filterOptions,
+  dateFilters: dateFiltersProp,
+  onDateFiltersChange,
+  dateFilterBounds,
   isFetching,
   onExport,
 }: DataTableProps<T>) {
@@ -232,6 +246,14 @@ export default function DataTable<T extends object>({
   const clearAllFilters = () => {
     if (serverSide) onColumnFiltersChange?.({});
     else setLocalColumnFilters({});
+    if (serverSide) onDateFiltersChange?.({});
+  };
+
+  const applyDateFilter = (key: string, value: DateFilterValue | undefined) => {
+    const next = { ...(dateFiltersProp || {}) };
+    if (!value) delete next[key];
+    else next[key] = value;
+    onDateFiltersChange?.(next);
   };
 
   const table = useReactTable({
@@ -250,7 +272,9 @@ export default function DataTable<T extends object>({
         }),
   });
 
-  const hasActiveFilters = Object.values(columnFilters).some((s) => s.size > 0);
+  const hasActiveFilters =
+    Object.values(columnFilters).some((s) => s.size > 0) ||
+    Object.values(dateFiltersProp || {}).some(Boolean);
 
   // Pagination numbers
   const totalRows = serverSide ? total ?? data.length : table.getFilteredRowModel().rows.length;
@@ -342,7 +366,10 @@ export default function DataTable<T extends object>({
               <tr key={headerGroup.id} className="border-b border-divider">
                 {headerGroup.headers.map((header) => {
                   const colKey = (header.column.columnDef as any).accessorKey as string | undefined;
-                  const isFiltered = colKey ? (columnFilters[colKey]?.size ?? 0) > 0 : false;
+                  const colDef = columnDefs.find((c) => c.key === colKey);
+                  const isFiltered = colKey
+                    ? (columnFilters[colKey]?.size ?? 0) > 0 || !!dateFiltersProp?.[colKey]
+                    : false;
                   const isOpen = colKey ? openFilterKey === colKey : false;
                   return (
                     <th
@@ -363,7 +390,7 @@ export default function DataTable<T extends object>({
                             <ChevronsUpDown size={14} className="opacity-40" />
                           )}
                         </span>
-                        {enableColumnFilters && colKey && (
+                        {enableColumnFilters && colKey && colDef?.filterable !== false && (
                           <span className="relative">
                             <button
                               onClick={(e) => {
@@ -379,7 +406,16 @@ export default function DataTable<T extends object>({
                             {isFiltered && (
                               <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-accent" />
                             )}
-                            {isOpen && (
+                            {isOpen && colDef?.filter === "date" && (
+                              <DateFilterPopover
+                                header={header.column.columnDef.header as string}
+                                value={dateFiltersProp?.[colKey]}
+                                bounds={dateFilterBounds}
+                                onApply={(v) => { applyDateFilter(colKey, v); setOpenFilterKey(null); }}
+                                onClose={() => setOpenFilterKey(null)}
+                              />
+                            )}
+                            {isOpen && colDef?.filter !== "date" && (
                               <ColumnFilterDropdown
                                 columnKey={colKey}
                                 header={header.column.columnDef.header as string}
@@ -471,6 +507,89 @@ export default function DataTable<T extends object>({
             Next
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Date-range column filter popover ────────────────────────────────────────
+function DateFilterPopover({
+  header,
+  value,
+  bounds,
+  onApply,
+  onClose,
+}: {
+  header: string;
+  value?: DateFilterValue;
+  bounds?: { min?: string; max?: string };
+  onApply: (value: DateFilterValue | undefined) => void;
+  onClose: () => void;
+}) {
+  const [start, setStart] = useState(value?.start || "");
+  const [end, setEnd] = useState(value?.end || "");
+  const [pickingEnd, setPickingEnd] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const now = new Date();
+  const [calMonth, setCalMonth] = useState({ y: now.getFullYear(), m: now.getMonth() });
+
+  useEffect(() => {
+    const h = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [onClose]);
+
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const iso = (y: number, m: number, d: number) => `${y}-${pad(m + 1)}-${pad(d)}`;
+
+  const dayClick = (y: number, m: number, d: number) => {
+    const clicked = iso(y, m, d);
+    if (!pickingEnd || !start || clicked < start) {
+      setStart(clicked);
+      setEnd(clicked);
+      setPickingEnd(true);
+    } else {
+      setEnd(clicked);
+      setPickingEnd(false);
+    }
+  };
+
+  return (
+    <div
+      ref={ref}
+      className="absolute left-0 top-full mt-1 z-30 w-[252px] bg-surface border border-border rounded-card shadow-lg p-2.5"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <p className="text-xs font-semibold text-text-primary mb-1.5">
+        {header} <span className="font-normal text-text-muted">· within selected range</span>
+      </p>
+      <MonthCalendar
+        year={calMonth.y} month={calMonth.m}
+        customStart={start} customEnd={end}
+        minDate={bounds?.min} maxDate={bounds?.max}
+        onPrev={() => setCalMonth((p) => { const d = new Date(p.y, p.m - 1, 1); return { y: d.getFullYear(), m: d.getMonth() }; })}
+        onNext={() => setCalMonth((p) => { const d = new Date(p.y, p.m + 1, 1); return { y: d.getFullYear(), m: d.getMonth() }; })}
+        onDayClick={dayClick}
+      />
+      <div className="text-[11px] text-text-secondary text-center py-1.5">
+        {start && end ? `${start} → ${end}` : "Pick a start, then an end"}
+      </div>
+      <div className="flex items-center justify-between pt-1.5 border-t border-divider">
+        <button
+          onClick={() => { setStart(""); setEnd(""); setPickingEnd(false); onApply(undefined); }}
+          className="text-xs text-text-muted hover:text-text-primary px-2 py-1 rounded-btn hover:bg-nav-hover transition-colors"
+        >
+          Clear
+        </button>
+        <button
+          onClick={() => start && end && onApply({ start, end })}
+          disabled={!start || !end}
+          className="text-xs font-medium text-white bg-accent px-3 py-1 rounded-btn hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          Apply
+        </button>
       </div>
     </div>
   );

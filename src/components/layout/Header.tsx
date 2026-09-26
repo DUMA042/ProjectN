@@ -1,5 +1,5 @@
 import { useLocation } from "react-router-dom";
-import { Bell, Calendar, RefreshCw } from "lucide-react";
+import { Bell, RefreshCw } from "lucide-react";
 import { useState, useEffect } from "react";
 
 export default function Header() {
@@ -19,7 +19,6 @@ export default function Header() {
     if (path === "/leave") return "Management / Leave";
     if (path === "/training") return "Management / Training";
     if (path === "/upload") return "Operations / Upload";
-    if (path === "/admin") return "Operations / Admin";
     if (path === "/reports") return "Analytics / Reports";
     if (path === "/settings") return "System / Settings";
     if (path === "/rules-settings") return "System / Rules Settings";
@@ -48,10 +47,6 @@ export default function Header() {
         <RefreshCw size={12} />
         <span>Updated {lastUpdate}</span>
         <div className="w-px h-4 bg-divider" />
-        <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-btn border border-border text-text-secondary hover:bg-nav-hover transition-colors text-xs">
-          <Calendar size={14} />
-          <span>Today</span>
-        </button>
         <button className="w-8 h-8 rounded-btn border border-border flex items-center justify-center text-text-muted hover:bg-nav-hover hover:text-text-secondary transition-colors">
           <Bell size={16} />
         </button>

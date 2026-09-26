@@ -14,6 +14,10 @@ from owl.analytics.dimensions import DIMENSIONS, dimension_expr, dimension_label
 from owl.analytics.metrics import DOMAIN_METRICS
 
 # ── Domain base definitions ───────────────────────────────────────────────────
+# search_exprs use fully-qualified columns: several record columns (id_no)
+# exist in more than one joined table and bare references are ambiguous.
+# record_filter_cols whitelists which record columns are filterable and how
+# each maps to SQL.
 DOMAIN_BASE: dict[str, dict] = {
     "attendance": {
         "from": "FROM attendance_daily ad JOIN employees e ON e.id_no = ad.id_no",
@@ -27,35 +31,87 @@ DOMAIN_BASE: dict[str, dict] = {
             "checkin_time", "checkout_time", "checkin_status", "checkout_status", "minutes_worked",
         ],
         "record_date_col": "ad.work_date",
+        "search_exprs": [
+            "CAST(ad.id_no AS text)", "e.full_name", "ad.status",
+            "ad.checkin_status", "ad.checkout_status",
+        ],
+        "record_filter_cols": {
+            "status": "ad.status",
+            "checkin_status": "ad.checkin_status",
+            "checkout_status": "ad.checkout_status",
+        },
+        "record_date_cols": {"work_date": "ad.work_date"},
         "default_metrics": ["attendance_rate", "present_days", "absent_days", "late_arrivals", "coverage"],
     },
     "leave": {
         "from": (
             "FROM leave_records lr JOIN employees e ON e.id_no = lr.id_no "
-            "LEFT JOIN leave_types lt ON lt.leave_type_id = lr.leave_type_id"
+            "LEFT JOIN leave_types lt ON lt.leave_type_id = lr.leave_type_id "
+            "LEFT JOIN departments d ON d.department_id = e.department_id "
+            "LEFT JOIN grade_levels gl ON gl.gl_id = e.gl_id"
         ),
         "date_col": "lr.start_date",
         "record_select": (
             "lr.record_id, lr.id_no, e.full_name, COALESCE(lt.leave_type_name, 'Unknown') AS leave_type, "
+            "COALESCE(d.department_name, 'Unknown') AS department, "
+            "COALESCE(gl.gl_name, 'Unknown') AS grade_level, "
             "lr.start_date, COALESCE(lr.end_date, lr.start_date) AS end_date"
         ),
-        "record_columns": ["record_id", "id_no", "full_name", "leave_type", "start_date", "end_date"],
+        "record_columns": ["record_id", "id_no", "full_name", "leave_type", "department", "grade_level", "start_date", "end_date"],
         "record_date_col": "lr.start_date",
+        "search_exprs": [
+            "CAST(lr.id_no AS text)", "e.full_name",
+            "COALESCE(lt.leave_type_name, 'Unknown')",
+            "COALESCE(d.department_name, 'Unknown')",
+            "COALESCE(gl.gl_name, 'Unknown')",
+            "CAST(lr.start_date AS text)", "CAST(COALESCE(lr.end_date, lr.start_date) AS text)",
+        ],
+        "record_filter_cols": {
+            "leave_type": "COALESCE(lt.leave_type_name, 'Unknown')",
+            "department": "COALESCE(d.department_name, 'Unknown')",
+            "grade_level": "COALESCE(gl.gl_name, 'Unknown')",
+        },
+        # Date columns the UI may narrow with sub-ranges
+        "record_date_cols": {
+            "start_date": "lr.start_date",
+            "end_date": "COALESCE(lr.end_date, lr.start_date)",
+        },
         "default_metrics": ["leave_records", "unique_staff", "avg_duration_days"],
     },
     "training": {
         "from": (
             "FROM employee_trainings tr JOIN employees e ON e.id_no = tr.id_no "
             "LEFT JOIN venues v ON v.venue_id = tr.venue_id "
-            "LEFT JOIN consultants c ON c.consultant_id = tr.consultant_id"
+            "LEFT JOIN consultants c ON c.consultant_id = tr.consultant_id "
+            "LEFT JOIN departments d ON d.department_id = e.department_id "
+            "LEFT JOIN grade_levels gl ON gl.gl_id = e.gl_id"
         ),
         "date_col": "tr.start_date",
         "record_select": (
             "tr.training_id, tr.id_no, e.full_name, COALESCE(v.venue_name, 'Unknown') AS venue, "
-            "COALESCE(c.consultant_name, 'Unknown') AS consultant, tr.start_date, tr.end_date, tr.title"
+            "COALESCE(c.consultant_name, 'Unknown') AS consultant, "
+            "COALESCE(d.department_name, 'Unknown') AS department, "
+            "COALESCE(gl.gl_name, 'Unknown') AS grade_level, "
+            "tr.start_date, tr.end_date, tr.title"
         ),
-        "record_columns": ["training_id", "id_no", "full_name", "venue", "consultant", "start_date", "end_date", "title"],
+        "record_columns": ["training_id", "id_no", "full_name", "venue", "consultant", "department", "grade_level", "start_date", "end_date", "title"],
         "record_date_col": "tr.start_date",
+        "search_exprs": [
+            "CAST(tr.id_no AS text)", "e.full_name",
+            "COALESCE(v.venue_name, 'Unknown')", "COALESCE(c.consultant_name, 'Unknown')", "tr.title",
+            "COALESCE(d.department_name, 'Unknown')",
+            "COALESCE(gl.gl_name, 'Unknown')",
+        ],
+        "record_filter_cols": {
+            "venue": "COALESCE(v.venue_name, 'Unknown')",
+            "consultant": "COALESCE(c.consultant_name, 'Unknown')",
+            "department": "COALESCE(d.department_name, 'Unknown')",
+            "grade_level": "COALESCE(gl.gl_name, 'Unknown')",
+        },
+        "record_date_cols": {
+            "start_date": "tr.start_date",
+            "end_date": "tr.end_date",
+        },
         "default_metrics": ["activities", "participants", "venues"],
     },
     "employees": {
@@ -72,6 +128,19 @@ DOMAIN_BASE: dict[str, dict] = {
         ),
         "record_columns": ["id_no", "full_name", "sex", "department", "grade_level", "status"],
         "record_date_col": None,
+        "search_exprs": [
+            "CAST(e.id_no AS text)", "e.full_name", "e.sex",
+            "COALESCE(d.department_name, 'Unknown')",
+            "COALESCE(gl.gl_name, 'Unknown')",
+            "COALESCE(es.status_name, 'Unknown')",
+        ],
+        "record_filter_cols": {
+            "department": "COALESCE(d.department_name, 'Unknown')",
+            "grade_level": "COALESCE(gl.gl_name, 'Unknown')",
+            "status": "COALESCE(es.status_name, 'Unknown')",
+            "sex": "e.sex",
+        },
+        "record_date_cols": {},
         "default_metrics": ["employees", "active"],
     },
 }
@@ -150,6 +219,8 @@ def run_explore(
     sort_by: str = "",
     sort_dir: str = "desc",
     search: str = "",
+    record_filters: dict | None = None,
+    date_sub_ranges: dict | None = None,
 ) -> dict:
     if domain not in DOMAIN_BASE:
         raise ValueError(f"Unknown domain '{domain}'")
@@ -163,7 +234,8 @@ def run_explore(
 
     with get_session() as s:
         if mode == "records":
-            result = _run_records(s, cfg, filters, sd, ed, page, page_size, search, sort_by, sort_dir)
+            result = _run_records(s, cfg, filters, sd, ed, page, page_size, search, sort_by, sort_dir,
+                                  record_filters, date_sub_ranges)
         else:
             result = _run_summary(s, domain, cfg, metric_defs, metrics, group_by, filters, sd, ed,
                                   page, page_size, sort_by, sort_dir)
@@ -244,35 +316,81 @@ def _run_summary(s, domain, cfg, metric_defs, metrics, group_by, filters, sd, ed
     }
 
 
-def _run_records(s, cfg, filters, sd, ed, page, page_size, search, sort_by, sort_dir):
-    # records mode: needs employee joins only
+def _run_records(s, cfg, filters, sd, ed, page, page_size, search, sort_by, sort_dir,
+                 record_filters=None, date_sub_ranges=None):
     joins = _collect_joins(cfg, list((filters or {}).keys()))
-    params = {}
-    # date filter uses the domain's record date col, not the employee one
-    clauses = []
-    if cfg["record_date_col"] and sd and ed:
-        clauses.append(f"{cfg['record_date_col']} BETWEEN :sd AND :ed")
-        params["sd"] = sd
-        params["ed"] = ed
-    i = 0
-    for key, values in (filters or {}).items():
-        if not values:
+    params: dict = {}
+    clauses: list[str] = []
+
+    # Date windows: the record date col, optionally narrowed by per-column
+    # sub-ranges (clamped so they can never widen the main scope).
+    date_cols: dict[str, str] = cfg.get("record_date_cols", {})
+    windows: list[tuple[str, str, str]] = []  # (sql_expr, lo, hi)
+    if sd and ed:
+        windows.append((cfg["record_date_col"], sd, ed) if cfg["record_date_col"] else ("", "", ""))
+    for col_key, rng in (date_sub_ranges or {}).items():
+        expr = date_cols.get(col_key)
+        if not expr or not rng:
             continue
-        expr = dimension_expr(key, cfg["record_date_col"] or "e.id_no")
+        sub_s, sub_e = rng.get("start"), rng.get("end")
+        if not sub_s or not sub_e:
+            continue
+        lo = max(sd, sub_s) if sd else sub_s
+        hi = min(ed, sub_e) if ed else sub_e
+        if lo > hi:
+            continue
+        windows.append((expr, lo, hi))
+    i = 0
+    for expr, lo, hi in windows:
         if not expr:
+            continue
+        clauses.append(f"{expr} BETWEEN :dw{i}s AND :dw{i}e")
+        params[f"dw{i}s"] = lo
+        params[f"dw{i}e"] = hi
+        i += 1
+    # The primary window (first) defines the filter-option scope bounds
+    lo, hi = (windows[0][1], windows[0][2]) if windows else (None, None)
+
+    def _dimension_clauses(p: dict, prefix: str) -> list[str]:
+        cs: list[str] = []
+        i = 0
+        for key, values in (filters or {}).items():
+            if not values:
+                continue
+            expr = dimension_expr(key, cfg["record_date_col"] or "e.id_no")
+            if not expr:
+                continue
+            phs = []
+            for v in values:
+                pname = f"{prefix}{i}"
+                p[pname] = v
+                phs.append(f":{pname}")
+                i += 1
+            cs.append(f"{expr} IN ({', '.join(phs)})")
+        return cs
+
+    clauses.extend(_dimension_clauses(params, "r"))
+
+    # Whitelisted record-column filters (status, leave_type, venue, ...)
+    rf_cols: dict[str, str] = cfg.get("record_filter_cols", {})
+    i = 0
+    for key, values in (record_filters or {}).items():
+        expr = rf_cols.get(key)
+        if not expr or not values:
             continue
         phs = []
         for v in values:
-            pname = f"r{i}"
+            pname = f"rf{i}"
             params[pname] = v
             phs.append(f":{pname}")
             i += 1
         clauses.append(f"{expr} IN ({', '.join(phs)})")
+
     if search and search.strip():
         q = search.strip().lower()
         params["q"] = f"%{q}%"
-        text_cols = [c for c in cfg["record_columns"]]
-        clauses.append("(" + " OR ".join(f"LOWER(COALESCE(CAST({c} AS text),'')) LIKE :q" for c in text_cols) + ")")
+        exprs = cfg.get("search_exprs") or [f"CAST({c} AS text)" for c in cfg["record_columns"]]
+        clauses.append("(" + " OR ".join(f"LOWER(COALESCE({e}, '')) LIKE :q" for e in exprs) + ")")
     where_sql = ("WHERE " + " AND ".join(clauses)) if clauses else ""
 
     order_col = sort_by if sort_by in cfg["record_columns"] else (cfg["record_date_col"] or cfg["record_columns"][0])
@@ -286,10 +404,32 @@ def _run_records(s, cfg, filters, sd, ed, page, page_size, search, sort_by, sort
         params,
     ).mappings().all()
 
+    # Distinct values per filterable record column, within scope + date window
+    # (ignores search and the record filters themselves, so every option stays
+    # reachable — same pattern as the dashboard's employee-summary filters).
+    filter_options: dict[str, list[str]] = {}
+    for key, expr in rf_cols.items():
+        opt_params: dict = {}
+        opt_clauses = _dimension_clauses(opt_params, "o")
+        if cfg["record_date_col"] and lo and hi:
+            opt_clauses.insert(0, f"{cfg['record_date_col']} BETWEEN :osd AND :oed")
+            opt_params["osd"] = lo
+            opt_params["oed"] = hi
+        opt_where = ("WHERE " + " AND ".join(opt_clauses)) if opt_clauses else ""
+        try:
+            opt_rows = s.execute(
+                text(f"SELECT DISTINCT {expr} {cfg['from']} {joins} {opt_where} ORDER BY 1 LIMIT 300"),
+                opt_params,
+            ).fetchall()
+            filter_options[key] = [str(r[0]) for r in opt_rows if r[0] is not None]
+        except Exception:  # noqa: BLE001 — options are a convenience, never fail the query
+            filter_options[key] = []
+
     return {
         "mode": "records",
         "columns": [{"key": c, "label": c.replace("_", " ").title()} for c in cfg["record_columns"]],
         "records": [dict(r) for r in rows],
+        "filter_options": filter_options,
         "total": int(total or 0),
         "page": page,
         "page_size": page_size,

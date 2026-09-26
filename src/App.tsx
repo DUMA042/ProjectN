@@ -5,7 +5,6 @@ import StatusBar from "./components/layout/StatusBar";
 import DashboardPage from "./pages/DashboardPage";
 import ManagementPage from "./pages/ManagementPage";
 import UploadPage from "./pages/UploadPage";
-import AdminPage from "./pages/AdminPage";
 import ReportsPage from "./pages/ReportsPage";
 import SettingsPage from "./pages/SettingsPage";
 import RulesSettingsPage from "./pages/RulesSettingsPage";
@@ -26,7 +25,6 @@ export default function App() {
             <Route path="/leave" element={<Navigate to="/management" replace />} />
             <Route path="/training" element={<Navigate to="/management" replace />} />
             <Route path="/upload" element={<UploadPage />} />
-            <Route path="/admin" element={<AdminPage />} />
             <Route path="/reports" element={<ReportsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/rules-settings" element={<RulesSettingsPage />} />

@@ -1,175 +1,162 @@
 import { useMemo, useState } from "react";
-import { motion } from "framer-motion";
-import { RefreshCw, Download, X } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Download } from "lucide-react";
 import DateRangePicker from "@/components/ui/DateRangePicker";
-import type { DateRange } from "@/components/ui/DateRangePicker";
+import ErrorBoundary from "@/components/ui/ErrorBoundary";
 import SegmentedControl from "@/components/analytics/SegmentedControl";
-import FilterDropdown from "@/components/analytics/FilterDropdown";
-import OverviewTab from "@/pages/management/OverviewTab";
-import EmployeesTab from "@/pages/management/EmployeesTab";
-import AttendanceTab from "@/pages/management/AttendanceTab";
+import LocationSelect from "@/components/analytics/LocationSelect";
+import FreshnessPill from "@/components/analytics/FreshnessPill";
+import ScopeChips from "@/components/analytics/ScopeChips";
+import FilterPopover from "@/components/analytics/FilterPopover";
+import SavedViewsMenu from "@/components/analytics/SavedViewsMenu";
 import EmployeeDetailDrawer from "@/components/ui/EmployeeDetailDrawer";
-import { useAnalyticsDimensions, useAnalyticsRefresh, toApiFilters } from "@/hooks/useAnalytics";
+import PulseTab from "./management/PulseTab";
+import TrendsTab from "./management/TrendsTab";
+import ExploreTab from "./management/ExploreTab";
+import PeopleTab from "./management/PeopleTab";
+import ForecastTab from "./management/ForecastTab";
+import NarrativeHeader from "./management/kpiConfig";
+import { ExportProvider, useExportButton } from "./management/exportRegistry";
+import { useManagementScope, scopeToApiFilters, type ManagementTab } from "@/hooks/useManagementScope";
 
-type Tab = "overview" | "employees" | "attendance" | "leave" | "training";
-
-const TABS: { value: Tab; label: string }[] = [
-  { value: "overview", label: "Overview" },
-  { value: "employees", label: "Employees" },
-  { value: "attendance", label: "Attendance" },
-  { value: "leave", label: "Leave" },
-  { value: "training", label: "Training" },
+const TABS: { value: ManagementTab; label: string }[] = [
+  { value: "pulse", label: "Pulse" },
+  { value: "trends", label: "Trends" },
+  { value: "explore", label: "Explore" },
+  { value: "people", label: "People" },
+  { value: "forecast", label: "Forecast" },
 ];
 
-const FILTER_DIMENSIONS = [
-  "location", "department", "grade_level", "rank", "employment_type", "status", "sex", "zone",
-];
-
-function defaultRange(): DateRange {
-  const end = new Date();
-  const start = new Date();
-  start.setDate(end.getDate() - 89);
-  const iso = (d: Date) => d.toISOString().split("T")[0];
-  return { startDate: iso(start), endDate: iso(end), label: "Last 90 Days" };
+function ExportButton() {
+  const { exportNow, hasExport } = useExportButton();
+  return (
+    <button
+      onClick={exportNow}
+      disabled={!hasExport}
+      className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs border border-border rounded-btn transition-colors ${
+        hasExport ? "text-text-secondary hover:bg-nav-hover" : "text-text-muted opacity-50 cursor-not-allowed"
+      }`}
+      title={hasExport ? "Export the tables on this tab to CSV" : "This tab has no exportable table"}
+    >
+      <Download size={12} />
+      Export
+    </button>
+  );
 }
 
 export default function ManagementPage() {
-  const [tab, setTab] = useState<Tab>("overview");
-  const [dateRange, setDateRange] = useState<DateRange>(defaultRange());
-  const [compare, setCompare] = useState(false);
-  const [filters, setFilters] = useState<Record<string, Set<string>>>({});
+  const {
+    tab, location, dateRange, compare, filters, peopleEntity,
+    setTab, setLocation, setDateRange, setCompare, setPeopleEntity, addFilter,
+  } = useManagementScope();
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
 
-  const { data: dims } = useAnalyticsDimensions();
-  const refresh = useAnalyticsRefresh();
-
-  const dimensionOptions = dims?.options || {};
-  const apiFilters = useMemo(() => toApiFilters(filters), [filters]);
+  const apiFilters = useMemo(() => scopeToApiFilters(filters, location), [filters, location]);
   const dateRangeObj = useMemo(
     () => ({ start: dateRange.startDate, end: dateRange.endDate }),
     [dateRange.startDate, dateRange.endDate]
   );
 
-  const setFilter = (key: string, selected: Set<string>) => {
-    setFilters((prev) => {
-      const next = { ...prev };
-      if (selected.size === 0) delete next[key];
-      else next[key] = selected;
-      return next;
-    });
-  };
-
+  /** Drill helper — location values scope the location selector, others become chips. */
   const drill = (dimension: string, value: string) => {
-    setFilters((prev) => {
-      const cur = new Set(prev[dimension] || []);
-      cur.add(value);
-      return { ...prev, [dimension]: cur };
-    });
+    if (dimension === "location") setLocation(value);
+    else addFilter(dimension, value);
   };
-
-  const activeFilterCount = Object.values(filters).reduce((n, s) => n + s.size, 0);
 
   return (
-    <motion.div className="p-6 space-y-4" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-      {/* Header */}
-      <div className="flex items-start justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-text-primary">Management</h1>
-          <p className="text-sm text-text-secondary mt-0.5">
-            Analytical workspace — explore, compare and drill into workforce data
-          </p>
+    <ExportProvider>
+      <motion.div
+        className="p-6 space-y-4"
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+      >
+        {/* ── Header ─────────────────────────────────────────────────────── */}
+        <div className="flex items-start justify-between flex-wrap gap-3">
+          <div>
+            <h1 className="text-lg font-semibold text-text-primary">Management</h1>
+            <p className="text-xs text-text-secondary mt-0.5">
+              The organization at a glance — what is happening, when, to whom, and what comes next
+            </p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <LocationSelect value={location} onChange={setLocation} />
+            <FreshnessPill filters={apiFilters} />
+            <ExportButton />
+          </div>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
+
+        {/* ── Scope bar ──────────────────────────────────────────────────── */}
+        <div className="card-container p-3 flex items-center gap-2 flex-wrap">
           <DateRangePicker value={dateRange} onChange={setDateRange} />
           <button
-            onClick={() => setCompare((v) => !v)}
+            onClick={() => setCompare(!compare)}
             className={`px-3 py-1.5 text-xs border rounded-btn transition-colors ${
-              compare ? "border-accent text-accent bg-accent/5" : "border-border text-text-secondary hover:bg-nav-hover"
+              compare
+                ? "border-accent text-accent bg-accent/5"
+                : "border-border text-text-secondary hover:bg-nav-hover"
             }`}
+            title="Overlays the previous period of equal length on trends, deltas and KPI chips — e.g. Last 90 Days compares against the 90 days before it"
           >
-            Compare previous period
+            Compare previous
           </button>
-          <button
-            onClick={() => refresh.mutate()}
-            disabled={refresh.isPending}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs border border-border rounded-btn text-text-secondary hover:bg-nav-hover disabled:opacity-50"
-            title="Rebuild the analytics fact table"
-          >
-            <RefreshCw size={12} className={refresh.isPending ? "animate-spin" : ""} />
-            Refresh
-          </button>
-          <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs border border-border rounded-btn text-text-secondary hover:bg-nav-hover">
-            <Download size={12} />
-            Export
-          </button>
+          <FilterPopover />
+          <ScopeChips />
+          <div className="ml-auto">
+            <SavedViewsMenu />
+          </div>
         </div>
-      </div>
 
-      {/* Global filter bar */}
-      <div className="card-container p-3 flex items-center gap-2 flex-wrap">
-        {FILTER_DIMENSIONS.map((key) => (
-          <FilterDropdown
-            key={key}
-            label={dims?.dimensions.find((d) => d.key === key)?.label || key}
-            columnKey={key}
-            options={dimensionOptions[key] || []}
-            selected={filters[key] || new Set()}
-            onChange={setFilter}
-          />
-        ))}
-        {activeFilterCount > 0 && (
-          <button
-            onClick={() => setFilters({})}
-            className="flex items-center gap-1 px-2 py-1 text-xs text-accent hover:bg-nav-hover rounded-btn"
-          >
-            <X size={12} /> Clear all ({activeFilterCount})
-          </button>
+        {/* ── Tabs ───────────────────────────────────────────────────────── */}
+        <SegmentedControl value={tab} options={TABS} onChange={setTab} />
+
+        <NarrativeHeader filters={apiFilters} dateRange={dateRangeObj} compare={compare} />
+
+        {/* ── Tab content ────────────────────────────────────────────────── */}
+        <ErrorBoundary label="this view">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={tab}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.18, ease: "easeOut" }}
+            >
+              {tab === "pulse" && (
+                <PulseTab
+                  filters={apiFilters}
+                  dateRange={dateRangeObj}
+                  compare={compare}
+                  onDrill={drill}
+                  onGoToTab={(t) => setTab(t as ManagementTab)}
+                  onOpenEmployee={setSelectedEmployeeId}
+                />
+              )}
+              {tab === "trends" && (
+                <TrendsTab filters={apiFilters} dateRange={dateRangeObj} compare={compare} onDrill={drill} />
+              )}
+              {tab === "explore" && (
+                <ExploreTab filters={apiFilters} dateRange={dateRangeObj} onDrill={drill} onOpenEmployee={setSelectedEmployeeId} />
+              )}
+              {tab === "people" && (
+                <PeopleTab
+                  filters={apiFilters}
+                  dateRange={dateRangeObj}
+                  compare={compare}
+                  onDrill={drill}
+                  onOpenEmployee={setSelectedEmployeeId}
+                />
+              )}
+              {tab === "forecast" && (
+                <ForecastTab filters={apiFilters} onOpenEmployee={setSelectedEmployeeId} />
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </ErrorBoundary>
+
+        {selectedEmployeeId && (
+          <EmployeeDetailDrawer employeeId={selectedEmployeeId} onClose={() => setSelectedEmployeeId(null)} />
         )}
-      </div>
-
-      {/* Segmented control */}
-      <SegmentedControl value={tab} options={TABS} onChange={setTab} />
-
-      {/* Tab content */}
-      {tab === "overview" && (
-        <OverviewTab
-          filters={apiFilters}
-          dateRange={dateRangeObj}
-          compare={compare}
-          onDrill={drill}
-          onGoToTab={(t) => setTab(t as Tab)}
-        />
-      )}
-
-      {tab === "employees" && (
-        <EmployeesTab filters={apiFilters} onOpenEmployee={setSelectedEmployeeId} />
-      )}
-
-      {tab === "attendance" && (
-        <AttendanceTab
-          filters={apiFilters}
-          dateRange={dateRangeObj}
-          compare={compare}
-          onDrill={drill}
-          onOpenEmployee={setSelectedEmployeeId}
-        />
-      )}
-
-      {tab !== "overview" && tab !== "employees" && tab !== "attendance" && (
-        <div className="card-container p-8 text-center text-sm text-text-secondary">
-          <p className="font-medium text-text-primary capitalize">{tab} analytics</p>
-          <p className="mt-1 text-text-muted">
-            Deep {tab} analysis (KPIs, trends, comparison, group-by and drill-down) is built in the next phase.
-          </p>
-        </div>
-      )}
-
-      {selectedEmployeeId && (
-        <EmployeeDetailDrawer
-          employeeId={selectedEmployeeId}
-          onClose={() => setSelectedEmployeeId(null)}
-        />
-      )}
-    </motion.div>
+      </motion.div>
+    </ExportProvider>
   );
 }

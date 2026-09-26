@@ -3,14 +3,8 @@ import { useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   Users,
-  Clock,
-  Umbrella,
-  GraduationCap,
   Upload,
   Settings,
-  Shield,
-  TrendingUp,
-  Building2,
   ChevronDown,
   PanelLeftClose,
   PanelLeft,
@@ -62,18 +56,12 @@ export default function Sidebar() {
     },
     {
       label: "Operations",
-      items: [
-        { icon: <Upload size={20} />, label: "Upload", path: "/upload" },
-        { icon: <Shield size={20} />, label: "Admin", path: "/admin" },
-      ],
+      items: [{ icon: <Upload size={20} />, label: "Upload", path: "/upload" }],
     },
     {
       label: "Reports",
       collapsed: true,
-      items: [
-        { icon: <TrendingUp size={18} />, label: "Trends", path: "/reports/trends" },
-        { icon: <Building2 size={18} />, label: "Dept Metrics", path: "/reports/dept" },
-      ],
+      items: [],
     },
     {
       label: "System",
