@@ -18,10 +18,12 @@ interface NarrativeHeaderProps {
   filters: Record<string, string[]>;
   dateRange: { start: string; end: string } | null;
   compare: boolean;
+  /** Jump to the full flagged-signal details (Pulse → Signals). */
+  onViewFlags?: () => void;
 }
 
 /** Auto-generated one-line story of the current scope. */
-export default function NarrativeHeader({ filters, dateRange, compare }: NarrativeHeaderProps) {
+export default function NarrativeHeader({ filters, dateRange, compare, onViewFlags }: NarrativeHeaderProps) {
   const totals = useScopedTotals(PULSE_TOTAL_DOMAINS, filters, dateRange, compare);
   const signals = useAnalyticsSignals(dateRange, filters);
 
@@ -46,7 +48,7 @@ export default function NarrativeHeader({ filters, dateRange, compare }: Narrati
       ? Math.round((Number(rate) - Number(pAtt.attendance_rate)) * 10) / 10
       : null;
 
-  const parts: { text: string; strong?: boolean; tone?: "good" | "bad" }[] = [
+  const parts: { text: string; strong?: boolean; tone?: "good" | "bad"; action?: boolean }[] = [
     { text: "Attendance ", strong: false },
     { text: fmtPct(rate ?? null), strong: true },
     ...(rateDelta != null
@@ -56,7 +58,7 @@ export default function NarrativeHeader({ filters, dateRange, compare }: Narrati
     { text: fmtNum(emp.employees ?? null), strong: true },
     { text: " · on leave ", strong: false },
     { text: fmtNum(leave.unique_staff ?? null), strong: true },
-    ...(flagText ? [{ text: " · ", strong: false }, { text: flagText, strong: true, tone: "bad" as const }] : []),
+    ...(flagText ? [{ text: " · ", strong: false }, { text: flagText, strong: true, tone: "bad" as const, action: true }] : []),
   ];
 
   if (loading) {
@@ -72,22 +74,33 @@ export default function NarrativeHeader({ filters, dateRange, compare }: Narrati
 
   return (
     <p className="text-[13px] text-text-secondary flex items-center flex-wrap gap-x-1">
-      {parts.map((p, i) => (
-        <span
-          key={i}
-          className={
-            p.strong
-              ? `font-semibold tabular-nums ${p.tone === "bad" ? "text-danger" : p.tone === "good" ? "text-badge-green-text" : "text-text-primary"}`
-              : p.tone === "bad"
-                ? "text-danger"
-                : p.tone === "good"
-                  ? "text-badge-green-text"
-                  : ""
-          }
-        >
-          {p.text}
-        </span>
-      ))}
+      {parts.map((p, i) => {
+        const cls = p.strong
+          ? `font-semibold tabular-nums ${p.tone === "bad" ? "text-danger" : p.tone === "good" ? "text-badge-green-text" : "text-text-primary"}`
+          : p.tone === "bad"
+            ? "text-danger"
+            : p.tone === "good"
+              ? "text-badge-green-text"
+              : "";
+        // The flagged count jumps to the full signal details on Pulse.
+        if (p.action && onViewFlags) {
+          return (
+            <button
+              key={i}
+              onClick={onViewFlags}
+              title="View the flagged areas in the Pulse Signals feed"
+              className={`${cls} underline decoration-dotted underline-offset-2 hover:opacity-80 transition-opacity cursor-pointer`}
+            >
+              {p.text}
+            </button>
+          );
+        }
+        return (
+          <span key={i} className={cls}>
+            {p.text}
+          </span>
+        );
+      })}
     </p>
   );
 }

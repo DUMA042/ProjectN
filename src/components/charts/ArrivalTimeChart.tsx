@@ -96,6 +96,14 @@ export default function ArrivalTimeChart({
             <p className="text-xs text-text-secondary mt-0.5">No data for selected period</p>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => exportToCSV([], "arrival_time", dateRange)}
+              title="Export CSV"
+              aria-label="Export CSV"
+              className="p-2 rounded-btn text-text-muted hover:text-accent hover:bg-nav-hover transition-colors"
+            >
+              <Download size={14} />
+            </button>
             {onDepartmentChange && (
               <select
                 value={selectedDepartment}
@@ -108,14 +116,6 @@ export default function ArrivalTimeChart({
                 ))}
               </select>
             )}
-            <button
-              onClick={() => exportToCSV([], "arrival_time", dateRange)}
-              title="Export CSV"
-              aria-label="Export CSV"
-              className="p-2 rounded-btn text-text-muted hover:text-accent hover:bg-nav-hover transition-colors"
-            >
-              <Download size={14} />
-            </button>
             <DateRangePicker value={dateRange} onChange={onDateChange} />
           </div>
         </div>
@@ -142,6 +142,14 @@ export default function ArrivalTimeChart({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => exportToCSV(data, "arrival_time", dateRange)}
+            title="Export CSV"
+            aria-label="Export CSV"
+            className="p-2 rounded-btn text-text-muted hover:text-accent hover:bg-nav-hover transition-colors"
+          >
+            <Download size={14} />
+          </button>
           {onDepartmentChange && (
             <select
               value={selectedDepartment}
@@ -156,14 +164,6 @@ export default function ArrivalTimeChart({
               ))}
             </select>
           )}
-          <button
-            onClick={() => exportToCSV(data, "arrival_time", dateRange)}
-            title="Export CSV"
-            aria-label="Export CSV"
-            className="p-2 rounded-btn text-text-muted hover:text-accent hover:bg-nav-hover transition-colors"
-          >
-            <Download size={14} />
-          </button>
           <DateRangePicker value={dateRange} onChange={onDateChange} />
         </div>
       </div>

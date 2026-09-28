@@ -67,17 +67,25 @@ export default function DonutChartCard({
   if (!data || data.length === 0) {
     return (
       <div className="card-container p-5 h-[440px] flex flex-col">
-        <div className="flex items-center justify-between mb-2 flex-wrap gap-2 flex-shrink-0">
+        <div className="mb-2 flex-shrink-0 space-y-2">
           <div>
             <h3 className="text-sm font-semibold text-text-primary">{title}</h3>
             <p className="text-xs text-text-secondary mt-0.5">Filter by department & day/date range</p>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => exportToCSV([], "workforce_status_distribution", dateRange)}
+              title="Export CSV"
+              aria-label="Export CSV"
+              className="p-2 rounded-btn text-text-muted hover:text-accent hover:bg-nav-hover transition-colors shrink-0"
+            >
+              <Download size={14} />
+            </button>
             {onDepartmentChange && (
               <select
                 value={selectedDepartment}
                 onChange={(e) => onDepartmentChange(e.target.value)}
-                className="px-3 py-1.5 text-xs border border-border rounded-btn bg-surface text-text-secondary cursor-pointer hover:bg-nav-hover transition-colors font-medium"
+                className="flex-1 min-w-0 px-3 py-1.5 text-xs border border-border rounded-btn bg-surface text-text-secondary cursor-pointer hover:bg-nav-hover transition-colors font-medium"
               >
                 <option value="">All department</option>
                 {departments.map((dept) => (
@@ -85,14 +93,6 @@ export default function DonutChartCard({
                 ))}
               </select>
             )}
-            <button
-              onClick={() => exportToCSV([], "workforce_status_distribution", dateRange)}
-              title="Export CSV"
-              aria-label="Export CSV"
-              className="p-2 rounded-btn text-text-muted hover:text-accent hover:bg-nav-hover transition-colors"
-            >
-              <Download size={14} />
-            </button>
             <DateRangePicker value={dateRange} onChange={onDateChange} />
           </div>
         </div>
@@ -109,37 +109,37 @@ export default function DonutChartCard({
 
   return (
     <div className="card-container p-5 h-[440px] flex flex-col justify-between">
-      <div className="flex items-center justify-between mb-2 flex-wrap gap-2 flex-shrink-0">
+      <div className="mb-2 flex-shrink-0 space-y-2">
         <div>
           <h3 className="text-sm font-semibold text-text-primary">{title}</h3>
           <p className="text-xs text-text-secondary mt-0.5">Filter by department & day/date range</p>
         </div>
-        <div className="flex items-center gap-2">
-          {onDepartmentChange && (
-            <select
-              value={selectedDepartment}
-              onChange={(e) => onDepartmentChange(e.target.value)}
-              className="px-3 py-1.5 text-xs border border-border rounded-btn bg-surface text-text-secondary cursor-pointer hover:bg-nav-hover transition-colors font-medium"
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => exportToCSV(data.map(d => ({ name: d.name, value: d.value, percentage: d.percentage ?? 0 })), "workforce_status_distribution", dateRange)}
+              title="Export CSV"
+              aria-label="Export CSV"
+              className="p-2 rounded-btn text-text-muted hover:text-accent hover:bg-nav-hover transition-colors shrink-0"
             >
-              <option value="">All department</option>
-              {departments.map((dept) => (
-                <option key={dept} value={dept}>
-                  {dept}
-                </option>
-              ))}
-            </select>
-          )}
-          <PercentCountToggle value={mode} onChange={setMode} />
-          <button
-            onClick={() => exportToCSV(data.map(d => ({ name: d.name, value: d.value, percentage: d.percentage ?? 0 })), "workforce_status_distribution", dateRange)}
-            title="Export CSV"
-            aria-label="Export CSV"
-            className="p-2 rounded-btn text-text-muted hover:text-accent hover:bg-nav-hover transition-colors"
-          >
-            <Download size={14} />
-          </button>
-          <DateRangePicker value={dateRange} onChange={onDateChange} />
-        </div>
+              <Download size={14} />
+            </button>
+            {onDepartmentChange && (
+              <select
+                value={selectedDepartment}
+                onChange={(e) => onDepartmentChange(e.target.value)}
+                className="flex-1 min-w-0 px-3 py-1.5 text-xs border border-border rounded-btn bg-surface text-text-secondary cursor-pointer hover:bg-nav-hover transition-colors font-medium"
+              >
+                <option value="">All department</option>
+                {departments.map((dept) => (
+                  <option key={dept} value={dept}>
+                    {dept}
+                  </option>
+                ))}
+              </select>
+            )}
+            <PercentCountToggle value={mode} onChange={setMode} />
+            <DateRangePicker value={dateRange} onChange={onDateChange} />
+          </div>
       </div>
 
       <div className="relative flex-1 min-h-0 flex items-center justify-center">

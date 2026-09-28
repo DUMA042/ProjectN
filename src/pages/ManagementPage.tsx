@@ -63,6 +63,14 @@ export default function ManagementPage() {
     else addFilter(dimension, value);
   };
 
+  /** Jump from the narrative "N areas flagged" line to the full Signals feed. */
+  const viewFlags = () => {
+    setTab("pulse");
+    window.setTimeout(() => {
+      document.getElementById("signals-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 350);
+  };
+
   return (
     <ExportProvider>
       <motion.div
@@ -75,7 +83,7 @@ export default function ManagementPage() {
           <div>
             <h1 className="text-lg font-semibold text-text-primary">Management</h1>
             <p className="text-xs text-text-secondary mt-0.5">
-              The organization at a glance — what is happening, when, to whom, and what comes next
+              The organization at a glance what is happening, when, to whom, and what comes next
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -109,7 +117,7 @@ export default function ManagementPage() {
         {/* ── Tabs ───────────────────────────────────────────────────────── */}
         <SegmentedControl value={tab} options={TABS} onChange={setTab} />
 
-        <NarrativeHeader filters={apiFilters} dateRange={dateRangeObj} compare={compare} />
+        <NarrativeHeader filters={apiFilters} dateRange={dateRangeObj} compare={compare} onViewFlags={viewFlags} />
 
         {/* ── Tab content ────────────────────────────────────────────────── */}
         <ErrorBoundary label="this view">

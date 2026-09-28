@@ -12,6 +12,7 @@ import { buildHeatOptions } from "@/lib/heatmapPairs";
 import { useTabExport } from "./exportRegistry";
 import { exportToCSV } from "@/lib/csvExport";
 import { fmtDateShort } from "@/lib/format";
+import ExportIconButton from "@/components/analytics/ExportIconButton";
 
 interface TrendsTabProps {
   filters: Record<string, string[]>;
@@ -210,6 +211,31 @@ export default function TrendsTab({ filters, dateRange, compare, onDrill }: Tren
   }, [compare, curByDim.data, prevByDim.data, deltaDim, metricKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const dimLabel = (key: string) => dims?.dimensions.find((d) => d.key === key)?.label || key;
+  const exportRange = dateRange ? { startDate: dateRange.start, endDate: dateRange.end } : undefined;
+
+  const exportTrend = () =>
+    exportToCSV(
+      trendData.map((p) => ({
+        series: metric?.label || metricKey,
+        period: p.label,
+        value: p.value,
+        previous: (trendPrev || []).find((t) => t.label === p.label)?.value ?? "",
+      })),
+      `trends_${metricKey}`,
+      exportRange
+    );
+
+  const exportHeatmap = () => {
+    const rows: Record<string, unknown>[] = [];
+    const rl = dimLabel(heatRow);
+    const cl = dimLabel(heatCol);
+    rowValues.forEach((r) => {
+      colValues.forEach((c) => {
+        rows.push({ [rl]: r, [cl]: c, [metric?.label || metricKey]: heatMap.get(`${r}|${c}`) ?? "" });
+      });
+    });
+    exportToCSV(rows, `trends_${metricKey}_heatmap`, exportRange);
+  };
 
   useTabExport(
     deltaRows.length > 0 || trendData.length > 0
@@ -233,6 +259,7 @@ export default function TrendsTab({ filters, dateRange, compare, onDrill }: Tren
               {metric?.label || "Metric"} over time
             </h4>
             <div className="flex items-center gap-2">
+              <ExportIconButton onExport={exportTrend} />
               <MetricPicker
                 value={metricKey}
                 onChange={(k) => setMetricKey(Array.isArray(k) ? (k[0] || "attendance_rate") : k)}
@@ -301,6 +328,7 @@ export default function TrendsTab({ filters, dateRange, compare, onDrill }: Tren
               suffix={suffix}
               loading={heat.isLoading}
               cellColor={heatCellColor}
+              onExport={exportHeatmap}
             />
           </RevealItem>
 
@@ -308,28 +336,72 @@ export default function TrendsTab({ filters, dateRange, compare, onDrill }: Tren
             <RevealItem>
               <div className="card-container p-4">
                 <h4 className="text-xs font-semibold text-text-primary mb-3">By day of week</h4>
-                <CompositionChart title="" data={dowData} loading={daily.isLoading} onSelect={(n) => {}} />
-                <p className="text-[11px] text-text-muted mt-2">Average {metric?.label.toLowerCase()} per weekday</p>
+                <CompositionChart
+                  title=""
+                  data={dowData}
+                  loading={daily.isLoading}
+                  onSelect={(n) => {}}
+                  onExport={() =>
+                    exportToCSV(
+                      dowData.map((d) => ({ weekday: d.name, [metric?.label || metricKey]: d.value })),
+                      `trends_${metricKey}_by_weekday`,
+                      exportRange
+                    )
+                  }
+                />
+                {metric ? (
+                  <p className="text-[11px] text-text-muted mt-2">Average {metric.label.toLowerCase()} per weekday</p>
+                ) : (
+                  <div className="h-3 w-40 bg-nav-hover rounded animate-pulse mt-2" aria-busy="true" aria-label="Loading metric" />
+                )}
               </div>
             </RevealItem>
             <RevealItem>
               <div className="card-container p-4">
                 <h4 className="text-xs font-semibold text-text-primary mb-3">By month</h4>
-                <CompositionChart title="" data={monthData} color="#722ED1" loading={daily.isLoading} onSelect={(n) => {}} />
-                <p className="text-[11px] text-text-muted mt-2">Average {metric?.label.toLowerCase()} per month</p>
+                <CompositionChart
+                  title=""
+                  data={monthData}
+                  color="#722ED1"
+                  loading={daily.isLoading}
+                  onSelect={(n) => {}}
+                  onExport={() =>
+                    exportToCSV(
+                      monthData.map((d) => ({ month: d.name, [metric?.label || metricKey]: d.value })),
+                      `trends_${metricKey}_by_month`,
+                      exportRange
+                    )
+                  }
+                />
+                {metric ? (
+                  <p className="text-[11px] text-text-muted mt-2">Average {metric.label.toLowerCase()} per month</p>
+                ) : (
+                  <div className="h-3 w-40 bg-nav-hover rounded animate-pulse mt-2" aria-busy="true" aria-label="Loading metric" />
+                )}
               </div>
             </RevealItem>
             <RevealItem>
               <div className="card-container p-4">
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="text-xs font-semibold text-text-primary">Δ vs previous</h4>
-                  <select
-                    value={deltaDim}
-                    onChange={(e) => setDeltaDim(e.target.value)}
-                    className="px-2 py-1 text-[11px] border border-border rounded-btn bg-surface text-text-secondary cursor-pointer"
-                  >
-                    {dimOptions.map((d) => <option key={d.key} value={d.key}>{d.label}</option>)}
-                  </select>
+                  <div className="flex items-center gap-1.5">
+                    <ExportIconButton
+                      onExport={() =>
+                        exportToCSV(
+                          deltaRows.map((r) => ({ [dimLabel(deltaDim)]: r.label, delta: r.value })),
+                          `trends_${metricKey}_delta`,
+                          exportRange
+                        )
+                      }
+                    />
+                    <select
+                      value={deltaDim}
+                      onChange={(e) => setDeltaDim(e.target.value)}
+                      className="px-2 py-1 text-[11px] border border-border rounded-btn bg-surface text-text-secondary cursor-pointer"
+                    >
+                      {dimOptions.map((d) => <option key={d.key} value={d.key}>{d.label}</option>)}
+                    </select>
+                  </div>
                 </div>
                 {compare ? (
                   <DivergingBars rows={deltaRows} unit={isRate ? "pp" : ""} loading={curByDim.isLoading || prevByDim.isFetching} />
@@ -366,15 +438,26 @@ function CompositionExplorer({
     <div className="card-container p-4">
       <div className="flex items-center justify-between mb-3">
         <h4 className="text-xs font-semibold text-text-primary">Workforce composition</h4>
-        <select
-          value={dim}
-          onChange={(e) => setDim(e.target.value)}
-          className="px-2 py-1 text-[11px] border border-border rounded-btn bg-surface text-text-secondary cursor-pointer"
-        >
-          {(dims?.dimensions || []).filter((d) => d.kind === "attribute").map((d) => (
-            <option key={d.key} value={d.key}>{d.label}</option>
-          ))}
-        </select>
+        <div className="flex items-center gap-1.5">
+          <ExportIconButton
+            onExport={() =>
+              exportToCSV(
+                data.map((d) => ({ group: d.name, [metricKey]: d.value })),
+                "workforce_composition",
+                undefined
+              )
+            }
+          />
+          <select
+            value={dim}
+            onChange={(e) => setDim(e.target.value)}
+            className="px-2 py-1 text-[11px] border border-border rounded-btn bg-surface text-text-secondary cursor-pointer"
+          >
+            {(dims?.dimensions || []).filter((d) => d.kind === "attribute").map((d) => (
+              <option key={d.key} value={d.key}>{d.label}</option>
+            ))}
+          </select>
+        </div>
       </div>
       <CompositionChart title="" data={data} loading={q.isLoading} onSelect={(n) => onDrill(dim, n)} />
     </div>

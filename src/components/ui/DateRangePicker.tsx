@@ -207,6 +207,9 @@ export default function DateRangePicker({ value, onChange, minDate, maxDate }: D
 
   useEffect(() => { syncFromValue(); }, [syncFromValue]);
 
+  // Hidden until first placement so the panel never flashes unpositioned.
+  const [positioned, setPositioned] = useState(false);
+
   // Position popover with fixed + viewport clamp
   const positionPopover = useCallback(() => {
     if (!btnRef.current || !popoverRef.current) return;
@@ -222,9 +225,11 @@ export default function DateRangePicker({ value, onChange, minDate, maxDate }: D
     pop.style.left = `${left}px`;
     pop.style.right = "auto";
 
-    // Vertical: below if space, else above — clamp height to available space so presets never clip
+    // Vertical: below if space, else above — clamp height to available space so presets never clip.
+    // Decided fresh on every call, so scrolling follows the button and flips sides as room changes.
     const spaceBelow = window.innerHeight - btn.bottom;
     const vh70 = window.innerHeight * 0.7;
+    setPositioned(true);
     if (spaceBelow < ph + pad) {
       pop.style.top = "auto";
       pop.style.bottom = `${window.innerHeight - btn.top + 4}px`;
@@ -240,6 +245,7 @@ export default function DateRangePicker({ value, onChange, minDate, maxDate }: D
 
   useEffect(() => {
     if (!open) return;
+    setPositioned(false);
     // rAF ensures offsetWidth is measured after render
     const id = requestAnimationFrame(positionPopover);
     window.addEventListener("resize", positionPopover);
@@ -313,10 +319,10 @@ export default function DateRangePicker({ value, onChange, minDate, maxDate }: D
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="dialog"
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-btn border border-border text-sm text-text-secondary hover:bg-nav-hover transition-colors"
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-btn border border-border text-sm text-text-secondary hover:bg-nav-hover transition-colors whitespace-nowrap flex-shrink-0"
       >
-        <Calendar size={14} />
-        <span>{value.label}</span>
+        <Calendar size={14} className="flex-shrink-0" />
+        <span className="whitespace-nowrap truncate min-w-0 flex-1 text-left">{value.label}</span>
       </button>
 
       {open && (
@@ -327,6 +333,7 @@ export default function DateRangePicker({ value, onChange, minDate, maxDate }: D
             role="dialog"
             aria-label="Select date range"
             className="fixed z-50 w-80 max-w-[calc(100vw-16px)] bg-surface border border-border rounded-card shadow-lg overflow-hidden"
+            style={{ visibility: positioned ? "visible" : "hidden" }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header — sticky so it stays visible when content scrolls */}

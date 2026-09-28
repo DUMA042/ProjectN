@@ -2,6 +2,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
 } from "recharts";
+import ExportIconButton from "@/components/analytics/ExportIconButton";
 
 export interface CompositionDatum {
   name: string;
@@ -18,6 +19,8 @@ interface CompositionChartProps {
   color?: string;
   onSelect?: (name: string) => void;
   loading?: boolean;
+  /** Per-card CSV export (icon button in the header). */
+  onExport?: () => void;
 }
 
 export default function CompositionChart({
@@ -27,10 +30,14 @@ export default function CompositionChart({
   color = "#1677FF",
   onSelect,
   loading,
+  onExport,
 }: CompositionChartProps) {
   return (
     <div className="card-container p-4">
-      <h4 className="text-xs font-semibold text-text-primary mb-3">{title}</h4>
+      <div className="flex items-start justify-between gap-2 mb-3">
+        <h4 className="text-xs font-semibold text-text-primary">{title}</h4>
+        {onExport && <ExportIconButton onExport={onExport} />}
+      </div>
       {loading ? (
         <div className="h-[220px] bg-nav-hover rounded animate-pulse" />
       ) : data.length === 0 ? (

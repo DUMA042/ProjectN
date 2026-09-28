@@ -157,17 +157,52 @@ def _metric_expr(domain: str, key: str) -> str | None:
     return expr
 
 
+def _join_alias(join_sql: str) -> str:
+    """Alias a JOIN clause introduces: 'LEFT JOIN departments d ON ...' -> 'd'."""
+    parts = (join_sql or "").split()
+    for i, p in enumerate(parts):
+        if p.upper() == "JOIN" and i + 1 < len(parts):
+            nxt = parts[i + 2] if i + 2 < len(parts) else ""
+            return parts[i + 1] if nxt.upper() == "ON" else nxt
+    return join_sql
+
+
+def _from_aliases(from_sql: str) -> set[str]:
+    """Table aliases already bound by a FROM clause (base table + its JOINs)."""
+    parts = (from_sql or "").split()
+    out: set[str] = set()
+    if (
+        len(parts) >= 3
+        and parts[0].upper() == "FROM"
+        and parts[2].upper() not in ("JOIN", "LEFT", "RIGHT", "INNER", "FULL", "CROSS", "WHERE", "ON")
+    ):
+        out.add(parts[2])
+    for i, p in enumerate(parts):
+        if p.upper() == "JOIN" and i + 1 < len(parts):
+            out.add(_join_alias(" ".join(parts[i:])))
+    return out
+
+
 def _collect_joins(cfg: dict, keys: list[str]) -> str:
     base = cfg.get("base_joins", [])
     if isinstance(base, str):
         base = [base] if base else []
-    candidates = list(base) + [DIMENSIONS.get(k, {}).get("join", "") for k in keys]
-    joins = []
-    seen = set()
-    for j in candidates:
-        if j and j not in seen:
-            seen.add(j)
-            joins.append(j)
+    # Dedupe by introduced alias, not exact text: domain FROM clauses bind the
+    # same aliases (d, gl, ...) with different ON-condition wording, and
+    # re-joining an alias raises DuplicateAlias.
+    taken = _from_aliases(cfg.get("from", ""))
+    for j in base:
+        taken.add(_join_alias(j))
+    joins = list(base)
+    for k in keys:
+        j = DIMENSIONS.get(k, {}).get("join", "")
+        if not j:
+            continue
+        alias = _join_alias(j)
+        if alias in taken:
+            continue
+        taken.add(alias)
+        joins.append(j)
     return " ".join(joins)
 
 
@@ -221,6 +256,7 @@ def run_explore(
     search: str = "",
     record_filters: dict | None = None,
     date_sub_ranges: dict | None = None,
+    date_filter_mode: str = "overlap",
 ) -> dict:
     if domain not in DOMAIN_BASE:
         raise ValueError(f"Unknown domain '{domain}'")
@@ -235,7 +271,7 @@ def run_explore(
     with get_session() as s:
         if mode == "records":
             result = _run_records(s, cfg, filters, sd, ed, page, page_size, search, sort_by, sort_dir,
-                                  record_filters, date_sub_ranges)
+                                   record_filters, date_sub_ranges, date_filter_mode, domain)
         else:
             result = _run_summary(s, domain, cfg, metric_defs, metrics, group_by, filters, sd, ed,
                                   page, page_size, sort_by, sort_dir)
@@ -317,29 +353,55 @@ def _run_summary(s, domain, cfg, metric_defs, metrics, group_by, filters, sd, ed
 
 
 def _run_records(s, cfg, filters, sd, ed, page, page_size, search, sort_by, sort_dir,
-                 record_filters=None, date_sub_ranges=None):
+                 record_filters=None, date_sub_ranges=None, date_filter_mode: str = "overlap", domain: str = ""):
     joins = _collect_joins(cfg, list((filters or {}).keys()))
     params: dict = {}
     clauses: list[str] = []
 
-    # Date windows: the record date col, optionally narrowed by per-column
-    # sub-ranges (clamped so they can never widen the main scope).
+    # Date windows
+    # Global scope window (record_date_col BETWEEN sd AND ed)
+    # Per-column sub-ranges: for leave/training treated as a single overlap
+    # interval unrestricted by the global range; for attendance kept as BETWEEN
+    # and clamped to the global scope.
     date_cols: dict[str, str] = cfg.get("record_date_cols", {})
     windows: list[tuple[str, str, str]] = []  # (sql_expr, lo, hi)
-    if sd and ed:
-        windows.append((cfg["record_date_col"], sd, ed) if cfg["record_date_col"] else ("", "", ""))
+    if sd and ed and cfg.get("record_date_col"):
+        windows.append((cfg["record_date_col"], sd, ed))
+    # Collect leave/training sub-ranges for overlap handling
+    sub_los: list[str] = []
+    sub_his: list[str] = []
     for col_key, rng in (date_sub_ranges or {}).items():
+        if not rng or not rng.get("start") or not rng.get("end"):
+            continue
+        if domain in ("leave", "training") and col_key in ("start_date", "end_date", "date_range"):
+            sub_los.append(rng["start"])
+            sub_his.append(rng["end"])
+            continue
         expr = date_cols.get(col_key)
-        if not expr or not rng:
+        if not expr:
             continue
-        sub_s, sub_e = rng.get("start"), rng.get("end")
-        if not sub_s or not sub_e:
-            continue
+        sub_s, sub_e = rng["start"], rng["end"]
         lo = max(sd, sub_s) if sd else sub_s
         hi = min(ed, sub_e) if ed else sub_e
         if lo > hi:
             continue
         windows.append((expr, lo, hi))
+    # Single window for leave/training
+    if sub_los:
+        lo = min(sub_los)
+        hi = max(sub_his)
+        if date_filter_mode == "strict":
+            if domain == "leave":
+                clauses.append("lr.start_date >= :sub_lo AND COALESCE(lr.end_date, lr.start_date) <= :sub_hi")
+            else:
+                clauses.append("tr.start_date >= :sub_lo AND tr.end_date <= :sub_hi")
+        else:
+            if domain == "leave":
+                clauses.append("lr.start_date <= :sub_hi AND COALESCE(lr.end_date, lr.start_date) >= :sub_lo")
+            else:
+                clauses.append("tr.start_date <= :sub_hi AND tr.end_date >= :sub_lo")
+        params["sub_lo"] = lo
+        params["sub_hi"] = hi
     i = 0
     for expr, lo, hi in windows:
         if not expr:
@@ -393,6 +455,9 @@ def _run_records(s, cfg, filters, sd, ed, page, page_size, search, sort_by, sort
         clauses.append("(" + " OR ".join(f"LOWER(COALESCE({e}, '')) LIKE :q" for e in exprs) + ")")
     where_sql = ("WHERE " + " AND ".join(clauses)) if clauses else ""
 
+    if sort_by == "date_range" and "start_date" in cfg["record_columns"]:
+        # UI's combined period column sorts by period start
+        sort_by = "start_date"
     order_col = sort_by if sort_by in cfg["record_columns"] else (cfg["record_date_col"] or cfg["record_columns"][0])
     direction = "ASC" if str(sort_dir).lower() == "asc" else "DESC"
 
@@ -403,6 +468,58 @@ def _run_records(s, cfg, filters, sd, ed, page, page_size, search, sort_by, sort
         text(f"SELECT {cfg['record_select']} {cfg['from']} {joins} {where_sql} ORDER BY {order_col} {direction} {limit_sql}"),
         params,
     ).mappings().all()
+
+    # Enrich leave/training with working-day-aware days_used / days_unused (relative to today)
+    if domain in ("leave", "training") and rows:
+        from owl.rules.query_builder import get_working_weekdays
+
+        try:
+            from owl.rules.engine import get_rule as _gr2
+            hd2 = _gr2("holidays", {}).get("dates", [])
+        except Exception:
+            hd2 = []
+        hs2: set[date] = set()
+        for _d2 in hd2:
+            try:
+                hs2.add(date.fromisoformat(str(_d2)))
+            except Exception:
+                pass
+        wdows = set(get_working_weekdays())
+
+        def _cnt_working(a: date, b: date) -> int:
+            if not a or not b or a > b:
+                return 0
+            n = 0
+            cur2 = a
+            while cur2 <= b:
+                if (cur2.weekday() + 1) in wdows and cur2 not in hs2:
+                    n += 1
+                cur2 += timedelta(days=1)
+            return n
+
+        today2 = date.today()
+        enriched: list[dict] = []
+        for _r in rows:
+            _d = dict(_r)
+            _s = _d.get("start_date")
+            _e = _d.get("end_date")
+            if _s and _e:
+                total_w = _cnt_working(_s, _e)
+                if today2 < _s:
+                    used_w = 0
+                elif today2 > _e:
+                    used_w = total_w
+                else:
+                    used_w = _cnt_working(_s, today2)
+                _d["days_used"] = used_w
+                _d["days_unused"] = total_w - used_w
+                _d["total_days"] = total_w
+            else:
+                _d["days_used"] = 0
+                _d["days_unused"] = 0
+                _d["total_days"] = 0
+            enriched.append(_d)
+        rows = enriched  # type: ignore[assignment]
 
     # Distinct values per filterable record column, within scope + date window
     # (ignores search and the record filters themselves, so every option stays
@@ -434,6 +551,120 @@ def _run_records(s, cfg, filters, sd, ed, page, page_size, search, sort_by, sort
         "page": page,
         "page_size": page_size,
     }
+
+
+# Range-trend subjects: period table + staff id + span columns behind the
+# staff-over-time charts. The end expression keeps open-ended spans counted.
+_TREND_SUBJECTS = {
+    "leave": {
+        "table": "leave_records",
+        "alias": "lr",
+        "id_col": "lr.id_no",
+        "span_start": "lr.start_date",
+        "span_end": "COALESCE(lr.end_date, lr.start_date)",
+    },
+    "training": {
+        "table": "employee_trainings",
+        "alias": "tr",
+        "id_col": "tr.id_no",
+        "span_start": "tr.start_date",
+        "span_end": "COALESCE(tr.end_date, tr.start_date)",
+    },
+}
+
+
+def _range_trend(domain: str, start: str, end: str, granularity: str = "month", filters: dict | None = None) -> dict:
+    """Staff-over-time time series: per bucket, per department, the distinct
+    staff whose span overlaps the bucket.
+
+    Granularity is 'day' (one bucket per date) or 'month' (calendar months).
+    Only global scope dimension filters apply — record-table filters do not.
+    """
+    if domain not in _TREND_SUBJECTS:
+        raise ValueError(f"Unknown trend domain '{domain}'")
+    if granularity not in ("day", "month"):
+        raise ValueError(f"Unknown granularity '{granularity}'")
+    try:
+        sd = date.fromisoformat(start)
+        ed = date.fromisoformat(end)
+    except (ValueError, TypeError):
+        raise ValueError("start/end must be YYYY-MM-DD dates")
+    if sd > ed:
+        raise ValueError("start must not be after end")
+    if (ed - sd).days > 730:
+        raise ValueError("range too large (max 2 years)")
+    subj = _TREND_SUBJECTS[domain]
+    cfg = DOMAIN_BASE["leave" if domain == "leave" else "training"]
+    step = "1 day" if granularity == "day" else "1 month"
+    # NOTE: CAST() instead of :: — SQLAlchemy text() chokes on :: casts.
+    first = "CAST(:sd AS date)" if granularity == "day" else "date_trunc('month', CAST(:sd AS date))"
+
+    params: dict = {"sd": sd.isoformat(), "ed": ed.isoformat()}
+    # Joins for the series dimension + scope filters, deduped by alias.
+    # (The shared _collect_joins can't be used: it assumes the subject FROM
+    # is present, but here the bucket series drives the query.)
+    join_parts: list[str] = []
+    seen_aliases = {"b", subj["alias"], "e"}
+    for k in ["department"] + list((filters or {}).keys()):
+        j = DIMENSIONS.get(k, {}).get("join", "")
+        if not j:
+            continue
+        if _join_alias(j) in seen_aliases:
+            continue
+        seen_aliases.add(_join_alias(j))
+        join_parts.append(j)
+    joins = " ".join(join_parts)
+    clauses: list[str] = []
+    i = 0
+    for key, values in (filters or {}).items():
+        if not values:
+            continue
+        expr = dimension_expr(key, cfg["date_col"])
+        if not expr:
+            continue
+        phs = []
+        for v in values:
+            pname = f"f{i}"
+            params[pname] = v
+            phs.append(f":{pname}")
+            i += 1
+        clauses.append(f"{expr} IN ({', '.join(phs)})")
+    where_sql = ("WHERE " + " AND ".join(clauses)) if clauses else ""
+
+    # A span counts toward every bucket it overlaps.
+    # NOTE: the subject's FROM is not reused here — the bucket series
+    # drives the query and the period table joins to it, not the other way round.
+    t, a = subj["table"], subj["alias"]
+    sql = (
+        "SELECT CAST(b AS date) AS bucket, "
+        "COALESCE(d.department_name, 'Unknown') AS department, "
+        f"COUNT(DISTINCT {subj['id_col']}) AS staff "
+        f"FROM generate_series(({first}), CAST(:ed AS date), CAST('{step}' AS interval)) AS b "
+        f"JOIN {t} {a} ON {subj['span_start']} <= CAST(b + "
+        f"CAST('{step}' AS interval) - INTERVAL '1 day' AS date) "
+        f"AND {subj['span_end']} >= CAST(b AS date) "
+        f"JOIN employees e ON e.id_no = {a}.id_no {joins} {where_sql} "
+        "GROUP BY 1, 2 ORDER BY 1, 2"
+    )
+    with get_session() as s:
+        rows = s.execute(text(sql), params).mappings().all()
+    return {
+        "domain": domain,
+        "granularity": granularity,
+        "start": sd.isoformat(),
+        "end": ed.isoformat(),
+        "rows": [{"bucket": r["bucket"].isoformat(), "department": r["department"], "staff": int(r["staff"])} for r in rows],
+    }
+
+
+def leave_trend(start: str, end: str, granularity: str = "month", filters: dict | None = None) -> dict:
+    """Staff-on-leave time series (see _range_trend)."""
+    return _range_trend("leave", start, end, granularity, filters)
+
+
+def training_trend(start: str, end: str, granularity: str = "month", filters: dict | None = None) -> dict:
+    """Staff-in-training time series (see _range_trend)."""
+    return _range_trend("training", start, end, granularity, filters)
 
 
 def get_dimension_options() -> dict:

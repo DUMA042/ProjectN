@@ -1,4 +1,5 @@
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import {
   useReactTable,
   getCoreRowModel,
@@ -15,6 +16,7 @@ import { exportToCSV } from "@/lib/csvExport";
 import ColumnFilterDropdown from "@/components/ui/ColumnFilterDropdown";
 import { MonthCalendar } from "@/components/ui/DateRangePicker";
 import type { DateRange } from "@/components/ui/DateRangePicker";
+import { usePopoverPosition } from "@/lib/usePopoverPosition";
 
 export interface DateFilterValue {
   start: string;
@@ -53,6 +55,12 @@ interface DataTableProps<T extends object> {
   dateFilterBounds?: { min?: string; max?: string };
   isFetching?: boolean;
   onExport?: () => void;
+  centeredDateFilter?: boolean | string[];
+  dateFilterMode?: string;
+  onDateFilterModeChange?: (mode: string) => void;
+  /** Row selection (visual only — never affects data): stable id per row. */
+  getRowId?: (row: T) => string;
+  selectedRowIds?: Set<string> | string[];
 }
 
 export default function DataTable<T extends object>({
@@ -83,12 +91,37 @@ export default function DataTable<T extends object>({
   onDateFiltersChange,
   dateFilterBounds,
   isFetching,
+  centeredDateFilter,
+  dateFilterMode,
+  onDateFilterModeChange,
   onExport,
+  getRowId,
+  selectedRowIds,
 }: DataTableProps<T>) {
   const [localSorting, setLocalSorting] = useState<SortingState>([]);
   const [localGlobalFilter, setLocalGlobalFilter] = useState("");
   const [localColumnFilters, setLocalColumnFilters] = useState<Record<string, Set<string>>>({});
   const [openFilterKey, setOpenFilterKey] = useState<string | null>(null);
+
+  // Per-column filter button refs for fixed popover positioning
+  const filterBtnRefs = useRef<Map<string, React.RefObject<HTMLButtonElement>>>(new Map());
+  const getFilterBtnRef = useCallback((key: string) => {
+    let r = filterBtnRefs.current.get(key);
+    if (!r) {
+      r = { current: null } as React.RefObject<HTMLButtonElement>;
+      filterBtnRefs.current.set(key, r);
+    }
+    return r;
+  }, []);
+
+  // Auto-close any open filter popover when the table scrolls
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || !openFilterKey) return;
+    const handler = () => setOpenFilterKey(null);
+    el.addEventListener("scroll", handler);
+    return () => el.removeEventListener("scroll", handler);
+  }, [openFilterKey]);
 
   // Horizontal drag-to-scroll
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -249,6 +282,12 @@ export default function DataTable<T extends object>({
     if (serverSide) onDateFiltersChange?.({});
   };
 
+  // Each date column owns one range value, keyed by column key.
+  const sharedDateValue = (key: string): DateFilterValue | undefined => {
+    const v = dateFiltersProp?.[key];
+    return v?.start || v?.end ? v : undefined;
+  };
+
   const applyDateFilter = (key: string, value: DateFilterValue | undefined) => {
     const next = { ...(dateFiltersProp || {}) };
     if (!value) delete next[key];
@@ -324,6 +363,24 @@ export default function DataTable<T extends object>({
               <Download size={14} />
             </button>
           )}
+          {centeredDateFilter && (
+            <div className="flex items-center gap-0.5 bg-nav-hover rounded-btn p-0.5">
+              <button
+                onClick={() => onDateFilterModeChange?.("overlap")}
+                className={`px-2 py-1 text-xs font-medium rounded-[4px] transition-colors ${(dateFilterMode || "overlap") === "overlap" ? "bg-surface text-accent shadow-sm" : "text-text-muted hover:text-text-primary"}`}
+                title="Any part of the record falls within the picked range"
+              >
+                Overlap
+              </button>
+              <button
+                onClick={() => onDateFilterModeChange?.("strict")}
+                className={`px-2 py-1 text-xs font-medium rounded-[4px] transition-colors ${dateFilterMode === "strict" ? "bg-surface text-accent shadow-sm" : "text-text-muted hover:text-text-primary"}`}
+                title="Record must be fully within the picked range"
+              >
+                Strict
+              </button>
+            </div>
+          )}
           {hasActiveFilters && (
             <button
               onClick={clearAllFilters}
@@ -368,7 +425,7 @@ export default function DataTable<T extends object>({
                   const colKey = (header.column.columnDef as any).accessorKey as string | undefined;
                   const colDef = columnDefs.find((c) => c.key === colKey);
                   const isFiltered = colKey
-                    ? (columnFilters[colKey]?.size ?? 0) > 0 || !!dateFiltersProp?.[colKey]
+                    ? (columnFilters[colKey]?.size ?? 0) > 0 || !!sharedDateValue(colKey)
                     : false;
                   const isOpen = colKey ? openFilterKey === colKey : false;
                   return (
@@ -393,6 +450,7 @@ export default function DataTable<T extends object>({
                         {enableColumnFilters && colKey && colDef?.filterable !== false && (
                           <span className="relative">
                             <button
+                              ref={colKey ? getFilterBtnRef(colKey) : undefined}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setOpenFilterKey(isOpen ? null : colKey);
@@ -408,8 +466,10 @@ export default function DataTable<T extends object>({
                             )}
                             {isOpen && colDef?.filter === "date" && (
                               <DateFilterPopover
+                                triggerRef={getFilterBtnRef(colKey!)}
+                                centered={Array.isArray(centeredDateFilter) ? centeredDateFilter.includes(colKey!) : !!centeredDateFilter}
                                 header={header.column.columnDef.header as string}
-                                value={dateFiltersProp?.[colKey]}
+                                value={sharedDateValue(colKey!)}
                                 bounds={dateFilterBounds}
                                 onApply={(v) => { applyDateFilter(colKey, v); setOpenFilterKey(null); }}
                                 onClose={() => setOpenFilterKey(null)}
@@ -417,6 +477,7 @@ export default function DataTable<T extends object>({
                             )}
                             {isOpen && colDef?.filter !== "date" && (
                               <ColumnFilterDropdown
+                                triggerRef={getFilterBtnRef(colKey!)}
                                 columnKey={colKey}
                                 header={header.column.columnDef.header as string}
                                 uniqueValues={uniqueValuesMap[colKey] || []}
@@ -443,11 +504,17 @@ export default function DataTable<T extends object>({
                 </td>
               </tr>
             ) : (
-              rows.map((row) => (
+              rows.map((row) => {
+                const rowId = getRowId?.(row.original);
+                const isSelected =
+                  rowId !== undefined &&
+                  (selectedRowIds instanceof Set ? selectedRowIds.has(rowId) : !!selectedRowIds?.includes(rowId));
+                return (
                 <tr
                   key={row.id}
                   onClick={onRowClick ? () => onRowClick(row.original) : undefined}
-                  className={`group border-b border-divider last:border-0 hover:bg-nav-hover transition-colors ${onRowClick ? "cursor-pointer" : ""}`}
+                  aria-selected={getRowId ? isSelected : undefined}
+                  className={`group border-b border-divider last:border-0 hover:bg-nav-hover transition-colors ${onRowClick ? "cursor-pointer" : ""} ${isSelected ? "bg-accent/[0.06]" : ""}`}
                 >
                   {row.getVisibleCells().map((cell) => {
                     const colKey = (cell.column.columnDef as any).accessorKey as string | undefined;
@@ -456,14 +523,15 @@ export default function DataTable<T extends object>({
                     <td
                       key={cell.id}
                       style={colKey ? stickyStyle(colKey, false) : undefined}
-                      className={`px-4 py-2.5 text-sm text-text-primary ${isSticky ? "bg-surface group-hover:bg-nav-hover" : ""}`}
+                      className={`px-4 py-2.5 text-sm text-text-primary ${isSticky ? (isSelected ? "bg-[#E9F1FD] group-hover:bg-nav-hover" : "bg-surface group-hover:bg-nav-hover") : ""}`}
                     >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>
                     );
                   })}
                 </tr>
-              ))
+                );
+              })
             )}
           </tbody>
         </table>
@@ -519,12 +587,16 @@ function DateFilterPopover({
   bounds,
   onApply,
   onClose,
+  triggerRef,
+  centered,
 }: {
   header: string;
   value?: DateFilterValue;
   bounds?: { min?: string; max?: string };
   onApply: (value: DateFilterValue | undefined) => void;
   onClose: () => void;
+  triggerRef?: React.RefObject<HTMLElement>;
+  centered?: boolean;
 }) {
   const [start, setStart] = useState(value?.start || "");
   const [end, setEnd] = useState(value?.end || "");
@@ -533,13 +605,31 @@ function DateFilterPopover({
   const now = new Date();
   const [calMonth, setCalMonth] = useState({ y: now.getFullYear(), m: now.getMonth() });
 
+  usePopoverPosition(triggerRef as React.RefObject<HTMLElement>, ref, !!triggerRef && !centered);
+
+  // Centered popovers are portaled to document.body, so lock page scroll too.
   useEffect(() => {
+    if (!centered) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [centered]);
+
+  useEffect(() => {
+    if (centered) {
+      const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+      document.addEventListener("keydown", onKey);
+      return () => document.removeEventListener("keydown", onKey);
+    }
     const h = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+      const target = e.target as Node;
+      const inPopover = ref.current && ref.current.contains(target);
+      const inTrigger = triggerRef?.current && triggerRef.current.contains(target);
+      if (!inPopover && !inTrigger) onClose();
     };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
-  }, [onClose]);
+  }, [onClose, triggerRef, centered]);
 
   const pad = (n: number) => String(n).padStart(2, "0");
   const iso = (y: number, m: number, d: number) => `${y}-${pad(m + 1)}-${pad(d)}`;
@@ -548,7 +638,7 @@ function DateFilterPopover({
     const clicked = iso(y, m, d);
     if (!pickingEnd || !start || clicked < start) {
       setStart(clicked);
-      setEnd(clicked);
+      setEnd("");
       setPickingEnd(true);
     } else {
       setEnd(clicked);
@@ -556,14 +646,11 @@ function DateFilterPopover({
     }
   };
 
-  return (
-    <div
-      ref={ref}
-      className="absolute left-0 top-full mt-1 z-30 w-[252px] bg-surface border border-border rounded-card shadow-lg p-2.5"
-      onClick={(e) => e.stopPropagation()}
-    >
+  const isInvalid = !!(start && end && end < start);
+  const inner = (
+    <>
       <p className="text-xs font-semibold text-text-primary mb-1.5">
-        {header} <span className="font-normal text-text-muted">· within selected range</span>
+        {header}
       </p>
       <MonthCalendar
         year={calMonth.y} month={calMonth.m}
@@ -574,8 +661,11 @@ function DateFilterPopover({
         onDayClick={dayClick}
       />
       <div className="text-[11px] text-text-secondary text-center py-1.5">
-        {start && end ? `${start} → ${end}` : "Pick a start, then an end"}
+        {start && end ? `${start} → ${end}` : start || end ? `${start || end}` : "Pick a start, then an end"}
       </div>
+      {isInvalid && (
+        <p className="text-[11px] text-danger text-center pb-1">End day must be greater than start date</p>
+      )}
       <div className="flex items-center justify-between pt-1.5 border-t border-divider">
         <button
           onClick={() => { setStart(""); setEnd(""); setPickingEnd(false); onApply(undefined); }}
@@ -584,13 +674,43 @@ function DateFilterPopover({
           Clear
         </button>
         <button
-          onClick={() => start && end && onApply({ start, end })}
-          disabled={!start || !end}
+          onClick={() => start && !isInvalid && onApply({ start, end: end || start })}
+          disabled={!start || isInvalid}
           className="text-xs font-medium text-white bg-accent px-3 py-1 rounded-btn hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
         >
           Apply
         </button>
       </div>
+    </>
+  );
+
+  if (centered) {
+    // Portaled to document.body: escapes transformed ancestors (e.g. RevealItem
+    // motion.divs) that would otherwise trap `fixed inset-0` to the card's box,
+    // so the dim covers the full viewport.
+    return createPortal(
+      <>
+        <div className="fixed inset-0 bg-black/30 z-[60]" onClick={onClose} />
+        <div
+          ref={ref}
+          className="fixed z-[60] w-[320px] max-w-[calc(100vw-32px)] bg-surface border border-border rounded-card shadow-xl p-4"
+          style={{ top: "50%", left: "50%", transform: "translate(-50%, -50%)", maxHeight: "80vh", overflowY: "auto" }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {inner}
+        </div>
+      </>,
+      document.body
+    );
+  }
+
+  return (
+    <div
+      ref={ref}
+      className={`${triggerRef ? "fixed z-50 w-[252px] max-w-[calc(100vw-16px)]" : "absolute left-0 top-full mt-1 z-30 w-[252px]"} bg-surface border border-border rounded-card shadow-lg p-2.5`}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {inner}
     </div>
   );
 }

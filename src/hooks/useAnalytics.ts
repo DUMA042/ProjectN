@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useQuery, useQueries, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 
@@ -25,8 +26,9 @@ export interface ExploreParams {
   /** Whitelisted record-column filters (records mode only). */
   record_filters?: Record<string, string[]>;
   /** Per date-column sub-ranges of the main range (records mode), keyed by
-   * the record column key (e.g. work_date, start_date, end_date). */
+   * the record column key (e.g. work_date, date_range). */
   date_sub_ranges?: Record<string, { start: string; end: string }>;
+  date_filter_mode?: string;
   /** Set false to disable the query (parameters still key the cache). */
   enabled?: boolean;
 }
@@ -232,6 +234,108 @@ export function useAnalyticsExplore(params: ExploreParams) {
     placeholderData: keepPreviousData,
     enabled: !!params.domain && params.enabled !== false,
   });
+}
+
+export interface MultiDomainPivotInput {
+  metricsByDomain: { domain: ExploreParams["domain"]; metrics: string[] }[];
+  group_by: string[];
+  filters?: Record<string, string[]>;
+  date_range?: { start: string; end: string } | null;
+  enabled?: boolean;
+}
+
+/** Cross-subject pivot: one summary explore per subject, merged on the group key.
+ * Groups present in any subject appear (missing metrics stay null → "—"). */
+export function useMultiDomainPivot(input: MultiDomainPivotInput) {
+  const groupKey = input.group_by.join(",");
+  const results = useQueries({
+    queries: input.metricsByDomain.map((d) => {
+      const params: ExploreParams = {
+        domain: d.domain,
+        metrics: d.metrics,
+        group_by: input.group_by,
+        filters: input.filters,
+        date_range: input.date_range,
+        mode: "summary",
+        page: 1,
+        page_size: 2000,
+      };
+      return {
+        queryKey: ["analytics-explore", JSON.stringify(params)],
+        queryFn: () => api.post("/api/analytics/explore", params).then((r) => r.data as ExploreResponse),
+        placeholderData: keepPreviousData,
+        enabled: input.enabled !== false && d.metrics.length > 0,
+      };
+    }),
+  });
+  // Memoize on serialized payloads: useQueries returns a new array each render.
+  const dataKey = JSON.stringify(results.map((r) => r.data?.groups ?? null));
+  const rows: Record<string, any>[] = useMemo(() => {
+    const merged = new Map<string, Record<string, any>>();
+    const gb = groupKey ? groupKey.split(",") : [];
+    const groupsByQuery = JSON.parse(dataKey) as Record<string, any>[][];
+    for (const groups of groupsByQuery) {
+      for (const g of groups || []) {
+        const k = JSON.stringify(gb.map((c) => g[c] ?? null));
+        const base = merged.get(k) || Object.fromEntries(gb.map((c) => [c, g[c] ?? "—"]));
+        merged.set(k, { ...base, ...g });
+      }
+    }
+    return [...merged.values()];
+  }, [dataKey, groupKey]);
+  return {
+    rows,
+    loading: results.some((r) => r.isLoading),
+    isFetching: results.some((r) => r.isFetching),
+  };
+}
+
+export interface LeaveTrendPoint {
+  bucket: string;
+  department: string;
+  staff: number;
+}
+
+/** Staff-over-time time series: distinct staff overlapping each bucket, per department. */
+export function useRangeTrend(
+  domain: "leave" | "training",
+  params: {
+    start: string;
+    end: string;
+    granularity: string;
+    filters?: Record<string, string[]>;
+    enabled?: boolean;
+  }
+) {
+  const key = JSON.stringify(params);
+  return useQuery<{ granularity: string; start: string; end: string; rows: LeaveTrendPoint[] }>({
+    queryKey: [`analytics-${domain}-trend`, key],
+    queryFn: () => api.post(`/api/analytics/${domain}-trend`, params).then((r) => r.data),
+    placeholderData: keepPreviousData,
+    enabled: params.enabled !== false && !!params.start && !!params.end,
+  });
+}
+
+/** Staff-on-leave time series (see useRangeTrend). */
+export function useLeaveTrend(params: {
+  start: string;
+  end: string;
+  granularity: string;
+  filters?: Record<string, string[]>;
+  enabled?: boolean;
+}) {
+  return useRangeTrend("leave", params);
+}
+
+/** Staff-in-training time series (see useRangeTrend). */
+export function useTrainingTrend(params: {
+  start: string;
+  end: string;
+  granularity: string;
+  filters?: Record<string, string[]>;
+  enabled?: boolean;
+}) {
+  return useRangeTrend("training", params);
 }
 
 export function useAnalyticsRefresh() {

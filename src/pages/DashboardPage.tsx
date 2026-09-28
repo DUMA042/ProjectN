@@ -50,6 +50,10 @@ export default function DashboardPage() {
   const { data: locations } = useLocations();
   const { data: departments } = useDepartments(selectedLocation);
 
+  // Global range broadcasts to every card; per-card pickers can still
+  // override their own card until the global range changes again.
+  const [globalDateRange, setGlobalDateRange] = useState<DateRange>(getDefaultDateRange());
+
   // Chart-specific filters & date ranges
   const [deptDateRange, setDeptDateRange] = useState<DateRange>(getDefaultDateRange());
   const [workforceDateRange, setWorkforceDateRange] = useState<DateRange>(getDefaultDateRange());
@@ -99,6 +103,16 @@ export default function DashboardPage() {
     empFilters,
     empPageSize,
   ]);
+
+  // Global date change: push the range to every card at once
+  const handleGlobalDateChange = (range: DateRange) => {
+    setGlobalDateRange(range);
+    setDeptDateRange(range);
+    setCheckinDateRange(range);
+    setArrivalTimeDateRange(range);
+    setWorkforceDateRange(range);
+    setEmpSummaryDateRange(range);
+  };
 
   // Reset department filters if top-level location changes
   const handleLocationChange = (newLoc: string) => {
@@ -244,20 +258,26 @@ export default function DashboardPage() {
           <p className="text-sm text-text-secondary mt-0.5">Here is your daily workforce overview.</p>
         </div>
 
-        <div className="flex items-center gap-2 bg-surface px-3 py-1.5 border border-border rounded-btn shadow-sm">
-          <MapPin className="w-4 h-4 text-accent" />
-          <span className="text-xs font-medium text-text-secondary">Location:</span>
-          <select
-            value={selectedLocation}
-            onChange={(e) => handleLocationChange(e.target.value)}
-            className="text-xs font-semibold bg-transparent text-text-primary focus:outline-none cursor-pointer pr-1"
-          >
-            {locationOptions.map((loc) => (
-              <option key={loc} value={loc} className="bg-surface text-text-primary">
-                {loc}
-              </option>
-            ))}
-          </select>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 bg-surface px-3 py-1.5 border border-border rounded-btn shadow-sm">
+            <MapPin className="w-4 h-4 text-accent" />
+            <span className="text-xs font-medium text-text-secondary">Location:</span>
+            <select
+              value={selectedLocation}
+              onChange={(e) => handleLocationChange(e.target.value)}
+              className="text-xs font-semibold bg-transparent text-text-primary focus:outline-none cursor-pointer pr-1"
+            >
+              {locationOptions.map((loc) => (
+                <option key={loc} value={loc} className="bg-surface text-text-primary">
+                  {loc}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-text-secondary">Period:</span>
+            <DateRangePicker value={globalDateRange} onChange={handleGlobalDateChange} />
+          </div>
         </div>
       </div>
 

@@ -8,6 +8,7 @@ import { semanticColor, readableFg } from "@/lib/analyticsColors";
 import { fmtDateShort, fmtNum } from "@/lib/format";
 import { useTabExport } from "./exportRegistry";
 import { exportToCSV } from "@/lib/csvExport";
+import ExportIconButton from "@/components/analytics/ExportIconButton";
 
 interface ForecastTabProps {
   filters: Record<string, string[]>;
@@ -46,29 +47,40 @@ export default function ForecastTab({ filters, onOpenEmployee }: ForecastTabProp
   const att = useMemo(() => splitSeries(data?.projection), [data]);
   const leave = useMemo(() => splitSeries(data?.leave_forecast), [data]);
 
+  const coverageRows: Record<string, unknown>[] = (data?.coverage.departments || []).map((d) => {
+    const row: Record<string, unknown> = { department: d.department, headcount: d.headcount };
+    (d.weeks || []).forEach((w, i) => {
+      row[`week_${i + 1} (${fmtDateShort(w.week)})`] = `${w.available} of ${w.headcount} (leave ${w.expected_leave}, training ${w.scheduled_training})`;
+    });
+    return row;
+  });
+  const riskRows = (data?.risks || []).map((r) => ({
+    employee: r.full_name, department: r.department,
+    absent_30d: r.recent_absent, late_30d: r.recent_late,
+    baseline_per_30d: r.baseline_per_30d, ratio: r.ratio,
+  }));
+
+  const seriesRows = (s: { actual: TrendPoint[]; projection: TrendPoint[]; band: BandPoint[] }) => {
+    const byLabel = new Map<string, Record<string, unknown>>();
+    s.actual.forEach((p) => byLabel.set(p.label, { week: p.label, actual: p.value }));
+    s.projection.forEach((p) => {
+      const row = byLabel.get(p.label) || { week: p.label, actual: "" };
+      row.projected = p.value;
+      byLabel.set(p.label, row);
+    });
+    s.band.forEach((b) => {
+      const row = byLabel.get(b.label) || { week: b.label, actual: "", projected: "" };
+      row.band_low = b.low;
+      row.band_high = b.high;
+      byLabel.set(b.label, row);
+    });
+    return [...byLabel.values()];
+  };
+
   useTabExport(
     data
       ? () => {
-          const coverageRows: Record<string, unknown>[] = (data.coverage.departments || []).map((d) => {
-            const row: Record<string, unknown> = { department: d.department, headcount: d.headcount };
-            (d.weeks || []).forEach((w, i) => {
-              row[`week_${i + 1} (${fmtDateShort(w.week)})`] = `${w.available} of ${w.headcount} (leave ${w.expected_leave}, training ${w.scheduled_training})`;
-            });
-            return row;
-          });
-          exportToCSV(
-            [
-              ...coverageRows,
-              {},
-              ...data.risks.map((r) => ({
-                employee: r.full_name, department: r.department,
-                absent_30d: r.recent_absent, late_30d: r.recent_late,
-                baseline_per_30d: r.baseline_per_30d, ratio: r.ratio,
-              })),
-            ],
-            "forecast",
-            undefined
-          );
+          exportToCSV([...coverageRows, {}, ...riskRows], "forecast", undefined);
         }
       : null
   );
@@ -83,9 +95,12 @@ export default function ForecastTab({ filters, onOpenEmployee }: ForecastTabProp
           <div className="card-container p-4">
             <div className="flex items-center justify-between mb-3">
               <h4 className="text-xs font-semibold text-text-primary">Projected attendance rate</h4>
-              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-badge-blue-bg text-badge-blue-text">
-                projection
-              </span>
+              <div className="flex items-center gap-1.5">
+                <ExportIconButton onExport={() => exportToCSV(seriesRows(att), "forecast_attendance", undefined)} />
+                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-badge-blue-bg text-badge-blue-text">
+                  projection
+                </span>
+              </div>
             </div>
             {isLoading ? (
               <div className="h-[240px] bg-nav-hover rounded animate-pulse" />
@@ -107,9 +122,12 @@ export default function ForecastTab({ filters, onOpenEmployee }: ForecastTabProp
           <div className="card-container p-4">
             <div className="flex items-center justify-between mb-3">
               <h4 className="text-xs font-semibold text-text-primary">Staff on leave · weekly</h4>
-              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-badge-blue-bg text-badge-blue-text">
-                projection
-              </span>
+              <div className="flex items-center gap-1.5">
+                <ExportIconButton onExport={() => exportToCSV(seriesRows(leave), "forecast_leave", undefined)} />
+                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-badge-blue-bg text-badge-blue-text">
+                  projection
+                </span>
+              </div>
             </div>
             {isLoading ? (
               <div className="h-[240px] bg-nav-hover rounded animate-pulse" />
@@ -127,7 +145,10 @@ export default function ForecastTab({ filters, onOpenEmployee }: ForecastTabProp
         <div className="card-container p-4">
           <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
             <h4 className="text-xs font-semibold text-text-primary">Coverage outlook · next {coverageWeeks.length} weeks</h4>
-            <p className="text-[11px] text-text-muted">Available = active − expected leave − scheduled training</p>
+            <div className="flex items-center gap-1.5">
+              <p className="text-[11px] text-text-muted">Available = active − expected leave − scheduled training</p>
+              <ExportIconButton onExport={() => exportToCSV(coverageRows, "forecast_coverage", undefined)} />
+            </div>
           </div>
           {isLoading ? (
             <div className="h-32 bg-nav-hover rounded animate-pulse" />
@@ -189,7 +210,10 @@ export default function ForecastTab({ filters, onOpenEmployee }: ForecastTabProp
         <div className="card-container p-4">
           <div className="flex items-center justify-between mb-3">
             <h4 className="text-xs font-semibold text-text-primary">Risk roster</h4>
-            <p className="text-[11px] text-text-muted">Trailing 30 days vs own 90-day baseline</p>
+            <div className="flex items-center gap-1.5">
+              <p className="text-[11px] text-text-muted">Trailing 30 days vs own 90-day baseline</p>
+              <ExportIconButton onExport={() => exportToCSV(riskRows as Record<string, unknown>[], "forecast_risks", undefined)} />
+            </div>
           </div>
           {isLoading ? (
             <div className="space-y-2">

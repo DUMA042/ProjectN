@@ -39,6 +39,15 @@ export const CATEGORICAL = [
   "#1677FF", "#52C41A", "#FAAD14", "#FF4D4F", "#722ED1", "#13C2C2", "#EB2F96", "#FA8C16",
 ];
 
+/** Maximally-distinct series color by index: golden-angle (~137.5°) hue steps
+ * keep neighbors far apart, alternating lightness adds separation. Deterministic —
+ * the same index always yields the same color, for any number of series. */
+export function distinctColor(index: number): string {
+  const hue = Math.round((index * 137.508) % 360);
+  const light = index % 2 === 0 ? 47 : 60;
+  return `hsl(${hue}, 68%, ${light}%)`;
+}
+
 function hexToRgb(hex: string): [number, number, number] {
   const h = hex.replace("#", "");
   return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];

@@ -149,7 +149,31 @@ export const useManagementScope = create<ManagementScopeState>()(
             p.filters && typeof p.filters === "object" && !Array.isArray(p.filters)
               ? (p.filters as Record<string, string[]>)
               : {},
-          savedViews: Array.isArray(p.savedViews) ? (p.savedViews as SavedView[]) : [],
+          savedViews: (() => {
+            if (!Array.isArray(p.savedViews)) return [];
+            const sanitized: SavedView[] = [];
+            for (const raw of p.savedViews) {
+              if (!raw || typeof raw !== "object") continue;
+              const v = raw as Record<string, unknown>;
+              const dr = v.dateRange as { startDate?: unknown; endDate?: unknown; label?: unknown } | undefined;
+              const dateRange =
+                dr && typeof dr.startDate === "string" && typeof dr.endDate === "string" && typeof dr.label === "string"
+                  ? (dr as DateRange)
+                  : defaultRange();
+              sanitized.push({
+                name: typeof v.name === "string" && v.name.trim() ? v.name : "Untitled",
+                tab: typeof v.tab === "string" ? (v.tab as ManagementTab) : "pulse",
+                location: typeof v.location === "string" ? v.location : null,
+                dateRange,
+                compare: !!v.compare,
+                filters:
+                  v.filters && typeof v.filters === "object" && !Array.isArray(v.filters)
+                    ? (v.filters as Record<string, string[]>)
+                    : {},
+              });
+            }
+            return sanitized;
+          })(),
           peopleEntity: typeof p.peopleEntity === "string" ? p.peopleEntity : "individuals",
         };
       },

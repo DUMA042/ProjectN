@@ -6,7 +6,16 @@ A Windows desktop HR/attendance application (Tauri 2 shell, React + TypeScript f
 - **ETL pipeline** that routes, validates, and loads Excel files into PostgreSQL, quarantining bad rows instead of dropping them — with dedup and idempotent upserts.
 - **Rules Settings** (per-day working hours, holidays, eligible statuses, incomplete threshold, leave-overrides-training) applied everywhere: working-day determination, absence/expected days, and early/normal/late + incomplete classification.
 - **Dashboard** with at-a-glance KPIs and infographics.
-- A unified **Management analytical workspace** (`/management`): **Overview · Employees · Attendance · Leave · Training** — a filterable, drill-down workspace with trends, comparisons, heatmaps, rankings, and coverage-aware rates, all scoped by a global filter bar + date range.
+- A unified **Management analytical workspace** (`/management`): **Pulse · Trends · Explore · People · Forecast** — a filterable, drill-down workspace with trends, comparisons, heatmaps, rankings, and coverage-aware rates, all scoped by a global filter bar + date range. (Tab highlights below.)
+
+## Management workspace (highlights)
+- **Scope bar** (all tabs): global date range with per-table broadcast + local override, compare-previous toggle, dimension/location filters, and named saved views.
+- **Pulse**: KPI strip, today board, auto-detected signals feed with drill-through, data-health card, weekly attendance trend, and top attention flags.
+- **Trends**: any metric over day/week/month/quarter with previous-period overlay, segment deltas, dimension heatmaps, weekday/month composition, and workforce composition for snapshot metrics.
+- **Explore**: multi-metric Summary pivot (mixed-subject merge, clickable row selection that scopes the side cards), server-side Attendance/Leave/Training record tables with search, sort, column + date-range filters, staff ranking, cross-dimension heatmap, and leave/training over-time charts.
+- **People**: headcount KPIs, ranked roster, searchable staff directory, and group league tables with drill-to-people.
+- **Forecast**: attendance-rate projection with confidence band, leave forecast, department coverage outlook, and an absence-risk roster.
+- Every data card and table offers its own **Export CSV** button (full filtered set, not just the visible page); the header Export covers the tab's primary dataset.
 
 ## Stack
 - Desktop: **Tauri 2** + **React 18** + **TypeScript** + **Vite** + **Tailwind** + **Recharts** + **TanStack Query/Table**

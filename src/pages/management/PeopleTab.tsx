@@ -12,6 +12,8 @@ import { semanticColor } from "@/lib/analyticsColors";
 import { fmtPct, fmtNum } from "@/lib/format";
 import { useTabExport } from "./exportRegistry";
 import { exportToCSV } from "@/lib/csvExport";
+import { api } from "@/lib/api";
+import ExportIconButton from "@/components/analytics/ExportIconButton";
 
 interface PeopleTabProps {
   filters: Record<string, string[]>;
@@ -212,6 +214,54 @@ export default function PeopleTab({ filters, dateRange, compare, onDrill, onOpen
     },
   ];
 
+  const exportRange = dateRange ? { startDate: dateRange.start, endDate: dateRange.end } : undefined;
+
+  // Full-set roster export (rankN-sized page is only a window into it)
+  const exportRosterFull = async () => {
+    try {
+      const res = await api.post("/api/analytics/explore", {
+        domain: "attendance",
+        group_by: ["employee", "employee_id", "department"],
+        metrics: rosterColorByRate ? [rosterMetric, "absence_rate"] : [rosterMetric],
+        filters,
+        date_range: dateRange,
+        sort_by: rosterMetric,
+        sort_dir: preset.dir,
+        mode: "summary",
+        page: 1,
+        page_size: 2000,
+      });
+      exportToCSV(
+        (res.data?.groups || []).map((r: Record<string, unknown>) => ({
+          id_no: r.employee_id, full_name: r.employee, department: r.department, [rosterMetric]: r[rosterMetric],
+        })),
+        `people_roster_${rosterMetric}`,
+        exportRange
+      );
+    } catch {
+      /* ignore export errors */
+    }
+  };
+
+  // Full-set directory export (table page is only a window into it)
+  const exportDirectoryFull = async () => {
+    try {
+      const res = await api.post("/api/analytics/explore", {
+        domain: "employees",
+        mode: "records",
+        filters,
+        page: 1,
+        page_size: 2000,
+        search,
+        sort_by: sorting[0]?.id ?? "full_name",
+        sort_dir: sorting[0]?.desc ? "desc" : "asc",
+      });
+      exportToCSV(res.data?.records || [], "people_directory", exportRange);
+    } catch {
+      /* ignore export errors */
+    }
+  };
+
   useTabExport(() => {
     if (entity === "individuals") {
       exportToCSV(
@@ -229,7 +279,18 @@ export default function PeopleTab({ filters, dateRange, compare, onDrill, onOpen
   return (
     <StaggerReveal className="space-y-4">
       <RevealItem>
-        <KpiStrip items={kpis} loading={totals.some((q) => q.isLoading)} />
+        <KpiStrip
+          items={kpis}
+          loading={totals.some((q) => q.isLoading)}
+          title="Workforce at a glance"
+          onExport={() =>
+            exportToCSV(
+              kpis.map((k) => ({ indicator: k.label, value: k.value, detail: k.sub ?? "" })),
+              "people_kpis",
+              exportRange
+            )
+          }
+        />
       </RevealItem>
 
       {/* Entity switcher */}
@@ -239,7 +300,7 @@ export default function PeopleTab({ filters, dateRange, compare, onDrill, onOpen
           <p className="text-[11px] text-text-muted">
             {entity === "individuals"
               ? "Ranked by attendance behaviour in scope — click a person for the full profile."
-              : "Group league table — click a row to see its people."}
+              : "Group league table click a row to see its people."}
           </p>
         </div>
       </RevealItem>
@@ -251,6 +312,7 @@ export default function PeopleTab({ filters, dateRange, compare, onDrill, onOpen
               <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
                 <h4 className="text-xs font-semibold text-text-primary">Roster</h4>
                 <div className="flex items-center gap-1.5 flex-wrap">
+                  <ExportIconButton onExport={() => { void exportRosterFull(); }} />
                   {ROSTER_PRESETS.map((p) => (
                     <button
                       key={p.key}
@@ -335,13 +397,8 @@ export default function PeopleTab({ filters, dateRange, compare, onDrill, onOpen
               search={searchInput}
               onSearchChange={setSearchInput}
               onRowClick={(r) => r.id_no && onOpenEmployee(String(r.id_no))}
-              onExport={() =>
-                exportToCSV(
-                  (directory.data?.records || []) as Record<string, unknown>[],
-                  "people_directory",
-                  dateRange ? { startDate: dateRange.start, endDate: dateRange.end } : undefined
-                )
-              }
+              csvExportName="people_directory"
+              onExport={() => { void exportDirectoryFull(); }}
             />
           </RevealItem>
         </>
@@ -399,6 +456,8 @@ export default function PeopleTab({ filters, dateRange, compare, onDrill, onOpen
             ]}
             data={league}
             loading={headcount.isLoading || perf.isLoading}
+            csvExportName={`people_league_${entity}`}
+            onExport={() => exportToCSV(league as Record<string, unknown>[], `people_league_${entity}`, exportRange)}
             onRowClick={(row) => {
               const name = String((row as Record<string, unknown>).name ?? "");
               if (name && name !== "—") {

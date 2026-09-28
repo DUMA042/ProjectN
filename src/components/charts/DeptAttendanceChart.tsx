@@ -84,7 +84,6 @@ export default function DeptAttendanceChart({
             <p className="text-xs text-text-secondary mt-0.5">Clustered breakdown for all {location} departments</p>
           </div>
           <div className="flex items-center gap-2">
-            <PercentCountToggle value={mode} onChange={setMode} />
             <button
               onClick={() => exportToCSV(data || [], "department_attendance_perf", dateRange)}
               title="Export CSV"
@@ -93,6 +92,7 @@ export default function DeptAttendanceChart({
             >
               <Download size={14} />
             </button>
+            <PercentCountToggle value={mode} onChange={setMode} />
             <DateRangePicker value={dateRange} onChange={onDateChange} />
           </div>
         </div>
@@ -117,7 +117,6 @@ export default function DeptAttendanceChart({
           <p className="text-xs text-text-secondary mt-0.5">Clustered breakdown for all {location} departments</p>
         </div>
         <div className="flex items-center gap-2">
-          <PercentCountToggle value={mode} onChange={setMode} />
           <button
             onClick={() => exportToCSV(data, "department_attendance_perf", dateRange)}
             title="Export CSV"
@@ -126,6 +125,7 @@ export default function DeptAttendanceChart({
           >
             <Download size={14} />
           </button>
+          <PercentCountToggle value={mode} onChange={setMode} />
           <DateRangePicker value={dateRange} onChange={onDateChange} />
         </div>
       </div>

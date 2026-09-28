@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowUpRight, ArrowDownRight, CircleDot, ChevronRight } from "lucide-react";
 import type { Signal } from "@/hooks/useAnalytics";
+import ExportIconButton from "./ExportIconButton";
 
 const SEVERITY_STYLE: Record<Signal["severity"], { icon: React.ReactNode; chip: string }> = {
   danger: {
@@ -22,15 +23,20 @@ interface SignalFeedProps {
   loading: boolean;
   onDrill: (dimension: string, value: string) => void;
   onOpenEmployee: (id: string) => void;
+  /** Per-card CSV export (icon button in the header). */
+  onExport?: () => void;
 }
 
 /** Ranked auto-insights — each row carries the filter that diagnoses it. */
-export default function SignalFeed({ signals, loading, onDrill, onOpenEmployee }: SignalFeedProps) {
+export default function SignalFeed({ signals, loading, onDrill, onOpenEmployee, onExport }: SignalFeedProps) {
   return (
     <div className="card-container p-4 flex flex-col">
       <div className="flex items-center justify-between mb-3">
         <h4 className="text-xs font-semibold text-text-primary">Signals</h4>
-        <span className="text-[10px] text-text-muted uppercase tracking-wide">auto-detected · current vs previous</span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] text-text-muted uppercase tracking-wide">auto-detected · current vs previous</span>
+          {onExport && <ExportIconButton onExport={onExport} />}
+        </div>
       </div>
 
       {loading ? (

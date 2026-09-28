@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Check, ChevronLeft } from "lucide-react";
 import { useAnalyticsMetrics } from "@/hooks/useAnalytics";
+import { usePopoverPosition } from "@/lib/usePopoverPosition";
 
 export interface MetricMeta {
   key: string;
@@ -36,6 +37,11 @@ export default function MetricPicker({ value, onChange, multi, domains, label, c
   const [open, setOpen] = useState(false);
   const [activeGroup, setActiveGroup] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  // Viewport-clamped panel: stays on-screen wherever the button wraps to.
+  // Hidden until first placement so it never flashes unpositioned.
+  const panelPlaced = usePopoverPosition(btnRef as React.RefObject<HTMLElement>, panelRef as React.RefObject<HTMLElement>, open);
 
   const metrics: MetricMeta[] = useMemo(() => data?.metrics || [], [data]);
 
@@ -56,12 +62,10 @@ export default function MetricPicker({ value, onChange, multi, domains, label, c
 
   const currentLabel = useMemo(() => {
     if (multi && Array.isArray(value)) {
+      // Count-based label keeps the button a stable width as picks change
+      // (full list stays in the tooltip).
       if (value.length === 0) return "Metrics";
-      const metas = value.map((k) => all.find((m) => m.key === k)).filter(Boolean) as MetricMeta[];
-      if (metas.length === 1) return metas[0].label;
-      if (metas.length === 2) return metas.map((m) => m.label).join(", ");
-      // "Attendance rate +2 more" — a count alone reads like a bare number
-      return `${metas[0].label} +${metas.length - 1} more`;
+      return `Metrics · ${value.length}`;
     }
     return all.find((m) => m.key === value)?.label || "Metric";
   }, [all, value, multi]);
@@ -96,11 +100,12 @@ export default function MetricPicker({ value, onChange, multi, domains, label, c
   void shown;
 
   return (
-    <div ref={ref} className={`relative ${className}`}>
+    <div ref={ref} className={className}>
       <button
+        ref={btnRef}
         onClick={() => setOpen((v) => !v)}
         title={currentTooltip}
-        className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs border rounded-btn transition-colors ${
+        className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs border rounded-btn transition-colors min-w-[118px] justify-between ${
           open ? "border-accent text-accent bg-accent/5" : "border-border text-text-secondary hover:bg-nav-hover"
         }`}
       >
@@ -111,8 +116,9 @@ export default function MetricPicker({ value, onChange, multi, domains, label, c
 
       {open && (
         <div
-          className="absolute right-0 top-full mt-1 z-30 w-64 bg-surface border border-border rounded-card shadow-lg overflow-hidden flex flex-col"
-          style={{ maxHeight: 340 }}
+          ref={panelRef}
+          className="fixed z-50 w-64 bg-surface border border-border rounded-card shadow-lg overflow-hidden flex flex-col"
+          style={{ maxHeight: 340, visibility: panelPlaced ? "visible" : "hidden" }}
         >
           {activeGroup ? (
             <>

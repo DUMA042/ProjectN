@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { ChevronDown } from "lucide-react";
 import { readableFg } from "@/lib/analyticsColors";
+import ExportIconButton from "@/components/analytics/ExportIconButton";
 
 interface DimOption {
   key: string;
@@ -24,6 +25,8 @@ interface HeatmapGridProps {
   cellColor?: (v: number) => { bg: string; fg: string };
   /** Distinct choices for the column dimension (defaults to dimOptions). */
   colDimOptions?: DimOption[];
+  /** Per-card CSV export (icon button in the header). */
+  onExport?: () => void;
 }
 
 function defaultColorFor(v: number, min: number, max: number): { bg: string; fg: string } {
@@ -35,7 +38,7 @@ function defaultColorFor(v: number, min: number, max: number): { bg: string; fg:
 
 export default function HeatmapGrid({
   title, rowDim, colDim, dimOptions, onRowDimChange, onColDimChange,
-  rowValues, colValues, value, onCellClick, suffix = "", loading, cellColor, colDimOptions,
+  rowValues, colValues, value, onCellClick, suffix = "", loading, cellColor, colDimOptions, onExport,
 }: HeatmapGridProps) {
   const { min, max } = useMemo(() => {
     let mn = Infinity, mx = -Infinity;
@@ -67,6 +70,7 @@ export default function HeatmapGrid({
       <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
         <h4 className="text-xs font-semibold text-text-primary">{title}</h4>
         <div className="flex items-center gap-1.5 text-[11px] text-text-muted">
+          {onExport && <ExportIconButton onExport={onExport} />}
           <Select value={rowDim} onChange={onRowDimChange} />
           <span>×</span>
           <Select value={colDim} onChange={onColDimChange} options={colDimOptions} />

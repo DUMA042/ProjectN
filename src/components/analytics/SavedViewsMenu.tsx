@@ -85,9 +85,9 @@ export default function SavedViewsMenu() {
                   >
                     <p className="text-xs font-medium text-text-primary truncate">{v.name}</p>
                     <p className="text-[10px] text-text-muted truncate">
-                      {v.dateRange.label}
+                      {v.dateRange?.label ?? "Custom"}
                       {v.location ? ` · ${v.location}` : " · All Locations"}
-                      {Object.keys(v.filters).length > 0 ? ` · ${Object.values(v.filters).flat().length} filter(s)` : ""}
+                      {v.filters && Object.keys(v.filters).length > 0 ? ` · ${Object.values(v.filters).flat().length} filter(s)` : ""}
                     </p>
                   </button>
                   <button

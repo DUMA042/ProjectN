@@ -3,6 +3,7 @@ import {
   AreaChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
 import { fmtDateShort } from "@/lib/format";
+import ExportIconButton from "@/components/analytics/ExportIconButton";
 
 export interface TrendPoint {
   label: string;
@@ -30,12 +31,14 @@ interface TrendChartProps {
   onPointClick?: (label: string) => void;
   /** Subtitle line under the title. */
   subtitle?: string;
+  /** Per-card CSV export (icon button in the header). */
+  onExport?: () => void;
 }
 
 /** Gradient-area trend line with optional previous-period overlay and
  * dashed projection + ±band. The workhorse chart of the workspace. */
 export default function TrendChart({
-  title, data, compareData, projectionData, bandData, suffix = "", loading, height = 220, compact, onPointClick, subtitle,
+  title, data, compareData, projectionData, bandData, suffix = "", loading, height = 220, compact, onPointClick, subtitle, onExport,
 }: TrendChartProps) {
   const gid = useId();
   const label = (v: string) => (suffix === "%" ? `${v}` : fmtDateShort(v));
@@ -118,9 +121,14 @@ export default function TrendChart({
   if (compact) return body;
   return (
     <div className="card-container p-4">
-      {title && <h4 className="text-xs font-semibold text-text-primary">{title}</h4>}
-      {subtitle && <p className="text-[11px] text-text-muted mt-0.5 mb-3">{subtitle}</p>}
-      {!subtitle && <div className="mb-3" />}
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          {title && <h4 className="text-xs font-semibold text-text-primary">{title}</h4>}
+          {subtitle && <p className="text-[11px] text-text-muted mt-0.5 mb-3">{subtitle}</p>}
+          {!subtitle && <div className="mb-3" />}
+        </div>
+        {onExport && <ExportIconButton onExport={onExport} />}
+      </div>
       {body}
     </div>
   );

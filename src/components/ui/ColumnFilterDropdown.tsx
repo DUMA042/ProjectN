@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { Search, Check } from "lucide-react";
+import { usePopoverPosition } from "@/lib/usePopoverPosition";
 
 interface ColumnFilterDropdownProps {
   columnKey: string;
@@ -8,6 +9,7 @@ interface ColumnFilterDropdownProps {
   selected: Set<string>;
   onApply: (columnKey: string, selected: Set<string>) => void;
   onClose: () => void;
+  triggerRef?: React.RefObject<HTMLElement>;
 }
 
 export default function ColumnFilterDropdown({
@@ -17,6 +19,7 @@ export default function ColumnFilterDropdown({
   selected,
   onApply,
   onClose,
+  triggerRef,
 }: ColumnFilterDropdownProps) {
   const [search, setSearch] = useState("");
   const [localSelected, setLocalSelected] = useState<Set<string>>(new Set(selected));
@@ -64,8 +67,11 @@ export default function ColumnFilterDropdown({
     setLocalSelected(new Set());
   };
 
-  // Close on outside click
+  usePopoverPosition(triggerRef as React.RefObject<HTMLElement>, containerRef, !!triggerRef);
+
+  // Close on outside click (only when not using triggerRef positioning — keep for fallback)
   useEffect(() => {
+    if (triggerRef) return;
     const handler = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         onClose();
@@ -73,12 +79,28 @@ export default function ColumnFilterDropdown({
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [onClose]);
+  }, [onClose, triggerRef]);
+
+  // Also close when clicking outside for triggerRef mode (check both trigger and popover)
+  useEffect(() => {
+    if (!triggerRef) return;
+    const handler = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (
+        containerRef.current && !containerRef.current.contains(target) &&
+        triggerRef.current && !triggerRef.current.contains(target)
+      ) {
+        onClose();
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [onClose, triggerRef]);
 
   return (
     <div
       ref={containerRef}
-      className="absolute left-0 top-full mt-1 z-30 w-56 bg-surface border border-border rounded-card shadow-lg overflow-hidden flex flex-col"
+      className={`${triggerRef ? "fixed z-50 w-56" : "absolute left-0 top-full mt-1 z-30 w-56"} bg-surface border border-border rounded-card shadow-lg overflow-hidden flex flex-col`}
       style={{ maxHeight: "320px" }}
       onClick={(e) => e.stopPropagation()}
     >

@@ -7,7 +7,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
-from owl.analytics.engine import get_dimension_options, run_explore
+from owl.analytics.engine import get_dimension_options, leave_trend, run_explore, training_trend
 from owl.analytics.dimensions import dimensions_metadata
 from owl.analytics.fact import rebuild_attendance_daily
 from owl.analytics.forecast import build_forecast
@@ -41,6 +41,7 @@ class ExploreRequest(BaseModel):
     search: str = ""
     record_filters: dict[str, list[str]] = {}
     date_sub_ranges: dict[str, dict] = {}
+    date_filter_mode: str = "overlap"
 
 
 @router.post("/analytics/explore")
@@ -61,7 +62,38 @@ def analytics_explore(body: ExploreRequest):
             search=body.search,
             record_filters=body.record_filters,
             date_sub_ranges=body.date_sub_ranges,
+            date_filter_mode=body.date_filter_mode,
         )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+class LeaveTrendRequest(BaseModel):
+    start: str
+    end: str
+    granularity: str = "month"
+    filters: dict[str, list[str]] = {}
+
+
+@router.post("/analytics/leave-trend")
+def analytics_leave_trend(body: LeaveTrendRequest):
+    try:
+        return leave_trend(body.start, body.end, body.granularity, body.filters)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+class TrainingTrendRequest(BaseModel):
+    start: str
+    end: str
+    granularity: str = "month"
+    filters: dict[str, list[str]] = {}
+
+
+@router.post("/analytics/training-trend")
+def analytics_training_trend(body: TrainingTrendRequest):
+    try:
+        return training_trend(body.start, body.end, body.granularity, body.filters)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
