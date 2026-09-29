@@ -9,6 +9,7 @@ import {
   PanelLeftClose,
   PanelLeft,
   Wrench,
+  FileText,
 } from "lucide-react";
 import NavItem from "../ui/NavItem";
 
@@ -28,9 +29,7 @@ export default function Sidebar() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     return localStorage.getItem("sidebarCollapsed") === "true";
   });
-  const [groupCollapsed, setGroupCollapsed] = useState<Record<string, boolean>>({
-    Reports: true,
-  });
+  const [groupCollapsed, setGroupCollapsed] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     localStorage.setItem("sidebarCollapsed", String(sidebarCollapsed));
@@ -60,8 +59,7 @@ export default function Sidebar() {
     },
     {
       label: "Reports",
-      collapsed: true,
-      items: [],
+      items: [{ icon: <FileText size={20} />, label: "Report Builder", path: "/reports" }],
     },
     {
       label: "System",

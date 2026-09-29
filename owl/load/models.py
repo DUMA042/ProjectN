@@ -19,6 +19,7 @@ from sqlalchemy import (
     Interval,
     String,
     Text,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
@@ -308,3 +309,15 @@ class RulesSetting(Base):
     rule_key: Mapped[str] = mapped_column(String(100), primary_key=True)
     rule_value: Mapped[dict] = mapped_column(JSONB, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+# ── Privacy Token Vault ──────────────────────────────────────────────────────
+
+class PrivacyToken(Base):
+    __tablename__ = "privacy_tokens"
+    __table_args__ = (UniqueConstraint("kind", "norm", name="privacy_tokens_kind_norm_key"),)
+    token: Mapped[str] = mapped_column(String(32), primary_key=True)
+    kind: Mapped[str] = mapped_column(Text, nullable=False)
+    norm: Mapped[str] = mapped_column(Text, nullable=False)
+    original: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

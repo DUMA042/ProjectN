@@ -645,4 +645,23 @@ ALTER TABLE IF EXISTS public.leave_records
     ON UPDATE NO ACTION
     ON DELETE NO ACTION;
 
+-- ============================================================================
+-- PRIVACY TOKEN VAULT: reversible anonymization for shared/CSV exports.
+-- token  = secrets.token_hex(16).upper() (32-char hex, PK)
+-- kind   = 'name' | 'id' (separate namespaces)
+-- norm   = normalized lookup key (strip/collapse/casefold)
+-- original = first-seen display form, returned by unhash
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS public.privacy_tokens
+(
+    token character(32) COLLATE pg_catalog."default" NOT NULL,
+    kind text COLLATE pg_catalog."default" NOT NULL,
+    norm text COLLATE pg_catalog."default" NOT NULL,
+    original text COLLATE pg_catalog."default" NOT NULL,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    CONSTRAINT privacy_tokens_pkey PRIMARY KEY (token),
+    CONSTRAINT privacy_tokens_kind_norm_key UNIQUE (kind, norm)
+);
+
 END;
