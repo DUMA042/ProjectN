@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowUp, ArrowDown, Minus } from "lucide-react";
 import RingGauge from "./RingGauge";
-import ExportIconButton from "./ExportIconButton";
+import ExportMenu, { type ExportMenuDescriptor } from "./ExportMenu";
 
 export interface Kpi {
   label: string;
@@ -86,13 +86,13 @@ function DeltaChip({ delta, polarity }: { delta: number; polarity?: "up_good" | 
   );
 }
 
-export default function KpiStrip({ items, loading, title, onExport }: { items: Kpi[]; loading?: boolean; title?: string; onExport?: () => void }) {
+export default function KpiStrip({ items, loading, title, exportMenu }: { items: Kpi[]; loading?: boolean; title?: string; exportMenu?: ExportMenuDescriptor }) {
   return (
     <div>
-      {(title || onExport) && (
+      {(title || exportMenu) && (
         <div className="flex items-center justify-between gap-2 mb-2">
           {title ? <h4 className="text-xs font-semibold text-text-primary">{title}</h4> : <span />}
-          {onExport && <ExportIconButton onExport={onExport} />}
+          {exportMenu && <ExportMenu {...exportMenu} />}
         </div>
       )}
       <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-8 gap-3">

@@ -9,11 +9,10 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
-import { Download } from "lucide-react";
 import DateRangePicker from "@/components/ui/DateRangePicker";
 import PercentCountToggle from "@/components/ui/PercentCountToggle";
 import { useClickableLegend } from "@/lib/chartUtils";
-import { exportToCSV } from "@/lib/csvExport";
+import ExportMenu from "@/components/analytics/ExportMenu";
 import type { DateRange } from "@/components/ui/DateRangePicker";
 
 const SEGMENTS = [
@@ -84,14 +83,11 @@ export default function DeptAttendanceChart({
             <p className="text-xs text-text-secondary mt-0.5">Clustered breakdown for all {location} departments</p>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => exportToCSV(data || [], "department_attendance_perf", dateRange)}
-              title="Export CSV"
-              aria-label="Export CSV"
-              className="p-2 rounded-btn text-text-muted hover:text-accent hover:bg-nav-hover transition-colors"
-            >
-              <Download size={14} />
-            </button>
+            <ExportMenu
+              getRows={() => (data || []) as Record<string, unknown>[]}
+              fileName="department_attendance_perf"
+              dateRange={dateRange}
+            />
             <PercentCountToggle value={mode} onChange={setMode} />
             <DateRangePicker value={dateRange} onChange={onDateChange} />
           </div>
@@ -117,14 +113,11 @@ export default function DeptAttendanceChart({
           <p className="text-xs text-text-secondary mt-0.5">Clustered breakdown for all {location} departments</p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => exportToCSV(data, "department_attendance_perf", dateRange)}
-            title="Export CSV"
-            aria-label="Export CSV"
-            className="p-2 rounded-btn text-text-muted hover:text-accent hover:bg-nav-hover transition-colors"
-          >
-            <Download size={14} />
-          </button>
+          <ExportMenu
+            getRows={() => (data || []) as Record<string, unknown>[]}
+            fileName="department_attendance_perf"
+            dateRange={dateRange}
+          />
           <PercentCountToggle value={mode} onChange={setMode} />
           <DateRangePicker value={dateRange} onChange={onDateChange} />
         </div>

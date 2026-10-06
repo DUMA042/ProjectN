@@ -164,8 +164,8 @@ export default function DashboardPage() {
   const empTotal = empSummaryData?.total ?? 0;
   const empFilterOptions = empSummaryData?.filter_options ?? {};
 
-  // CSV export: fetch the full filtered set (same search/filters/sort, no pagination)
-  const handleEmpExport = async () => {
+  // CSV export rows: fetch the full filtered set (same search/filters/sort, no pagination)
+  const handleEmpExport = async (): Promise<Record<string, unknown>[]> => {
     try {
       const res = await api.get("/api/dashboard/employee-summary", {
         params: {
@@ -180,9 +180,9 @@ export default function DashboardPage() {
           filters: JSON.stringify(empFilters),
         },
       });
-      exportToCSV(res.data?.items || [], "employee_summary_report", empSummaryDateRange);
+      return res.data?.items || [];
     } catch {
-      /* ignore export errors */
+      return [];
     }
   };
 
@@ -375,7 +375,7 @@ export default function DashboardPage() {
           onRowClick={(row: any) => setSelectedEmployeeId(row.id_no)}
           dateRange={empSummaryDateRange}
           csvExportName="employee_summary_report"
-          onExport={handleEmpExport}
+          getExportRows={handleEmpExport}
         />
       </div>
 

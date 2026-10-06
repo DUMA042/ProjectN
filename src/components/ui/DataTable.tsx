@@ -11,8 +11,8 @@ import {
   type SortingState,
   type Updater,
 } from "@tanstack/react-table";
-import { ChevronUp, ChevronDown, ChevronsUpDown, Search, Download, X, Filter, ChevronLeft, ChevronRight } from "lucide-react";
-import { exportToCSV } from "@/lib/csvExport";
+import { ChevronUp, ChevronDown, ChevronsUpDown, Search, X, Filter, ChevronLeft, ChevronRight } from "lucide-react";
+import ExportMenu from "@/components/analytics/ExportMenu";
 import ColumnFilterDropdown from "@/components/ui/ColumnFilterDropdown";
 import { MonthCalendar } from "@/components/ui/DateRangePicker";
 import type { DateRange } from "@/components/ui/DateRangePicker";
@@ -54,7 +54,10 @@ interface DataTableProps<T extends object> {
   /** Selectable bounds for date filters (e.g. the page's overall range). */
   dateFilterBounds?: { min?: string; max?: string };
   isFetching?: boolean;
-  onExport?: () => void;
+  /** Full-set row provider feeding Export CSV + Send to Report. */
+  getExportRows?: () => T[] | Promise<T[]>;
+  /** Inbox source label for Send to Report (defaults to csvExportName). */
+  exportSource?: string;
   centeredDateFilter?: boolean | string[];
   dateFilterMode?: string;
   onDateFilterModeChange?: (mode: string) => void;
@@ -94,7 +97,8 @@ export default function DataTable<T extends object>({
   centeredDateFilter,
   dateFilterMode,
   onDateFilterModeChange,
-  onExport,
+  getExportRows,
+  exportSource,
   getRowId,
   selectedRowIds,
 }: DataTableProps<T>) {
@@ -354,14 +358,14 @@ export default function DataTable<T extends object>({
         </h3>
         <div className="flex items-center gap-2">
           {csvExportName && (
-            <button
-              onClick={() => (onExport ? onExport() : exportToCSV(filteredData, csvExportName, dateRange))}
-              title={hasActiveFilters ? `Export filtered (${totalRows} rows)` : "Export CSV"}
-              className="p-2 rounded-btn text-text-muted hover:text-accent hover:bg-nav-hover transition-colors"
-              aria-label="Export CSV"
-            >
-              <Download size={14} />
-            </button>
+            <ExportMenu
+              getRows={() =>
+                (getExportRows ? getExportRows() : filteredData) as Record<string, unknown>[] | Promise<Record<string, unknown>[]>
+              }
+              fileName={csvExportName}
+              dateRange={dateRange}
+              source={exportSource || csvExportName}
+            />
           )}
           {centeredDateFilter && (
             <div className="flex items-center gap-0.5 bg-nav-hover rounded-btn p-0.5">

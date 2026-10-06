@@ -7,8 +7,7 @@ import { useAnalyticsForecast, type ForecastWeek } from "@/hooks/useAnalytics";
 import { semanticColor, readableFg } from "@/lib/analyticsColors";
 import { fmtDateShort, fmtNum } from "@/lib/format";
 import { useTabExport } from "./exportRegistry";
-import { exportToCSV } from "@/lib/csvExport";
-import ExportIconButton from "@/components/analytics/ExportIconButton";
+import ExportMenu from "@/components/analytics/ExportMenu";
 
 interface ForecastTabProps {
   filters: Record<string, string[]>;
@@ -79,8 +78,9 @@ export default function ForecastTab({ filters, onOpenEmployee }: ForecastTabProp
 
   useTabExport(
     data
-      ? () => {
-          exportToCSV([...coverageRows, {}, ...riskRows], "forecast", undefined);
+      ? {
+          getRows: () => [...coverageRows, {}, ...riskRows] as Record<string, unknown>[],
+          fileName: "forecast",
         }
       : null
   );
@@ -96,7 +96,7 @@ export default function ForecastTab({ filters, onOpenEmployee }: ForecastTabProp
             <div className="flex items-center justify-between mb-3">
               <h4 className="text-xs font-semibold text-text-primary">Projected attendance rate</h4>
               <div className="flex items-center gap-1.5">
-                <ExportIconButton onExport={() => exportToCSV(seriesRows(att), "forecast_attendance", undefined)} />
+                <ExportMenu getRows={() => seriesRows(att)} fileName="forecast_attendance" />
                 <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-badge-blue-bg text-badge-blue-text">
                   projection
                 </span>
@@ -123,7 +123,7 @@ export default function ForecastTab({ filters, onOpenEmployee }: ForecastTabProp
             <div className="flex items-center justify-between mb-3">
               <h4 className="text-xs font-semibold text-text-primary">Staff on leave · weekly</h4>
               <div className="flex items-center gap-1.5">
-                <ExportIconButton onExport={() => exportToCSV(seriesRows(leave), "forecast_leave", undefined)} />
+                <ExportMenu getRows={() => seriesRows(leave)} fileName="forecast_leave" />
                 <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-badge-blue-bg text-badge-blue-text">
                   projection
                 </span>
@@ -146,8 +146,8 @@ export default function ForecastTab({ filters, onOpenEmployee }: ForecastTabProp
           <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
             <h4 className="text-xs font-semibold text-text-primary">Coverage outlook · next {coverageWeeks.length} weeks</h4>
             <div className="flex items-center gap-1.5">
+              <ExportMenu getRows={() => coverageRows} fileName="forecast_coverage" />
               <p className="text-[11px] text-text-muted">Available = active − expected leave − scheduled training</p>
-              <ExportIconButton onExport={() => exportToCSV(coverageRows, "forecast_coverage", undefined)} />
             </div>
           </div>
           {isLoading ? (
@@ -211,8 +211,8 @@ export default function ForecastTab({ filters, onOpenEmployee }: ForecastTabProp
           <div className="flex items-center justify-between mb-3">
             <h4 className="text-xs font-semibold text-text-primary">Risk roster</h4>
             <div className="flex items-center gap-1.5">
+              <ExportMenu getRows={() => riskRows as Record<string, unknown>[]} fileName="forecast_risks" />
               <p className="text-[11px] text-text-muted">Trailing 30 days vs own 90-day baseline</p>
-              <ExportIconButton onExport={() => exportToCSV(riskRows as Record<string, unknown>[], "forecast_risks", undefined)} />
             </div>
           </div>
           {isLoading ? (

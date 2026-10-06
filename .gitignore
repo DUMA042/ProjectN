@@ -6,6 +6,20 @@
 nest/
 !nest/.gitkeep
 
+# ── Report Builder inbox (sensitive CSVs — never commit) ──────────────────────
+report_inbox/
+
+# ── Staff-data files (never commit new ones; already-tracked files unaffected)
+*.xlsx
+*.xls
+*.docx
+*.doc
+*.csv
+
+# ── Agent / planner scratch dirs (never commit) ───────────────────────────────
+.opencode/
+.zcode/
+
 # ── Python artefacts ─────────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]

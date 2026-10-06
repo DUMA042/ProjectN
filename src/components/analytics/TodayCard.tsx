@@ -3,16 +3,16 @@ import WaffleChart from "./WaffleChart";
 import { STATUS_COLORS, STATUS_LABELS } from "@/lib/analyticsColors";
 import { fmtNum } from "@/lib/format";
 import { CalendarCheck } from "lucide-react";
-import ExportIconButton from "./ExportIconButton";
+import ExportMenu, { type ExportMenuDescriptor } from "./ExportMenu";
 
 interface TodayCardProps {
   filters: Record<string, string[]>;
-  /** Per-card CSV export (icon button in the header). */
-  onExport?: () => void;
+  /** Per-card export menu (Export CSV + Send to Report) in the header. */
+  exportMenu?: ExportMenuDescriptor;
 }
 
 /** Live-ish today board: swipes, late-so-far, leave, training, no-swipe. */
-export default function TodayCard({ filters, onExport }: TodayCardProps) {
+export default function TodayCard({ filters, exportMenu }: TodayCardProps) {
   const { data, isLoading } = useAnalyticsToday(filters);
 
   const dateLabel = data
@@ -40,7 +40,7 @@ export default function TodayCard({ filters, onExport }: TodayCardProps) {
         </div>
         <div className="flex items-center gap-1.5">
           <span className="text-[11px] text-text-muted">{dateLabel}</span>
-          {onExport && <ExportIconButton onExport={onExport} />}
+          {exportMenu && <ExportMenu {...exportMenu} />}
         </div>
       </div>
 

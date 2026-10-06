@@ -9,13 +9,12 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
-import { Download } from "lucide-react";
 import DateRangePicker, { getDefaultDateRange } from "@/components/ui/DateRangePicker";
 import type { DateRange } from "@/components/ui/DateRangePicker";
 import { useClickableLegend } from "@/lib/chartUtils";
 import { distinctColor } from "@/lib/analyticsColors";
 import { fmtDateShort, fmtDateMonth } from "@/lib/format";
-import { exportToCSV } from "@/lib/csvExport";
+import ExportMenu from "@/components/analytics/ExportMenu";
 import { useRangeTrend } from "@/hooks/useAnalytics";
 
 interface RangeTrendChartProps {
@@ -138,24 +137,17 @@ export default function RangeTrendChart({
           <p className="text-xs text-text-secondary mt-0.5">{subtitle}</p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() =>
-              exportToCSV(
-                (trend.data?.rows || []).map((r) => ({
-                  bucket: r.bucket,
-                  department: r.department,
-                  [staffField]: r.staff,
-                })),
-                exportName,
-                { startDate: trendRange.startDate, endDate: trendRange.endDate }
-              )
+          <ExportMenu
+            getRows={() =>
+              (trend.data?.rows || []).map((r) => ({
+                bucket: r.bucket,
+                department: r.department,
+                [staffField]: r.staff,
+              }))
             }
-            title="Export CSV"
-            aria-label="Export CSV"
-            className="p-2 rounded-btn text-text-muted hover:text-accent hover:bg-nav-hover transition-colors"
-          >
-            <Download size={14} />
-          </button>
+            fileName={exportName}
+            dateRange={{ startDate: trendRange.startDate, endDate: trendRange.endDate }}
+          />
           <DateRangePicker value={trendRange} onChange={setTrendRange} />
         </div>
       </div>

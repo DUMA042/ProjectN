@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
-import { Clock, Download } from "lucide-react";
+import { Clock } from "lucide-react";
 import DateRangePicker from "@/components/ui/DateRangePicker";
-import { exportToCSV } from "@/lib/csvExport";
+import ExportMenu from "@/components/analytics/ExportMenu";
 import type { DateRange } from "@/components/ui/DateRangePicker";
 
 interface CheckinEntry {
@@ -103,14 +103,19 @@ export default function EarliestCheckinsCard({
             <p className="text-xs text-text-secondary mt-0.5">First swipe times</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <button
-              onClick={() => exportToCSV(data, "earliest_check_ins", dateRange)}
-              title="Export CSV"
-              aria-label="Export CSV"
-              className="p-2 rounded-btn text-text-muted hover:text-accent hover:bg-nav-hover transition-colors"
-            >
-              <Download size={14} />
-            </button>
+            <ExportMenu
+              getRows={() =>
+                (data || []).map((d) => ({
+                  id_no: d.id_no,
+                  full_name: d.full_name,
+                  department: d.department,
+                  swipe_time: d.swipe_time,
+                  appearances: d.appearances ?? "",
+                }))
+              }
+              fileName="earliest_check_ins"
+              dateRange={dateRange}
+            />
             <DateRangePicker value={dateRange} onChange={onDateChange} />
             <select
               value={limit}
@@ -143,14 +148,19 @@ export default function EarliestCheckinsCard({
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={() => exportToCSV(data, "earliest_check_ins", dateRange)}
-            title="Export CSV"
-            aria-label="Export CSV"
-            className="p-2 rounded-btn text-text-muted hover:text-accent hover:bg-nav-hover transition-colors"
-          >
-            <Download size={14} />
-          </button>
+          <ExportMenu
+            getRows={() =>
+              (data || []).map((d) => ({
+                id_no: d.id_no,
+                full_name: d.full_name,
+                department: d.department,
+                swipe_time: d.swipe_time,
+                appearances: d.appearances ?? "",
+              }))
+            }
+            fileName="earliest_check_ins"
+            dateRange={dateRange}
+          />
           <DateRangePicker value={dateRange} onChange={onDateChange} />
           <select
             value={limit}

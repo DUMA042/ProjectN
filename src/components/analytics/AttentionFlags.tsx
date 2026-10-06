@@ -1,5 +1,5 @@
 import { AlertTriangle, ArrowRight } from "lucide-react";
-import ExportIconButton from "./ExportIconButton";
+import ExportMenu, { type ExportMenuDescriptor } from "./ExportMenu";
 
 export interface AttentionFlag {
   label: string;
@@ -14,12 +14,12 @@ const TONE: Record<string, string> = {
   info: "text-info",
 };
 
-export default function AttentionFlags({ flags, loading, onExport }: { flags: AttentionFlag[]; loading?: boolean; onExport?: () => void }) {
+export default function AttentionFlags({ flags, loading, exportMenu }: { flags: AttentionFlag[]; loading?: boolean; exportMenu?: ExportMenuDescriptor }) {
   return (
     <div className="card-container p-4">
       <div className="flex items-center justify-between gap-2 mb-3">
         <h4 className="text-xs font-semibold text-text-primary">Attention</h4>
-        {onExport && <ExportIconButton onExport={onExport} />}
+        {exportMenu && <ExportMenu {...exportMenu} />}
       </div>
       {loading ? (
         <div className="space-y-2">

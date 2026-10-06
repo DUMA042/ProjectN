@@ -17,6 +17,7 @@ import PeopleTab from "./management/PeopleTab";
 import ForecastTab from "./management/ForecastTab";
 import NarrativeHeader from "./management/kpiConfig";
 import { ExportProvider, useExportButton } from "./management/exportRegistry";
+import ExportMenu from "@/components/analytics/ExportMenu";
 import { useManagementScope, scopeToApiFilters, type ManagementTab } from "@/hooks/useManagementScope";
 
 const TABS: { value: ManagementTab; label: string }[] = [
@@ -28,19 +29,28 @@ const TABS: { value: ManagementTab; label: string }[] = [
 ];
 
 function ExportButton() {
-  const { exportNow, hasExport } = useExportButton();
+  const { descriptor, hasExport } = useExportButton();
+  if (!descriptor || !hasExport) {
+    return (
+      <button
+        disabled
+        className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs border border-border rounded-btn transition-colors text-text-muted opacity-50 cursor-not-allowed"
+        title="This tab has no exportable table"
+      >
+        <Download size={12} />
+        Export
+      </button>
+    );
+  }
   return (
-    <button
-      onClick={exportNow}
-      disabled={!hasExport}
-      className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs border border-border rounded-btn transition-colors ${
-        hasExport ? "text-text-secondary hover:bg-nav-hover" : "text-text-muted opacity-50 cursor-not-allowed"
-      }`}
-      title={hasExport ? "Export the tables on this tab to CSV" : "This tab has no exportable table"}
-    >
-      <Download size={12} />
-      Export
-    </button>
+    <ExportMenu
+      getRows={descriptor.getRows}
+      fileName={descriptor.fileName}
+      dateRange={descriptor.dateRange}
+      source={descriptor.source}
+      variant="button"
+      label="Export"
+    />
   );
 }
 

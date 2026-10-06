@@ -16,9 +16,8 @@ import { makeSemanticScale, semanticColor, readableFg, STATUS_COLORS } from "@/l
 import { fmtPct, fmtNum, fmtMinutes, fmtDateFull } from "@/lib/format";
 import { buildHeatOptions, TIME_DIMS } from "@/lib/heatmapPairs";
 import { useTabExport } from "./exportRegistry";
-import { exportToCSV } from "@/lib/csvExport";
 import { api } from "@/lib/api";
-import ExportIconButton from "@/components/analytics/ExportIconButton";
+import ExportMenu from "@/components/analytics/ExportMenu";
 
 interface ExploreTabProps {
   filters: Record<string, string[]>;
@@ -504,14 +503,11 @@ export default function ExploreTab({ filters, dateRange, onDrill, onOpenEmployee
     });
   const exportPivotRange = dateRange ? { startDate: dateRange.start, endDate: dateRange.end } : undefined;
 
-  // Full-set pivot export (the table page is only a window into it; mixed
-  // pivots already hold all groups client-side).
-  const exportPivotFull = async () => {
+  // Full-set pivot rows (the table page is only a window into it; mixed
+  // pivots already hold all groups client-side). Feeds Export CSV + Send.
+  const exportPivotFull = async (): Promise<Record<string, unknown>[]> => {
     try {
-      if (isMixed) {
-        exportToCSV(mapPivotGroups(pivotRows), `explore_${subject}_mixed`, exportPivotRange);
-        return;
-      }
+      if (isMixed) return mapPivotGroups(pivotRows);
       const res = await api.post("/api/analytics/explore", {
         domain: subject,
         metrics: metricKeys,
@@ -524,15 +520,15 @@ export default function ExploreTab({ filters, dateRange, onDrill, onOpenEmployee
         sort_by: sortId,
         sort_dir: sorting[0]?.desc === false ? "asc" : "desc",
       });
-      exportToCSV(mapPivotGroups(res.data?.groups || []), `explore_${subject}`, exportPivotRange);
+      return mapPivotGroups(res.data?.groups || []);
     } catch {
-      /* ignore export errors */
+      return [];
     }
   };
 
-  // Full-set records export (table page is only a window into it; capped at
+  // Full-set records rows (table page is only a window into it; capped at
   // 2000 rows so unfiltered attendance sweeps can't hang the browser).
-  const exportRecordsFull = async () => {
+  const exportRecordsFull = async (): Promise<Record<string, unknown>[]> => {
     try {
       const res = await api.post("/api/analytics/explore", {
         domain: mode === "summary" ? "attendance" : mode,
@@ -548,21 +544,19 @@ export default function ExploreTab({ filters, dateRange, onDrill, onOpenEmployee
         date_sub_ranges: dateSubRanges,
         date_filter_mode: dateFilterMode,
       });
-      exportToCSV(
-        rowsForExport(mode, (res.data?.records || []) as Record<string, unknown>[]),
-        `explore_${mode}`,
-        exportPivotRange
-      );
+      return rowsForExport(mode, (res.data?.records || []) as Record<string, unknown>[]);
     } catch {
-      /* ignore export errors */
+      return [];
     }
   };
 
-  useTabExport(() => {
-    const rows = isSummary
-      ? mapPivotGroups(pivotRows)
-      : rowsForExport(mode, (records.data?.records || []) as Record<string, unknown>[]);
-    exportToCSV(rows as Record<string, unknown>[], `explore_${isSummary ? subject : mode}`, dateRange ? { startDate: dateRange.start, endDate: dateRange.end } : undefined);
+  useTabExport({
+    getRows: () =>
+      (isSummary
+        ? mapPivotGroups(pivotRows)
+        : rowsForExport(mode, (records.data?.records || []) as Record<string, unknown>[])) as Record<string, unknown>[],
+    fileName: `explore_${isSummary ? subject : mode}`,
+    dateRange: dateRange ? { startDate: dateRange.start, endDate: dateRange.end } : undefined,
   });
 
   return (
@@ -655,7 +649,7 @@ export default function ExploreTab({ filters, dateRange, onDrill, onOpenEmployee
             searchable={false}
             enableColumnFilters
             csvExportName={`explore_${subject}_pivot`}
-            onExport={() => { void exportPivotFull(); }}
+            getExportRows={exportPivotFull}
             serverSide={!isMixed}
             total={isMixed ? undefined : pivot.data?.total ?? 0}
             page={page}
@@ -706,7 +700,7 @@ export default function ExploreTab({ filters, dateRange, onDrill, onOpenEmployee
               if (r.id_no) onOpenEmployee(String(r.id_no));
             }}
             csvExportName={`explore_${mode}`}
-            onExport={() => { void exportRecordsFull(); }}
+            getExportRows={exportRecordsFull}
           />
         )}
       </RevealItem>
@@ -732,19 +726,17 @@ export default function ExploreTab({ filters, dateRange, onDrill, onOpenEmployee
             <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
               <h4 className="text-xs font-semibold text-text-primary">Staff ranking</h4>
               <div className="flex items-center gap-1.5">
-                <ExportIconButton
-                  onExport={() =>
-                    exportToCSV(
-                      rankRows.map((r) => ({
-                        id_no: r.employee_id ?? "",
-                        full_name: r.employee ?? "",
-                        department: r.department ?? "",
-                        [rankMeta?.label || rankMetric]: r[rankMetric] ?? "",
-                      })),
-                      `explore_ranking_${rankMetric}`,
-                      exportPivotRange
-                    )
+                <ExportMenu
+                  getRows={() =>
+                    rankRows.map((r) => ({
+                      id_no: r.employee_id ?? "",
+                      full_name: r.employee ?? "",
+                      department: r.department ?? "",
+                      [rankMeta?.label || rankMetric]: r[rankMetric] ?? "",
+                    }))
                   }
+                  fileName={`explore_ranking_${rankMetric}`}
+                  dateRange={exportPivotRange}
                 />
                 <MetricPicker
                   value={rankMetric}
@@ -833,8 +825,8 @@ export default function ExploreTab({ filters, dateRange, onDrill, onOpenEmployee
             suffix={heatMeta?.type === "pct" ? "%" : ""}
             loading={heat.isLoading}
             cellColor={heatCellColor}
-            onExport={() =>
-              exportToCSV(
+            exportMenu={{
+              getRows: () =>
                 heatRowVals.flatMap((r) =>
                   heatColVals.map((c) => ({
                     [dimLabel(heatRow)]: r,
@@ -842,10 +834,9 @@ export default function ExploreTab({ filters, dateRange, onDrill, onOpenEmployee
                     [heatMeta?.label || heatMetric]: heatMap.get(`${r}|${c}`) ?? "",
                   }))
                 ),
-                "explore_heatmap",
-                exportPivotRange
-              )
-            }
+              fileName: "explore_heatmap",
+              dateRange: exportPivotRange,
+            }}
           />
         </RevealItem>
       </div>

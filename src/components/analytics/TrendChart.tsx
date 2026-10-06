@@ -3,7 +3,7 @@ import {
   AreaChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
 import { fmtDateShort } from "@/lib/format";
-import ExportIconButton from "@/components/analytics/ExportIconButton";
+import ExportMenu, { type ExportMenuDescriptor } from "@/components/analytics/ExportMenu";
 
 export interface TrendPoint {
   label: string;
@@ -31,14 +31,14 @@ interface TrendChartProps {
   onPointClick?: (label: string) => void;
   /** Subtitle line under the title. */
   subtitle?: string;
-  /** Per-card CSV export (icon button in the header). */
-  onExport?: () => void;
+  /** Per-card export menu (Export CSV + Send to Report) in the header. */
+  exportMenu?: ExportMenuDescriptor;
 }
 
 /** Gradient-area trend line with optional previous-period overlay and
  * dashed projection + ±band. The workhorse chart of the workspace. */
 export default function TrendChart({
-  title, data, compareData, projectionData, bandData, suffix = "", loading, height = 220, compact, onPointClick, subtitle, onExport,
+  title, data, compareData, projectionData, bandData, suffix = "", loading, height = 220, compact, onPointClick, subtitle, exportMenu,
 }: TrendChartProps) {
   const gid = useId();
   const label = (v: string) => (suffix === "%" ? `${v}` : fmtDateShort(v));
@@ -127,7 +127,7 @@ export default function TrendChart({
           {subtitle && <p className="text-[11px] text-text-muted mt-0.5 mb-3">{subtitle}</p>}
           {!subtitle && <div className="mb-3" />}
         </div>
-        {onExport && <ExportIconButton onExport={onExport} />}
+        {exportMenu && <ExportMenu {...exportMenu} />}
       </div>
       {body}
     </div>

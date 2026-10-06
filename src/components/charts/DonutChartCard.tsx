@@ -1,10 +1,9 @@
 import { useState } from "react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
-import { Download } from "lucide-react";
 import DateRangePicker from "@/components/ui/DateRangePicker";
 import PercentCountToggle from "@/components/ui/PercentCountToggle";
 import { useClickableLegend } from "@/lib/chartUtils";
-import { exportToCSV } from "@/lib/csvExport";
+import ExportMenu from "@/components/analytics/ExportMenu";
 import type { DateRange } from "@/components/ui/DateRangePicker";
 
 interface DonutSegment {
@@ -73,14 +72,11 @@ export default function DonutChartCard({
             <p className="text-xs text-text-secondary mt-0.5">Filter by department & day/date range</p>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => exportToCSV([], "workforce_status_distribution", dateRange)}
-              title="Export CSV"
-              aria-label="Export CSV"
-              className="p-2 rounded-btn text-text-muted hover:text-accent hover:bg-nav-hover transition-colors shrink-0"
-            >
-              <Download size={14} />
-            </button>
+            <ExportMenu
+              getRows={() => []}
+              fileName="workforce_status_distribution"
+              dateRange={dateRange}
+            />
             {onDepartmentChange && (
               <select
                 value={selectedDepartment}
@@ -115,14 +111,11 @@ export default function DonutChartCard({
           <p className="text-xs text-text-secondary mt-0.5">Filter by department & day/date range</p>
         </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => exportToCSV(data.map(d => ({ name: d.name, value: d.value, percentage: d.percentage ?? 0 })), "workforce_status_distribution", dateRange)}
-              title="Export CSV"
-              aria-label="Export CSV"
-              className="p-2 rounded-btn text-text-muted hover:text-accent hover:bg-nav-hover transition-colors shrink-0"
-            >
-              <Download size={14} />
-            </button>
+            <ExportMenu
+              getRows={() => data.map(d => ({ name: d.name, value: d.value, percentage: d.percentage ?? 0 }))}
+              fileName="workforce_status_distribution"
+              dateRange={dateRange}
+            />
             {onDepartmentChange && (
               <select
                 value={selectedDepartment}

@@ -8,10 +8,9 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
-import { Download } from "lucide-react";
 import DateRangePicker from "@/components/ui/DateRangePicker";
 import { useClickableLegend } from "@/lib/chartUtils";
-import { exportToCSV } from "@/lib/csvExport";
+import ExportMenu from "@/components/analytics/ExportMenu";
 import type { DateRange } from "@/components/ui/DateRangePicker";
 
 const SERIES = [
@@ -96,14 +95,11 @@ export default function ArrivalTimeChart({
             <p className="text-xs text-text-secondary mt-0.5">No data for selected period</p>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => exportToCSV([], "arrival_time", dateRange)}
-              title="Export CSV"
-              aria-label="Export CSV"
-              className="p-2 rounded-btn text-text-muted hover:text-accent hover:bg-nav-hover transition-colors"
-            >
-              <Download size={14} />
-            </button>
+            <ExportMenu
+              getRows={() => []}
+              fileName="arrival_time"
+              dateRange={dateRange}
+            />
             {onDepartmentChange && (
               <select
                 value={selectedDepartment}
@@ -142,14 +138,11 @@ export default function ArrivalTimeChart({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => exportToCSV(data, "arrival_time", dateRange)}
-            title="Export CSV"
-            aria-label="Export CSV"
-            className="p-2 rounded-btn text-text-muted hover:text-accent hover:bg-nav-hover transition-colors"
-          >
-            <Download size={14} />
-          </button>
+          <ExportMenu
+            getRows={() => (data || []) as Record<string, unknown>[]}
+            fileName="arrival_time"
+            dateRange={dateRange}
+          />
           {onDepartmentChange && (
             <select
               value={selectedDepartment}

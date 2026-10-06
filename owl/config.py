@@ -61,6 +61,11 @@ class Settings(BaseSettings):
         description="Landing zone for new file uploads.",
     )
 
+    report_inbox_dir: Path = Field(
+        default=Path("report_inbox"),
+        description="Sent-to-Report-Builder file store (sensitive — never commit).",
+    )
+
     max_file_size_mb: int = Field(
         default=50,
         description="Files larger than this (MB) will be read in streaming mode to avoid memory exhaustion.",
@@ -81,6 +86,37 @@ class Settings(BaseSettings):
         default=["http://localhost:1420"],
         description="Allowed CORS origins for the frontend (Tauri dev port).",
     )
+
+    # ── AI (DeepSeek) ─────────────────────────────────────────────────────────
+    # Empty default = unconfigured (fail-closed). The key lives ONLY in the
+    # operator's local .env — it is never logged, never sent to the frontend,
+    # and never returned by any endpoint.
+    deepseek_api_key: str = Field(
+        default="",
+        description="DeepSeek API key (sk-...). Leave empty to disable AI features.",
+    )
+    deepseek_model: str = Field(
+        default="deepseek-flash",
+        description="DeepSeek model for assistant replies (flash, not pro).",
+    )
+
+    reader_database_url: str = Field(
+        default="",
+        description=(
+            "Optional separate connection string for the read-only chatbot role. "
+            "When empty, the executor uses the app session inside a read-only "
+            "transaction instead. Example: postgresql+psycopg2://flow_reader:PASSWORD@localhost:5432/owl_db"
+        ),
+    )
+
+    def get_deepseek_key(self) -> str:
+        """Return the DeepSeek key, or raise if AI is not configured."""
+        if not self.deepseek_api_key.strip():
+            raise ValueError(
+                "DEEPSEEK_API_KEY is not configured. "
+                "Add it to your local .env (never commit it) and restart the API."
+            )
+        return self.deepseek_api_key.strip()
 
     # ── Logging ───────────────────────────────────────────────────────────────
     log_level: str = Field(

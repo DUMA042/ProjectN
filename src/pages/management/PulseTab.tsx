@@ -14,7 +14,6 @@ import { useManagementScope } from "@/hooks/useManagementScope";
 import { semanticColor } from "@/lib/analyticsColors";
 import { PULSE_TOTAL_DOMAINS } from "./kpiConfig";
 import { useTabExport } from "./exportRegistry";
-import { exportToCSV } from "@/lib/csvExport";
 import { fmtDateShort } from "@/lib/format";
 
 interface PulseTabProps {
@@ -83,54 +82,42 @@ export default function PulseTab({ filters, dateRange, compare, onDrill, onGoToT
 
   const exportRange = dateRange ? { startDate: dateRange.start, endDate: dateRange.end } : undefined;
 
-  const exportSignals = () =>
-    exportToCSV(
-      signalList.map((s) => ({
-        severity: s.severity,
-        segment: s.segment,
-        dimension: s.dimension,
-        metric: s.metric_label,
-        current: s.current,
-        previous: s.previous,
-        change: s.delta_pp ?? s.pct_change,
-      })),
-      "pulse_signals",
-      exportRange
-    );
+  const signalRows = () =>
+    signalList.map((s) => ({
+      severity: s.severity,
+      segment: s.segment,
+      dimension: s.dimension,
+      metric: s.metric_label,
+      current: s.current,
+      previous: s.previous,
+      change: s.delta_pp ?? s.pct_change,
+    }));
 
-  const exportToday = () => {
+  const todayRows = () => {
     const d = today.data;
-    if (!d) return;
-    exportToCSV(
-      [
-        { metric: "swipes", value: d.total_swipes },
-        { metric: "people_in", value: d.swipers },
-        { metric: "late_so_far", value: d.late_so_far ?? "" },
-        { metric: "on_leave", value: d.on_leave },
-        { metric: "in_training", value: d.in_training },
-        { metric: "no_swipe_yet", value: d.no_swipe_yet ?? "" },
-        { metric: "last_swipe", value: d.last_swipe ?? "" },
-      ],
-      "pulse_today",
-      exportRange
-    );
+    if (!d) return [];
+    return [
+      { metric: "swipes", value: d.total_swipes },
+      { metric: "people_in", value: d.swipers },
+      { metric: "late_so_far", value: d.late_so_far ?? "" },
+      { metric: "on_leave", value: d.on_leave },
+      { metric: "in_training", value: d.in_training },
+      { metric: "no_swipe_yet", value: d.no_swipe_yet ?? "" },
+      { metric: "last_swipe", value: d.last_swipe ?? "" },
+    ];
   };
 
-  const exportHealth = () => {
+  const healthRows = () => {
     const h = signals.data?.health;
-    if (!h) return;
-    exportToCSV(
-      [
-        { metric: "coverage_pct", value: h.coverage ?? "" },
-        { metric: "fact_start", value: h.fact_start ?? "" },
-        { metric: "fact_end", value: h.fact_end ?? "" },
-        { metric: "fact_rows", value: h.fact_rows },
-        { metric: "quarantine_rows", value: h.quarantine_rows },
-        { metric: "last_ingest_file", value: h.last_ingest?.filename ?? "" },
-      ],
-      "pulse_data_health",
-      exportRange
-    );
+    if (!h) return [];
+    return [
+      { metric: "coverage_pct", value: h.coverage ?? "" },
+      { metric: "fact_start", value: h.fact_start ?? "" },
+      { metric: "fact_end", value: h.fact_end ?? "" },
+      { metric: "fact_rows", value: h.fact_rows },
+      { metric: "quarantine_rows", value: h.quarantine_rows },
+      { metric: "last_ingest_file", value: h.last_ingest?.filename ?? "" },
+    ];
   };
 
   const delta = (cur: unknown, prev: unknown): number | null => {
@@ -206,7 +193,11 @@ export default function PulseTab({ filters, dateRange, compare, onDrill, onGoToT
       onClick: () => onOpenEmployee(String(s.drill.value)),
     }));
 
-  useTabExport(signalList.length > 0 ? exportSignals : null);
+  useTabExport(
+    signalList.length > 0
+      ? { getRows: signalRows, fileName: "pulse_signals", dateRange: exportRange }
+      : null
+  );
 
   return (
     <StaggerReveal className="space-y-4">
@@ -215,19 +206,18 @@ export default function PulseTab({ filters, dateRange, compare, onDrill, onGoToT
           items={kpis}
           loading={totals.some((q) => q.isLoading)}
           title="Pulse at a glance"
-          onExport={() =>
-            exportToCSV(
+          exportMenu={{
+            getRows: () =>
               kpis.map((k) => ({ indicator: k.label, value: k.value, detail: k.sub ?? "", delta: k.delta ?? "" })),
-              "pulse_kpis",
-              exportRange
-            )
-          }
+            fileName: "pulse_kpis",
+            dateRange: exportRange,
+          }}
         />
       </RevealItem>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.7fr] gap-4">
         <RevealItem>
-          <TodayCard filters={filters} onExport={exportToday} />
+          <TodayCard filters={filters} exportMenu={{ getRows: todayRows, fileName: "pulse_today", dateRange: exportRange }} />
         </RevealItem>
         <RevealItem>
           <SignalFeed
@@ -235,14 +225,14 @@ export default function PulseTab({ filters, dateRange, compare, onDrill, onGoToT
             loading={signals.isLoading}
             onDrill={(dim, value) => { onDrill(dim, value); onGoToTab("trends"); }}
             onOpenEmployee={onOpenEmployee}
-            onExport={exportSignals}
+            exportMenu={{ getRows: signalRows, fileName: "pulse_signals", dateRange: exportRange }}
           />
         </RevealItem>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <RevealItem>
-          <DataHealthCard health={signals.data?.health} loading={signals.isLoading} onExport={exportHealth} />
+          <DataHealthCard health={signals.data?.health} loading={signals.isLoading} exportMenu={{ getRows: healthRows, fileName: "pulse_data_health", dateRange: exportRange }} />
         </RevealItem>
         <RevealItem>
           <TrendChart
@@ -252,17 +242,16 @@ export default function PulseTab({ filters, dateRange, compare, onDrill, onGoToT
             compareData={weeklyPrev}
             suffix="%"
             height={190}
-            onExport={() =>
-              exportToCSV(
+            exportMenu={{
+              getRows: () =>
                 weekly.points.map((p, i) => ({
                   week: p.label,
                   attendance_rate: p.value,
                   previous: weeklyPrev?.[i]?.value ?? "",
                 })),
-                "pulse_weekly_trend",
-                exportRange
-              )
-            }
+              fileName: "pulse_weekly_trend",
+              dateRange: exportRange,
+            }}
             onPointClick={(label) => {
               const ws = weekly.weekOf.get(label);
               if (!ws) return;
@@ -277,13 +266,11 @@ export default function PulseTab({ filters, dateRange, compare, onDrill, onGoToT
           <AttentionFlags
             flags={attention}
             loading={signals.isLoading}
-            onExport={() =>
-              exportToCSV(
-                attention.map((f) => ({ flag: f.label, detail: f.detail, tone: f.tone ?? "" })),
-                "pulse_attention",
-                exportRange
-              )
-            }
+            exportMenu={{
+              getRows: () => attention.map((f) => ({ flag: f.label, detail: f.detail, tone: f.tone ?? "" })),
+              fileName: "pulse_attention",
+              dateRange: exportRange,
+            }}
           />
         </RevealItem>
       </div>

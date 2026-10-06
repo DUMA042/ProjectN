@@ -10,9 +10,8 @@ import { useAnalyticsExplore, useAnalyticsDimensions, useAnalyticsMetrics, type 
 import { makeSemanticScale, readableFg } from "@/lib/analyticsColors";
 import { buildHeatOptions } from "@/lib/heatmapPairs";
 import { useTabExport } from "./exportRegistry";
-import { exportToCSV } from "@/lib/csvExport";
 import { fmtDateShort } from "@/lib/format";
-import ExportIconButton from "@/components/analytics/ExportIconButton";
+import ExportMenu from "@/components/analytics/ExportMenu";
 
 interface TrendsTabProps {
   filters: Record<string, string[]>;
@@ -213,19 +212,15 @@ export default function TrendsTab({ filters, dateRange, compare, onDrill }: Tren
   const dimLabel = (key: string) => dims?.dimensions.find((d) => d.key === key)?.label || key;
   const exportRange = dateRange ? { startDate: dateRange.start, endDate: dateRange.end } : undefined;
 
-  const exportTrend = () =>
-    exportToCSV(
-      trendData.map((p) => ({
-        series: metric?.label || metricKey,
-        period: p.label,
-        value: p.value,
-        previous: (trendPrev || []).find((t) => t.label === p.label)?.value ?? "",
-      })),
-      `trends_${metricKey}`,
-      exportRange
-    );
+  const trendRows = () =>
+    trendData.map((p) => ({
+      series: metric?.label || metricKey,
+      period: p.label,
+      value: p.value,
+      previous: (trendPrev || []).find((t) => t.label === p.label)?.value ?? "",
+    }));
 
-  const exportHeatmap = () => {
+  const exportHeatmapRows = () => {
     const rows: Record<string, unknown>[] = [];
     const rl = dimLabel(heatRow);
     const cl = dimLabel(heatCol);
@@ -234,17 +229,18 @@ export default function TrendsTab({ filters, dateRange, compare, onDrill }: Tren
         rows.push({ [rl]: r, [cl]: c, [metric?.label || metricKey]: heatMap.get(`${r}|${c}`) ?? "" });
       });
     });
-    exportToCSV(rows, `trends_${metricKey}_heatmap`, exportRange);
+    return rows;
   };
 
   useTabExport(
     deltaRows.length > 0 || trendData.length > 0
-      ? () => {
-          const rows = [
+      ? {
+          getRows: () => [
             ...trendData.map((p) => ({ series: metric?.label || metricKey, period: p.label, value: p.value })),
             ...deltaRows.map((r) => ({ series: `Δ ${metric?.label || metricKey} vs previous`, period: r.label, value: r.value })),
-          ];
-          exportToCSV(rows, `trends_${metricKey}`, dateRange ? { startDate: dateRange.start, endDate: dateRange.end } : undefined);
+          ],
+          fileName: `trends_${metricKey}`,
+          dateRange: dateRange ? { startDate: dateRange.start, endDate: dateRange.end } : undefined,
         }
       : null
   );
@@ -259,7 +255,11 @@ export default function TrendsTab({ filters, dateRange, compare, onDrill }: Tren
               {metric?.label || "Metric"} over time
             </h4>
             <div className="flex items-center gap-2">
-              <ExportIconButton onExport={exportTrend} />
+              <ExportMenu
+                getRows={trendRows}
+                fileName={`trends_${metricKey}`}
+                dateRange={exportRange}
+              />
               <MetricPicker
                 value={metricKey}
                 onChange={(k) => setMetricKey(Array.isArray(k) ? (k[0] || "attendance_rate") : k)}
@@ -328,7 +328,7 @@ export default function TrendsTab({ filters, dateRange, compare, onDrill }: Tren
               suffix={suffix}
               loading={heat.isLoading}
               cellColor={heatCellColor}
-              onExport={exportHeatmap}
+              exportMenu={{ getRows: exportHeatmapRows, fileName: `trends_${metricKey}_heatmap`, dateRange: exportRange }}
             />
           </RevealItem>
 
@@ -341,13 +341,11 @@ export default function TrendsTab({ filters, dateRange, compare, onDrill }: Tren
                   data={dowData}
                   loading={daily.isLoading}
                   onSelect={(n) => {}}
-                  onExport={() =>
-                    exportToCSV(
-                      dowData.map((d) => ({ weekday: d.name, [metric?.label || metricKey]: d.value })),
-                      `trends_${metricKey}_by_weekday`,
-                      exportRange
-                    )
-                  }
+                  exportMenu={{
+                    getRows: () => dowData.map((d) => ({ weekday: d.name, [metric?.label || metricKey]: d.value })),
+                    fileName: `trends_${metricKey}_by_weekday`,
+                    dateRange: exportRange,
+                  }}
                 />
                 {metric ? (
                   <p className="text-[11px] text-text-muted mt-2">Average {metric.label.toLowerCase()} per weekday</p>
@@ -365,13 +363,11 @@ export default function TrendsTab({ filters, dateRange, compare, onDrill }: Tren
                   color="#722ED1"
                   loading={daily.isLoading}
                   onSelect={(n) => {}}
-                  onExport={() =>
-                    exportToCSV(
-                      monthData.map((d) => ({ month: d.name, [metric?.label || metricKey]: d.value })),
-                      `trends_${metricKey}_by_month`,
-                      exportRange
-                    )
-                  }
+                  exportMenu={{
+                    getRows: () => monthData.map((d) => ({ month: d.name, [metric?.label || metricKey]: d.value })),
+                    fileName: `trends_${metricKey}_by_month`,
+                    dateRange: exportRange,
+                  }}
                 />
                 {metric ? (
                   <p className="text-[11px] text-text-muted mt-2">Average {metric.label.toLowerCase()} per month</p>
@@ -385,14 +381,10 @@ export default function TrendsTab({ filters, dateRange, compare, onDrill }: Tren
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="text-xs font-semibold text-text-primary">Δ vs previous</h4>
                   <div className="flex items-center gap-1.5">
-                    <ExportIconButton
-                      onExport={() =>
-                        exportToCSV(
-                          deltaRows.map((r) => ({ [dimLabel(deltaDim)]: r.label, delta: r.value })),
-                          `trends_${metricKey}_delta`,
-                          exportRange
-                        )
-                      }
+                    <ExportMenu
+                      getRows={() => deltaRows.map((r) => ({ [dimLabel(deltaDim)]: r.label, delta: r.value }))}
+                      fileName={`trends_${metricKey}_delta`}
+                      dateRange={exportRange}
                     />
                     <select
                       value={deltaDim}
@@ -439,14 +431,9 @@ function CompositionExplorer({
       <div className="flex items-center justify-between mb-3">
         <h4 className="text-xs font-semibold text-text-primary">Workforce composition</h4>
         <div className="flex items-center gap-1.5">
-          <ExportIconButton
-            onExport={() =>
-              exportToCSV(
-                data.map((d) => ({ group: d.name, [metricKey]: d.value })),
-                "workforce_composition",
-                undefined
-              )
-            }
+          <ExportMenu
+            getRows={() => data.map((d) => ({ group: d.name, [metricKey]: d.value }))}
+            fileName="workforce_composition"
           />
           <select
             value={dim}

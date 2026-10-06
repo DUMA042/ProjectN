@@ -20,6 +20,7 @@ export default function Header() {
     if (path === "/training") return "Management / Training";
     if (path === "/upload") return "Operations / Upload";
     if (path === "/reports") return "Analytics / Reports";
+    if (path === "/individual-report") return "Analytics / Individual Report";
     if (path === "/settings") return "System / Settings";
     if (path === "/rules-settings") return "System / Rules Settings";
     return path.replace("/", "").charAt(0).toUpperCase() + path.slice(2);

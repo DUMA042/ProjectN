@@ -85,6 +85,7 @@ def staff_list(
     size: int = Query(50, ge=1, le=500),
     search: str = Query("", max_length=100),
     department: str = Query("", max_length=100),
+    location: str = Query("", max_length=100),
 ):
     offset = (page - 1) * size
     params = {"offset": offset, "limit": size}
@@ -98,6 +99,9 @@ def staff_list(
     if department:
         where_clauses.append("LOWER(d.department_name) = :dept")
         params["dept"] = department.lower()
+    if location:
+        where_clauses.append("LOWER(l.location_name) = :loc")
+        params["loc"] = location.lower()
 
     where_sql = " AND ".join(where_clauses) if where_clauses else "TRUE"
 
@@ -111,12 +115,16 @@ def staff_list(
         LEFT JOIN ranks r ON e.rank_id = r.rank_id
         LEFT JOIN grade_levels gl ON e.gl_id = gl.gl_id
         LEFT JOIN employee_statuses es ON e.status_id = es.status_id
+        LEFT JOIN locations l ON e.location_id = l.location_id
         WHERE {where_sql}
         ORDER BY e.full_name
         LIMIT :limit OFFSET :offset
     """
     rows = db.execute(text(sql), params).fetchall()
-    total = db.execute(text(f"SELECT COUNT(*) FROM employees e WHERE {where_sql}"), {k: v for k, v in params.items() if k != "offset" and k != "limit"}).scalar()
+    total = db.execute(text(f"""SELECT COUNT(*) FROM employees e
+        LEFT JOIN departments d ON e.department_id = d.department_id
+        LEFT JOIN locations l ON e.location_id = l.location_id
+        WHERE {where_sql}"""), {k: v for k, v in params.items() if k != "offset" and k != "limit"}).scalar()
 
     return {
         "page": page,

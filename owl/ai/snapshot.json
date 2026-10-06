@@ -1,0 +1,209 @@
+{
+  "version": 1,
+  "generated_at": "2026-10-01T11:37:18.862681+00:00",
+  "tables": {
+    "attendance_daily": [
+      "id_no",
+      "work_date",
+      "status",
+      "checkin_time",
+      "checkout_time",
+      "checkin_status",
+      "checkout_status",
+      "minutes_worked",
+      "is_working_day"
+    ],
+    "consultants": [
+      "consultant_id",
+      "consultant_name"
+    ],
+    "departments": [
+      "department_id",
+      "department_name"
+    ],
+    "employee_statuses": [
+      "status_id",
+      "status_name"
+    ],
+    "employee_trainings": [
+      "training_id",
+      "id_no",
+      "venue_id",
+      "consultant_id",
+      "location_id",
+      "start_date",
+      "end_date",
+      "title"
+    ],
+    "employees": [
+      "id_no",
+      "full_name",
+      "sex",
+      "rank_id",
+      "emp_type_id",
+      "status_id",
+      "remark",
+      "location_id",
+      "department_id",
+      "gl_id",
+      "geographical_zone",
+      "date_of_last_deployment",
+      "phone_number"
+    ],
+    "employment_types": [
+      "emp_type_id",
+      "emp_type_name"
+    ],
+    "grade_levels": [
+      "gl_id",
+      "gl_name"
+    ],
+    "leave_records": [
+      "record_id",
+      "application_id",
+      "id_no",
+      "leave_type_id",
+      "start_date",
+      "end_date",
+      "start_date_raw",
+      "end_date_raw",
+      "planned_start_date",
+      "planned_start_date_raw",
+      "planned_end_date",
+      "planned_end_date_raw"
+    ],
+    "leave_types": [
+      "leave_type_id",
+      "leave_type_name"
+    ],
+    "locations": [
+      "location_id",
+      "location_name"
+    ],
+    "ranks": [
+      "rank_id",
+      "rank_name"
+    ],
+    "venues": [
+      "venue_id",
+      "venue_name"
+    ]
+  },
+  "rules": {
+    "working_hours": {
+      "friday": {
+        "checkin": {
+          "late_after": "09:00",
+          "normal_end": "09:00",
+          "early_before": "08:30",
+          "normal_start": "08:30"
+        },
+        "checkout": {
+          "late_after": "17:00",
+          "normal_end": "17:00",
+          "early_before": "16:00",
+          "normal_start": "16:00"
+        }
+      },
+      "monday": {
+        "checkin": {
+          "late_after": "09:00",
+          "normal_end": "09:00",
+          "early_before": "08:30",
+          "normal_start": "08:30"
+        },
+        "checkout": {
+          "late_after": "18:00",
+          "normal_end": "18:00",
+          "early_before": "17:00",
+          "normal_start": "17:00"
+        }
+      },
+      "sunday": null,
+      "tuesday": {
+        "checkin": {
+          "late_after": "09:00",
+          "normal_end": "09:00",
+          "early_before": "08:30",
+          "normal_start": "08:30"
+        },
+        "checkout": {
+          "late_after": "18:00",
+          "normal_end": "18:00",
+          "early_before": "17:00",
+          "normal_start": "17:00"
+        }
+      },
+      "saturday": null,
+      "thursday": {
+        "checkin": {
+          "late_after": "09:00",
+          "normal_end": "09:00",
+          "early_before": "08:30",
+          "normal_start": "08:30"
+        },
+        "checkout": {
+          "late_after": "18:00",
+          "normal_end": "18:00",
+          "early_before": "17:00",
+          "normal_start": "17:00"
+        }
+      },
+      "wednesday": {
+        "checkin": {
+          "late_after": "09:00",
+          "normal_end": "09:00",
+          "early_before": "08:30",
+          "normal_start": "08:30"
+        },
+        "checkout": {
+          "late_after": "18:00",
+          "normal_end": "18:00",
+          "early_before": "17:00",
+          "normal_start": "17:00"
+        }
+      }
+    },
+    "holidays": {
+      "dates": [
+        "2026-08-25"
+      ]
+    },
+    "incomplete_threshold": {
+      "hours": 1
+    },
+    "eligible_statuses": {
+      "statuses": [
+        "Active"
+      ]
+    },
+    "leave_overrides_training": true
+  },
+  "dimensions": {
+    "location": "Location",
+    "department": "Department",
+    "grade_level": "Grade Level",
+    "rank": "Rank",
+    "employment_type": "Employment Type",
+    "status": "Status",
+    "sex": "Sex",
+    "zone": "Geographical Zone",
+    "employee": "Employee",
+    "employee_id": "Employee ID"
+  },
+  "intents": [
+    "top_early",
+    "on_leave",
+    "top_absent",
+    "late_comers",
+    "dept_rate",
+    "rule_lookup"
+  ],
+  "definitions": {
+    "absent": "Past working day with no swipe and no leave/training logged, for an employee whose status is eligible.",
+    "attendance_rate": "Present staff-days divided by expected staff-days (percent).",
+    "incomplete_day": "First-to-last swipe gap under the incomplete threshold (default 1 hour).",
+    "working_day": "Configured weekday (working_hours) that is not a holiday.",
+    "leave_overrides_training": "When leave and training overlap a day, leave wins (configurable)."
+  }
+}

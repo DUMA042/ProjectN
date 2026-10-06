@@ -12,6 +12,7 @@ import {
   FileText,
 } from "lucide-react";
 import NavItem from "../ui/NavItem";
+import { unprocessedCount, useReportInbox } from "@/lib/reportInbox";
 
 interface NavGroup {
   label: string;
@@ -42,6 +43,12 @@ export default function Sidebar() {
 
   const isActive = (path: string) => location.pathname === path;
 
+  // Unprocessed Report Builder files (shared inbox cache — updates on send/move).
+  const inboxQuery = useReportInbox();
+  const inboxBadge = unprocessedCount(inboxQuery.data?.files || []);
+  const badgeFor = (path: string): number | undefined =>
+    path === "/reports" && inboxBadge > 0 ? inboxBadge : undefined;
+
   const groups: NavGroup[] = [
     {
       label: "Main",
@@ -59,7 +66,10 @@ export default function Sidebar() {
     },
     {
       label: "Reports",
-      items: [{ icon: <FileText size={20} />, label: "Report Builder", path: "/reports" }],
+      items: [
+        { icon: <FileText size={20} />, label: "Report Builder", path: "/reports" },
+        { icon: <Users size={20} />, label: "Individual Report", path: "/individual-report" },
+      ],
     },
     {
       label: "System",
@@ -137,6 +147,7 @@ export default function Sidebar() {
                   onClick={() => navigate(item.path)}
                   compact={sidebarCollapsed}
                   tooltip={sidebarCollapsed ? item.label : undefined}
+                  badge={badgeFor(item.path)}
                 />
               ))}
             </div>

@@ -2,17 +2,17 @@ import { FileWarning, UploadCloud, ShieldCheck } from "lucide-react";
 import BulletMeter from "./BulletMeter";
 import type { Freshness } from "@/hooks/useAnalytics";
 import { fmtDateShort, fmtNum } from "@/lib/format";
-import ExportIconButton from "./ExportIconButton";
+import ExportMenu, { type ExportMenuDescriptor } from "./ExportMenu";
 
 interface DataHealthCardProps {
   health: Freshness | undefined;
   loading: boolean;
-  /** Per-card CSV export (icon button in the header). */
-  onExport?: () => void;
+  /** Per-card export menu (Export CSV + Send to Report) in the header. */
+  exportMenu?: ExportMenuDescriptor;
 }
 
 /** How trustworthy is what you're looking at? Fact span, coverage, ingest, quarantine. */
-export default function DataHealthCard({ health, loading, onExport }: DataHealthCardProps) {
+export default function DataHealthCard({ health, loading, exportMenu }: DataHealthCardProps) {
   return (
     <div className="card-container p-4">
       <div className="flex items-center justify-between gap-2 mb-3">
@@ -20,7 +20,7 @@ export default function DataHealthCard({ health, loading, onExport }: DataHealth
           <ShieldCheck size={14} className="text-accent" />
           <h4 className="text-xs font-semibold text-text-primary">Data Health</h4>
         </div>
-        {onExport && <ExportIconButton onExport={onExport} />}
+        {exportMenu && <ExportMenu {...exportMenu} />}
       </div>
 
       {loading || !health ? (

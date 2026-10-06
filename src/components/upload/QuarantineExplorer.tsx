@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Search, Trash2, RefreshCw, Download,
+  Search, Trash2, RefreshCw,
   ChevronLeft, ChevronRight, ShieldAlert,
 } from "lucide-react";
+import ExportMenu from "@/components/analytics/ExportMenu";
 import {
   useQuarantineList,
   useDeleteQuarantine,
@@ -103,29 +104,27 @@ export default function QuarantineExplorer({ onToast }: QuarantineExplorerProps)
     }
   };
 
-  const exportCsv = () => {
-    if (!rows.length) return;
+  const quarantineRows = (): Record<string, unknown>[] => {
     const isSwipes = tab === "swipes";
-    const header = isSwipes
-      ? ["Employee Name", "ID Hint", "Location", "Swipe Time", "Quarantined At"]
-      : ["ID No", "Venue", "Consultant", "Title", "Start Date", "End Date", "Quarantined At"];
-    const esc = (v: any) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-    const lines = [header.join(",")];
-    for (const r of rows) {
-      lines.push(
-        isSwipes
-          ? [r.employee_name, r.row_key, r.location, r.event_time, r.quarantined_at].map(esc).join(",")
-          : [r.row_key, r.venue, r.consultant, r.title, r.start_date, r.end_date, r.quarantined_at].map(esc).join(",")
-      );
-    }
-    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `quarantined_${tab}_${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    onToast(`⬇ Exported ${rows.length} filtered quarantined rows to CSV.`, "info");
+    return rows.map((r: any) =>
+      isSwipes
+        ? {
+            "Employee Name": r.employee_name,
+            "ID Hint": r.row_key,
+            Location: r.location,
+            "Swipe Time": r.event_time,
+            "Quarantined At": r.quarantined_at,
+          }
+        : {
+            "ID No": r.row_key,
+            Venue: r.venue,
+            Consultant: r.consultant,
+            Title: r.title,
+            "Start Date": r.start_date,
+            "End Date": r.end_date,
+            "Quarantined At": r.quarantined_at,
+          }
+    );
   };
 
   return (
@@ -185,14 +184,12 @@ export default function QuarantineExplorer({ onToast }: QuarantineExplorerProps)
         </button>
         <div className="ml-auto flex items-center gap-2">
           {listQuery.isFetching && <RefreshCw size={12} className="animate-spin text-text-muted" />}
-          <button
-            onClick={exportCsv}
-            disabled={!rows.length}
-            className="flex items-center gap-1 px-3 py-1.5 text-xs border border-border rounded-btn text-text-secondary hover:bg-nav-hover disabled:opacity-40 transition-colors"
-          >
-            <Download size={12} />
-            Export CSV
-          </button>
+          <ExportMenu
+            getRows={quarantineRows}
+            fileName={`quarantined_${tab}`}
+            variant="button"
+            label="Export CSV"
+          />
         </div>
       </div>
 
