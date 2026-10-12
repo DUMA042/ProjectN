@@ -55,8 +55,6 @@ def test_parse_date_cell(processor):
     assert r is None
 
 def test_process_row_latest_leave_mapping(processor):
-    session = DummySession()
-    
     # Create a dummy pandas Series matching the expected columns (at least 38 columns)
     row_data = [None] * 40
     row_data[2] = "EMP001" # STAFF ID
@@ -73,14 +71,16 @@ def test_process_row_latest_leave_mapping(processor):
     row_data[23] = "25/03/2026"
     
     row = pd.Series(row_data)
-    
-    processor._process_row(1, row, session)
-    
+
+    # Live API is _build_row_objects (row in, ORM objects out, no DB writes).
+    built = processor._build_row_objects(1, row)
+    assert built is not None
+    app, records = built
+
     # Should have 1 application and 2 records
-    app = next(o for o in session.added if isinstance(o, LeaveApplication))
+    assert isinstance(app, LeaveApplication)
     assert app.proposed_leave_date == date(2026, 1, 1)
-    
-    records = [o for o in session.added if isinstance(o, LeaveRecord)]
+
     assert len(records) == 2
     
     sick_rec = next(r for r in records if r.leave_type_id == 3)
@@ -95,8 +95,6 @@ def test_process_row_latest_leave_mapping(processor):
     assert compass_rec.planned_end_date == date(2026, 1, 15)
 
 def test_process_row_duration_calculation(processor):
-    session = DummySession()
-    
     row_data = [None] * 40
     row_data[2] = "EMP001"
     
@@ -106,20 +104,21 @@ def test_process_row_duration_calculation(processor):
     row_data[20] = "10/06/2026"
     
     row = pd.Series(row_data)
-    processor._process_row(1, row, session)
-    
-    records = [o for o in session.added if isinstance(o, LeaveRecord)]
+    built = processor._build_row_objects(1, row)
+    assert built is not None
+    _, records = built
+
     assert len(records) == 1
     assert records[0].leave_type_id == 1 # Annual Leave
-    
+
     # Now try > 30 working days
-    session = DummySession()
     row_data[19] = "01/01/2026"
     row_data[20] = "01/04/2026" # 3 months, ~60+ working days
-    
+
     row = pd.Series(row_data)
-    processor._process_row(2, row, session)
-    
-    records = [o for o in session.added if isinstance(o, LeaveRecord)]
+    built = processor._build_row_objects(2, row)
+    assert built is not None
+    _, records = built
+
     assert len(records) == 1
     assert records[0].leave_type_id == 2 # Maternity Leave

@@ -67,9 +67,11 @@ def _check_leave_signatures(r1: pd.Series, r2: pd.Series) -> bool:
 
 @lru_cache(maxsize=2048)
 def _cached_parse_date(str_val: str) -> date | None:
-    """Cached dateutil parsing — avoids repeated work on duplicate date strings."""
+    """Cached day-first parsing — avoids repeated work on duplicate date strings."""
+    from owl.transform.dates import parse_dayfirst
+
     try:
-        return parse_date(str_val).date()
+        return parse_dayfirst(str_val)
     except Exception:
         return None
 
