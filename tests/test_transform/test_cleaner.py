@@ -49,7 +49,11 @@ class TestCoerceDates:
     def test_valid_dates_parsed(self):
         df = pd.DataFrame({"date": ["2024-01-15", "2024-02-20"]})
         result = coerce_dates(df, ["date"])
-        assert result["date"].dtype == "datetime64[ns]"
+        # Assert parsed values, not the datetime unit (pandas 2.x uses ns,
+        # pandas 3.x infers us — both are correct).
+        assert result["date"].iloc[0].date() == pd.Timestamp("2024-01-15").date()
+        assert result["date"].iloc[1].date() == pd.Timestamp("2024-02-20").date()
+        assert result["date"].isna().sum() == 0
 
     def test_invalid_dates_become_nat(self):
         df = pd.DataFrame({"date": ["not-a-date", "2024-01-15"]})
@@ -59,5 +63,9 @@ class TestCoerceDates:
 
 class TestDropDuplicates:
     def test_removes_exact_duplicates(self, dirty_df):
-        result = drop_duplicates(dirty_df)
-        assert len(result) < len(dirty_df)
+        # dirty_df alone has no exact-duplicate pair: append one explicitly.
+        dup = pd.concat([dirty_df, dirty_df.iloc[[0]]], ignore_index=True)
+        result = drop_duplicates(dup)
+        assert len(result) == len(dirty_df)
+        # And a frame with no duplicates passes through untouched.
+        assert len(drop_duplicates(dirty_df)) == len(dirty_df)

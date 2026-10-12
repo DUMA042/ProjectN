@@ -40,6 +40,28 @@ from owl.logger import get_logger
 log = get_logger(__name__)
 
 
+def _coerce_dayfirst_date(v: Any, *, strict: bool = False) -> date | None:
+    """Shared DD/MM/YYYY coercion: ISO-try first, day-first fallback.
+
+    Preserves each caller's contract: strict callers raise on garbage (row
+    rejected loudly), lenient callers return None.
+    """
+    from owl.transform.dates import parse_dayfirst
+
+    if v is None or (isinstance(v, float) and pd.isna(v)):
+        return None
+    if isinstance(v, datetime):
+        return v.date()
+    if isinstance(v, date):
+        return v
+    parsed = parse_dayfirst(v)
+    if parsed is not None:
+        return parsed
+    if strict:
+        raise ValueError(f"Invalid date: {v}")
+    return None
+
+
 # ── Base record ───────────────────────────────────────────────────────────────
 
 class OwlBaseRecord(BaseModel):
@@ -178,10 +200,7 @@ class EmployeeRecord(OwlBaseRecord):
             return v.date()
         if isinstance(v, date):
             return v
-        try:
-            return date.fromisoformat(str(v).strip())
-        except (ValueError, TypeError):
-            return None
+        return _coerce_dayfirst_date(v)
 
 
 class TrainingRecord(OwlBaseRecord):
@@ -204,7 +223,7 @@ class TrainingRecord(OwlBaseRecord):
             return v.date()
         if isinstance(v, date):
             return v
-        return date.fromisoformat(str(v).strip())
+        return _coerce_dayfirst_date(v, strict=True)
 
 
 class CardSwipeRecord(OwlBaseRecord):
@@ -245,10 +264,7 @@ class LeaveApplicationRecord(OwlBaseRecord):
             return v.date()
         if isinstance(v, date):
             return v
-        try:
-            return date.fromisoformat(str(v).strip())
-        except (ValueError, TypeError):
-            return None
+        return _coerce_dayfirst_date(v)
 
 class LeaveRecordRecord(OwlBaseRecord):
     """Aligned with 'leave_records' table."""
@@ -268,10 +284,7 @@ class LeaveRecordRecord(OwlBaseRecord):
             return v.date()
         if isinstance(v, date):
             return v
-        try:
-            return date.fromisoformat(str(v).strip())
-        except (ValueError, TypeError):
-            return None
+        return _coerce_dayfirst_date(v)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -318,7 +331,7 @@ class KanbanTaskRecord(OwlBaseRecord):
             return v.date()
         if isinstance(v, date):
             return v
-        return date.fromisoformat(str(v).strip())
+        return _coerce_dayfirst_date(v, strict=True)
 
 class KanbanTaskAssigneeRecord(OwlBaseRecord):
     assignment_id: Optional[int] = None
@@ -377,7 +390,7 @@ class QuarantineTrainingRecord(OwlBaseRecord):
             return v.date()
         if isinstance(v, date):
             return v
-        return date.fromisoformat(str(v).strip())
+        return _coerce_dayfirst_date(v, strict=True)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

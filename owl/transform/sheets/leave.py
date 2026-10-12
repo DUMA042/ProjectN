@@ -58,10 +58,12 @@ class LeaveNormalizer(BaseNormalizer):
         else:
             valid_recs["leave_type_id"] = None
 
-        # Helper to safely parse dates
+        # Helper to safely parse dates (DD/MM/YYYY business rule, ISO-first).
         def _parse_date(col_name):
             if col_name in valid_recs.columns:
-                return pd.to_datetime(valid_recs[col_name], errors="coerce").dt.date
+                from owl.transform.dates import coerce_dayfirst
+
+                return coerce_dayfirst(valid_recs[col_name]).dt.date
             return None
 
         valid_recs["proposed_leave_date"] = _parse_date("proposed_leave_date")
