@@ -22,3 +22,6 @@ fastapi>=0.111.0
 uvicorn[standard]>=0.30.0
 python-multipart>=0.0.9
 sse-starlette>=3.0.0
+
+# ── Database migrations (pinned for reproducible releases) ───────────────────
+alembic==1.16.5

@@ -116,6 +116,10 @@ class EmployeeCardSwipe(Base):
 
 class EmployeeTraining(Base):
     __tablename__ = "employee_trainings"
+    __table_args__ = (
+        UniqueConstraint("id_no", "venue_id", "consultant_id", "start_date", "end_date",
+                         name="uk_employee_trainings_dedup"),
+    )
     training_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     id_no: Mapped[str] = mapped_column(ForeignKey("employees.id_no"), nullable=False)
     venue_id: Mapped[Optional[int]] = mapped_column(ForeignKey("venues.venue_id"))
@@ -172,6 +176,10 @@ class LeaveApplication(Base):
 
 class LeaveRecord(Base):
     __tablename__ = "leave_records"
+    __table_args__ = (
+        UniqueConstraint("id_no", "leave_type_id", "start_date", "end_date",
+                         name="uk_leave_records_dedup"),
+    )
     record_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     application_id: Mapped[Optional[int]] = mapped_column(ForeignKey("leave_applications.application_id", ondelete="CASCADE"))
     id_no: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("employees.id_no"))
