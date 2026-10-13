@@ -33,6 +33,25 @@ from owl.pipeline import Pipeline
 log = get_logger(__name__)
 
 
+def claim_pending(session, limit: int = 5) -> list:
+    """Select pending jobs and mark them processing, skipping rows locked
+    by a concurrent worker (FOR UPDATE SKIP LOCKED). Returns claimed ids.
+    Caller must commit. Pure row mechanics — no file processing here."""
+    stmt = (
+        select(FileIngestionMeta)
+        .where(FileIngestionMeta.status == "pending")
+        .order_by(FileIngestionMeta.created_at)
+        .limit(limit)
+        .with_for_update(skip_locked=True)
+    )
+    pending = session.execute(stmt).scalars().all()
+    pending_ids = [record.id for record in pending]
+    for record in pending:
+        record.status = "processing"
+    session.flush()
+    return pending_ids
+
+
 class IngestionWorker:
     """Processes pending ingestion records."""
 
@@ -42,16 +61,7 @@ class IngestionWorker:
     def run_once(self) -> None:
         """Poll and process one batch of pending records."""
         with get_session() as session:
-            # Atomic selection and marking as processing
-            stmt = (
-                select(FileIngestionMeta)
-                .where(FileIngestionMeta.status == "pending")
-                .limit(5)
-            )
-            pending = session.execute(stmt).scalars().all()
-            pending_ids = [record.id for record in pending]
-            for record in pending:
-                record.status = "processing"
+            pending_ids = claim_pending(session, limit=5)
             session.commit()
 
         # Process each record by its ID

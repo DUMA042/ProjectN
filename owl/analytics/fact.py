@@ -23,6 +23,10 @@ from owl.analytics.classification import (
 
 log = get_logger(__name__)
 
+# Advisory-lock key serializing attendance_daily rebuilds/clears across
+# processes (manual refresh, rule-change debounce, post-ingest hook).
+_FACT_LOCK_KEY = 842101
+
 _INSERT_COLS = (
     "id_no, work_date, status, checkin_time, checkout_time, "
     "checkin_status, checkout_status, minutes_worked, is_working_day"
@@ -53,12 +57,22 @@ def _data_span(session):
 
 
 def rebuild_attendance_daily(start: date | None = None, end: date | None = None) -> dict:
-    """Rebuild the attendance_daily fact table. Returns row-count metadata."""
+    """Rebuild the attendance_daily fact table. Returns row-count metadata.
+
+    Single-flight across processes via a transaction-scoped advisory lock:
+    a concurrent rebuild gets {"status": "already_running"} instead of
+    interleaving TRUNCATE/INSERT streams. Readers always see the last
+    committed snapshot (single transaction).
+    """
     ctx = load_rule_context()
     working_hours = ctx["working_hours"]
     incomplete_hours = ctx["incomplete_hours"]
 
     with get_session() as s:
+        locked = s.execute(text("SELECT pg_try_advisory_xact_lock(:k)"), {"k": _FACT_LOCK_KEY}).scalar()
+        if not locked:
+            log.warning("attendance_daily rebuild already running — skipping")
+            return {"rows": 0, "start": None, "end": None, "status": "already_running"}
         if start is None or end is None:
             span_min, span_max = _data_span(s)
             start = start or span_min
@@ -143,10 +157,14 @@ def rebuild_attendance_daily(start: date | None = None, end: date | None = None)
         s.commit()
 
     log.info(f"attendance_daily rebuilt: {total} rows ({start}..{end})")
-    return {"rows": total, "start": start.isoformat(), "end": end.isoformat()}
+    return {"rows": total, "start": start.isoformat(), "end": end.isoformat(), "status": "ok"}
 
 
 def clear_attendance_daily() -> None:
     with get_session() as s:
+        locked = s.execute(text("SELECT pg_try_advisory_xact_lock(:k)"), {"k": _FACT_LOCK_KEY}).scalar()
+        if not locked:
+            log.warning("attendance_daily clear skipped — rebuild in progress")
+            return
         s.execute(text("TRUNCATE attendance_daily"))
         s.commit()

@@ -58,12 +58,13 @@ def _sweep_stuck_jobs() -> None:
             stale = session.execute(
                 select(FileIngestionMeta).where(
                     FileIngestionMeta.status == "processing",
-                    FileIngestionMeta.created_at < cutoff,
+                    FileIngestionMeta.updated_at < cutoff,
                 )
             ).scalars().all()
             for record in stale:
                 record.status = "failed"
                 record.processed_at = datetime.now()
+                record.updated_at = datetime.now()
                 record.error_context = {
                     "fatal_error": "Server restarted mid-processing — job recovered as failed."
                 }
