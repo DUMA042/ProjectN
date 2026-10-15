@@ -42,8 +42,9 @@ def load_rule_context():
     working_dows = set(get_working_weekdays())
     leave_overrides_training = bool(get_rule("leave_overrides_training", True))
     active_statuses = {s.lower() for s in get_active_statuses()}
+    holiday_raw = (get_rule("holidays", {}) or {}).get("dates", []) or []
     holiday_set = set()
-    for d in (get_rule("holidays", {}) or {}).get("dates", []) or []:
+    for d in holiday_raw:
         try:
             holiday_set.add(date.fromisoformat(str(d)))
         except ValueError:
@@ -55,7 +56,52 @@ def load_rule_context():
         "leave_overrides_training": leave_overrides_training,
         "active_statuses": active_statuses,
         "holiday_set": holiday_set,
+        "holidays_raw": list(holiday_raw),
     }
+
+
+def validate_rule_context(ctx=None) -> list[str]:
+    """Audit rule values for garbage that would silently misclassify.
+
+    Returns human-readable warnings (empty when clean). Pure — no I/O.
+    Checks time thresholds parse, holiday dates parse, and the incomplete
+    threshold is a positive number. Callers log these instead of letting
+    bad rules degrade silently into None/'Unclassified'.
+    """
+    from owl.logger import get_logger
+
+    ctx = ctx or load_rule_context()
+    log = get_logger(__name__)
+    warnings: list[str] = []
+    wh = ctx.get("working_hours") or {}
+    for day_name, day_rules in wh.items():
+        if not isinstance(day_rules, dict):
+            warnings.append(f"working_hours.{day_name} is not an object — day skipped")
+            continue
+        for section in ("checkin", "checkout"):
+            part = day_rules.get(section) or {}
+            if not isinstance(part, dict):
+                continue
+            for field, value in part.items():
+                if hm_to_min(value) is None:
+                    warnings.append(
+                        f"working_hours.{day_name}.{section}.{field} "
+                        f"is not a valid HH:MM time ({value!r})"
+                    )
+    for d in (ctx.get("holidays_raw") or []):
+        try:
+            date.fromisoformat(str(d))
+        except ValueError:
+            warnings.append(f"holidays entry is not a valid date ({d!r})")
+    try:
+        hours = float(ctx.get("incomplete_hours", 1))
+        if hours <= 0:
+            warnings.append(f"incomplete_threshold hours must be positive ({hours!r})")
+    except (TypeError, ValueError):
+        warnings.append("incomplete_threshold hours is not a number")
+    for w in warnings:
+        log.warning("rule context: %s", w)
+    return warnings
 
 
 def working_days_in_range(start: date, end: date, ctx=None):

@@ -53,6 +53,14 @@ def _build_model_map() -> dict[str, type]:
 # is processed again.
 DEDUP_CONFLICT_COLUMNS: dict[str, list[str]] = {
     "employee_trainings": ["id_no", "venue_id", "consultant_id", "start_date", "end_date"],
+    # Mirrors uk_leave_records_dedup (and the legacy LeaveProcessor path):
+    # reprocessing the same file content cannot duplicate business rows.
+    # NOTE: PostgreSQL treats NULL key parts as distinct, so rows with a
+    # NULL leave_type_id/start_date still insert — same semantics as the
+    # legacy path; swipes/history deliberately have no natural unique
+    # (live data shows repeated identical taps, so uniqueness there would
+    # be a data decision, not a safe constraint).
+    "leave_records": ["id_no", "leave_type_id", "start_date", "end_date"],
 }
 
 

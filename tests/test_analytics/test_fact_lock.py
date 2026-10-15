@@ -45,4 +45,4 @@ def test_rebuild_result_carries_status():
             result = rebuild_attendance_daily()
         finally:
             conn.rollback()
-    assert set(result) >= {"rows", "start", "end", "status"}
+    assert set(result) >= {"rows", "start", "end", "status", "unclassified"}
