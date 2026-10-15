@@ -1,7 +1,6 @@
 """Management analytics endpoints — flexible explore engine over the rule-driven
 attendance fact table plus leave/training/employee data, plus the unified
 metric catalog, today snapshot, signal engine and forecast layer."""
-import json
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
@@ -19,11 +18,9 @@ router = APIRouter(tags=["management-analytics"])
 
 
 def _parse_filters(raw: Optional[str]) -> dict:
-    try:
-        parsed = json.loads(raw) if raw else {}
-        return parsed if isinstance(parsed, dict) else {}
-    except (ValueError, TypeError):
-        return {}
+    from api.routes.params import parse_json_object_param
+
+    return parse_json_object_param(raw)
 
 
 class ExploreRequest(BaseModel):

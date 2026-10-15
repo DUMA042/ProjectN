@@ -20,7 +20,7 @@ from api.routes.report_inbox import (
     classify_csv,
     count_rows,
     inbox_dir,
-    load_manifest,
+    load_manifest_or_500,
     sanitize_stem,
     stored_name,
 )
@@ -81,7 +81,7 @@ def build_start(body: BuildStartRequest):
     if not body.file_ids:
         raise HTTPException(status_code=400, detail="Select at least one file to build")
     base = inbox_dir()
-    items = load_manifest(base)
+    items = load_manifest_or_500(base)
     entries = [_entry_or_404(items, fid) for fid in body.file_ids]
     not_build = [e["display_name"] for e in entries if (e.get("status") or "inbox") != "build"]
     if not_build:
@@ -132,7 +132,7 @@ def build_hash(job_id: str, body: BuildHashRequest):
     jobs.set_stage(job_id, "hashing", f"Hashing mode: {body.mode}")
     jobs.set_payload(job_id, "hash_mode", body.mode)
     base = inbox_dir()
-    items = load_manifest(base)
+    items = load_manifest_or_500(base)
     # Hash originals only: entries whose source is "hashed:*" are already
     # hashed output and must never be hashed again (double-hash guard).
     targets = [e for e in (_entry_or_404(items, fid) for fid in job["file_ids"])
@@ -259,7 +259,7 @@ def build_analyze(job_id: str):
             detail="Hash and validate the files before AI analysis.",
         )
     base = inbox_dir()
-    items = load_manifest(base)
+    items = load_manifest_or_500(base)
     entries = resolve_finals(items, job["file_ids"])
     if not entries:
         raise HTTPException(status_code=400, detail="No files left to analyze.")
@@ -401,7 +401,7 @@ def build_generate(job_id: str):
     wr = selection["word_range"]
     sel_hash = _json.dumps(selection, sort_keys=True)
     base = inbox_dir()
-    items = load_manifest(base)
+    items = load_manifest_or_500(base)
     entries = resolve_finals(items, job["file_ids"])
     finals: list[tuple[str, str, str]] = []
     for e in entries:
@@ -612,7 +612,7 @@ def build_cancel(job_id: str):
     removed = 0
     try:
         base = inbox_dir()
-        items = load_manifest(base)
+        items = load_manifest_or_500(base)
         doomed = {hid for hid in (job["payload"].get("hashed_ids") or [])}
         kept = []
         for e in items:

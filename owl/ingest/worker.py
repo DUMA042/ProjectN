@@ -212,19 +212,18 @@ class IngestionWorker:
             
             status = "completed"
             summary = results.get("load_results", {})
-            for table, counts in summary.items():
+            for _table, counts in summary.items():
                 if counts.get("failed", 0) > 0:
-                    status = "failed" # Should we mark as failed if ANY row fails? 
-                                     # Or "completed" with warnings?
-                                     # User said "isolate bad rows without halting".
-                                     # I'll use "completed" if it finished, but log errors.
-                    has_failures = True
+                    # Partial success must never masquerade as clean:
+                    # downstream filters, badges, and history distinguish it.
+                    status = "completed_with_errors"
+                    break
 
             stmt = (
                 update(FileIngestionMeta)
                 .where(FileIngestionMeta.id == ingestion_id)
                 .values(
-                    status="completed" if not has_failures else "completed", # keeping status clear
+                    status=status,
                     processed_at=datetime.now(),
                     error_context=results
                 )

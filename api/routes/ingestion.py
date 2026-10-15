@@ -61,6 +61,8 @@ def _stage_info(db_status, progress) -> dict:
     """Build a normalized stage payload for the frontend."""
     if db_status == "completed":
         return {"label": "Processing complete", "percent": 100, "current": None, "total": None}
+    if db_status == "completed_with_errors":
+        return {"label": "Completed with errors — view details", "percent": 100, "current": None, "total": None}
     if db_status == "failed":
         return {"label": "Processing failed", "percent": None, "current": None, "total": None}
     if db_status == "quarantined":

@@ -54,6 +54,7 @@ const STAGE_LABELS: Record<string, string> = {
   generating: "Generating report",
   complete: "Report complete",
   cancelled: "Cancelled",
+  failed: "Failed — see message",
   resolving: "Finding employees",
   querying: "Computing attendance",
   rendering: "Writing document",

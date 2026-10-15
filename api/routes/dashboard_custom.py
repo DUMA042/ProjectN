@@ -1,5 +1,4 @@
 """Dashboard custom endpoints — workforce status, dept attendance, employee summary, locations, arrival time."""
-import json
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query
@@ -87,10 +86,9 @@ def employee_summary(
     sort_dir: str = Query("asc", description="asc or desc"),
     filters: str = Query("", description="JSON object of {column: [values]}"),
 ):
-    try:
-        parsed_filters = json.loads(filters) if filters else {}
-    except Exception:
-        parsed_filters = {}
+    from api.routes.params import parse_json_object_param
+
+    parsed_filters = parse_json_object_param(filters)
     return get_employee_summary(
         start_date, end_date, location,
         page=page, page_size=page_size, search=search,

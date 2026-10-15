@@ -29,7 +29,8 @@ export default function IngestionTrackerCard({
 
   const steps = buildSteps(dbStatus);
   const isQuarantined = dbStatus === "quarantined";
-  const isDone = dbStatus === "completed" || dbStatus === "failed" || isQuarantined;
+  const isPartial = dbStatus === "completed_with_errors";
+  const isDone = dbStatus === "completed" || dbStatus === "failed" || isQuarantined || isPartial;
 
   // Extract totals from error_context
   let successCount: number | undefined;
@@ -55,6 +56,8 @@ export default function IngestionTrackerCard({
     notifiedRef.current = true;
     if (dbStatus === "completed") {
       onCompleted(filename, successCount ?? 0);
+    } else if (isPartial) {
+      onFailed(filename, `${failedCount ?? 0} rows failed — view details`);
     } else if (isQuarantined) {
       onQuarantined(filename, ctx.reason || "Unknown reason");
     } else if (dbStatus === "failed") {

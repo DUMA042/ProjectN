@@ -3,9 +3,14 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+import pytest
+from fastapi import HTTPException
+
 from api.routes.report_inbox import (
+    ManifestCorrupt,
     count_rows,
     load_manifest,
+    load_manifest_or_500,
     sanitize_stem,
     save_manifest,
     stored_name,
@@ -32,9 +37,15 @@ def test_manifest_roundtrip(tmp_path):
     items = [{"id": "abc", "display_name": "r.csv"}]
     save_manifest(items, tmp_path)
     assert load_manifest(tmp_path) == items
-    # Corrupt manifest never crashes readers.
+    # Corrupt manifest raises loudly (never silent empty) ...
     (tmp_path / "manifest.json").write_text("not json{{", encoding="utf-8")
-    assert load_manifest(tmp_path) == []
+    with pytest.raises(ManifestCorrupt):
+        load_manifest(tmp_path)
+    # ... and the HTTP-facing helper converts it to a 500 with guidance.
+    with pytest.raises(HTTPException) as exc:
+        load_manifest_or_500(tmp_path)
+    assert exc.value.status_code == 500
+    assert "backup" in exc.value.detail
 
 
 def test_count_rows():

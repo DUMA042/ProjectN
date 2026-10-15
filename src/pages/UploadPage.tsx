@@ -15,6 +15,7 @@ import {
 function statusBadgeFn(s: string) {
   const map: Record<string, string> = {
     completed: "✅",
+    completed_with_errors: "⚠️",
     processing: "🔄",
     pending: "⏳",
     failed: "❌",
@@ -341,7 +342,7 @@ export default function UploadPage() {
               className="px-2 py-1.5 text-xs border border-border rounded-input bg-surface text-text-secondary cursor-pointer"
             >
               <option value="">All Statuses</option>
-              {["completed", "failed", "pending", "processing", "quarantined"].map((s) => (
+              {["completed", "completed_with_errors", "failed", "pending", "processing", "quarantined"].map((s) => (
                 <option key={s} value={s}>{s}</option>
               ))}
             </select>
@@ -396,7 +397,7 @@ export default function UploadPage() {
                     </td>
                     <td className="px-4 py-2.5">
                       <div className="flex items-center gap-3 opacity-60 group-hover:opacity-100 transition-opacity">
-                        {(row.status === "completed" || row.status === "failed") && (
+                        {(row.status === "completed" || row.status === "completed_with_errors" || row.status === "failed") && (
                           <button
                             onClick={() => handleViewDetails(row.normalized_filename || row.original_filename, row.id)}
                             className="text-xs text-info hover:underline"
