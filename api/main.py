@@ -83,16 +83,21 @@ def _sweep_stuck_jobs() -> None:
 app = FastAPI(
     title="AttendanceN API",
     version="0.1.0",
-    docs_url="/docs",
+    docs_url="/docs" if settings.docs_enabled else None,
+    redoc_url="/redoc" if settings.docs_enabled else None,
+    openapi_url="/openapi.json" if settings.docs_enabled else None,
     lifespan=lifespan,
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins + ["http://localhost:1420"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    # Origins come from configuration only (CORS_ORIGINS). The packaged
+    # desktop app adds its Tauri origin there at packaging time — no code
+    # change required. Credentials are not used by this app.
+    allow_origins=settings.cors_origins,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Accept", "Content-Type", "Authorization"],
 )
 
 from api.routes import health, analytics, ingestion, staff, kanban, card_swipe, leave_routes, training, dashboard_custom, settings_routes, rules, quarantine, management_analytics, privacy, report_inbox, report_build, individual_reports, schema as schema_routes, assistant, blue  # noqa: E402

@@ -140,11 +140,14 @@ async def ingest_upload(files: List[UploadFile] = File(..., description="One or 
                         "status": "classification_failed",
                     })
         except Exception as exc:  # noqa: BLE001 — one bad file must not fail the batch
+            from api.routes.errors import safe_error_detail
+
             results.append({
                 "ingestion_id": None,
                 "original_filename": original_name,
                 "status": "classification_failed",
-                "error": str(exc),
+                "error": safe_error_detail(
+                    exc, "Could not read this file.", context="ingest/upload"),
             })
 
     # Kick off processing on a daemon thread; HTTP returns immediately so the

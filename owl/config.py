@@ -149,6 +149,23 @@ class Settings(BaseSettings):
             raise ValueError(f"environment must be one of {allowed}, got '{value}'")
         return lower
 
+    # ── Derived runtime helpers (pure, testable) ─────────────────────────────
+    @property
+    def is_development(self) -> bool:
+        return self.environment == "development"
+
+    @property
+    def effective_log_level(self) -> str:
+        """Production defaults to WARNING; development keeps the chosen level."""
+        if not self.is_development and self.log_level == "INFO":
+            return "WARNING"
+        return self.log_level
+
+    @property
+    def docs_enabled(self) -> bool:
+        """Interactive API docs are a development convenience only."""
+        return self.is_development
+
 
 # Singleton — import this object everywhere; do NOT instantiate Settings yourself.
 settings = Settings()
