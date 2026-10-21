@@ -6,18 +6,33 @@ from datetime import datetime, timedelta
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from owl.config import settings
+from owl.config import settings, unknown_env_keys
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup sweep + rules cache listener; shutdown hooks."""
+    _warn_unknown_env_keys()
     _sweep_stuck_jobs()
     _start_rules_cache()
     try:
         yield
     finally:
         _stop_rules_cache()
+
+
+def _warn_unknown_env_keys() -> None:
+    """Make typo'd .env keys visible instead of silently ignored."""
+    try:
+        import logging
+
+        for key, suggestion in unknown_env_keys():
+            hint = f" — did you mean '{suggestion}'?" if suggestion else ""
+            logging.getLogger("owl.startup").warning(
+                "Ignoring unknown setting '%s' in .env%s", key, hint
+            )
+    except Exception:  # noqa: BLE001 — diagnostics must never block startup
+        pass
 
 
 def _start_rules_cache() -> None:

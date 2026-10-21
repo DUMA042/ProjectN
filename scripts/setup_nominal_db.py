@@ -1,15 +1,18 @@
 # HISTORICAL SETUP SCRIPT — DO NOT RE-RUN AGAINST PRODUCTION.
 # Use scripts/migrate_nominal_schema.py for schema migrations.
 
+import os
 import psycopg2
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 import sys
 
-DB_NAME = "flowdb"
-DB_USER = "postgres"
-DB_PASSWORD = "1234"
-DB_HOST = "localhost"
-DB_PORT = "5433"
+# No credentials in code: supply FLOW_DB_PASSWORD (and optionally the other
+# FLOW_DB_* variables) in the environment when running this historical script.
+DB_NAME = os.environ.get("FLOW_DB_NAME", "flowdb")
+DB_USER = os.environ.get("FLOW_DB_USER", "postgres")
+DB_PASSWORD = os.environ.get("FLOW_DB_PASSWORD", "")
+DB_HOST = os.environ.get("FLOW_DB_HOST", "localhost")
+DB_PORT = os.environ.get("FLOW_DB_PORT", "5433")
 
 SCHEMA_DDL = """
 -- Create Lookup Tables
@@ -121,12 +124,17 @@ def run_ddl():
         sys.exit(1)
 
 if __name__ == "__main__":
+    if not DB_PASSWORD:
+        print(
+            "FLOW_DB_PASSWORD is not set. Export it (and FLOW_DB_* overrides if "
+            "needed) before running this historical setup script.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
     create_db_if_missing()
     run_ddl()
-    
-    with open(".env", "w") as f:
-        f.write(f"DATABASE_URL=postgresql+psycopg2://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}\n")
-        f.write("NEST_DIR=nest\n")
-        f.write("LOG_LEVEL=INFO\n")
-        f.write("ENVIRONMENT=development\n")
-    print("Created .env with proper config.")
+
+    print(
+        "\nDatabase ready. Create your .env from .env.example and set "
+        "DATABASE_URL (this script no longer writes credentials to disk)."
+    )
