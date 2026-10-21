@@ -14,16 +14,13 @@ export default function Header() {
   const getBreadcrumb = () => {
     const path = location.pathname;
     if (path === "/") return "Overview / Dashboard";
-    if (path === "/employees") return "Management / Employees";
-    if (path === "/attendance") return "Management / Attendance";
-    if (path === "/leave") return "Management / Leave";
-    if (path === "/training") return "Management / Training";
+    if (path === "/management") return "Management / Workspace";
     if (path === "/upload") return "Operations / Upload";
     if (path === "/reports") return "Analytics / Reports";
     if (path === "/individual-report") return "Analytics / Individual Report";
     if (path === "/settings") return "System / Settings";
     if (path === "/rules-settings") return "System / Rules Settings";
-    return path.replace("/", "").charAt(0).toUpperCase() + path.slice(2);
+    return "Flow";
   };
 
   const getGreeting = () => {

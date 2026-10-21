@@ -132,6 +132,8 @@ export interface ReportChart {
 
 export interface ReportView {
   job_id: string;
+  gen_id?: string;
+  filename: string;
   markdown: string;
   charts: ReportChart[];
   download_url: string;

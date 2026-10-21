@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Download, FileText, Trash2 } from "lucide-react";
 import { useStoredReports, useDeleteStoredReport } from "@/lib/reportBuild";
+import { saveUrl } from "@/lib/download";
 import { useToast } from "@/components/ui/Toast";
 import ConfirmCard from "@/components/ui/ConfirmCard";
 
@@ -72,15 +73,14 @@ export default function StoredReports() {
                   {r.topics.length > 0 ? ` · ${r.topics.join(" · ")}` : ""}
                 </p>
               </div>
-              <a
-                href={r.download_url}
-                download
+              <button
+                onClick={() => saveUrl(r.download_url, r.filename)}
                 title="Download Word document"
                 aria-label={`Download ${r.filename}`}
                 className="p-2 rounded-btn text-text-muted hover:text-accent hover:bg-nav-hover transition-colors"
               >
                 <Download size={14} />
-              </a>
+              </button>
               <button
                 onClick={() => setPendingDelete({ entry_id: r.entry_id, label: r.filename })}
                 title="Delete this report"
