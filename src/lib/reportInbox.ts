@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { buildCSVText, buildExportFileName } from "@/lib/csvExport";
+import { saveBlob } from "@/lib/download";
 
 export interface InboxFile {
   id: string;
@@ -66,15 +67,10 @@ export async function downloadInboxFile(file: InboxFile): Promise<void> {
   const res = await api.get(`/api/reports/inbox/${file.id}/download`, {
     responseType: "blob",
   });
-  const url = URL.createObjectURL(new Blob([res.data], { type: "text/csv;charset=utf-8;" }));
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = file.display_name;
-  link.style.display = "none";
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  saveBlob(
+    new Blob([res.data], { type: "text/csv;charset=utf-8;" }),
+    file.display_name
+  );
 }
 
 /** Permanently delete a stored inbox file. Refetches the manifest. */

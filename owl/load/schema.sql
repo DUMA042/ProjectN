@@ -423,228 +423,343 @@ CREATE INDEX IF NOT EXISTS idx_attendance_daily_status ON public.attendance_dail
 -- 8. FOREIGN KEY CONSTRAINTS
 -- ============================================================================
 
-ALTER TABLE IF EXISTS public.employee_card_swipes
-    ADD CONSTRAINT employee_card_swipes_id_no_fkey FOREIGN KEY (id_no)
-    REFERENCES public.employees (id_no) MATCH SIMPLE
-    ON UPDATE NO ACTION
-    ON DELETE NO ACTION;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'employee_card_swipes_id_no_fkey') THEN
+        ALTER TABLE IF EXISTS public.employee_card_swipes
+            ADD CONSTRAINT employee_card_swipes_id_no_fkey FOREIGN KEY (id_no)
+            REFERENCES public.employees (id_no) MATCH SIMPLE
+            ON UPDATE NO ACTION
+            ON DELETE NO ACTION;
+    END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS idx_emp_swipe_id ON public.employee_card_swipes(id_no);
 
-ALTER TABLE IF EXISTS public.employee_card_swipes
-    ADD CONSTRAINT employee_card_swipes_location_id_fkey FOREIGN KEY (location_id)
-    REFERENCES public.locations (location_id) MATCH SIMPLE
-    ON UPDATE NO ACTION
-    ON DELETE SET NULL;
-
-ALTER TABLE IF EXISTS public.employee_department_history
-    ADD CONSTRAINT employee_department_history_department_id_fkey FOREIGN KEY (department_id)
-    REFERENCES public.departments (department_id) MATCH SIMPLE
-    ON UPDATE NO ACTION
-    ON DELETE RESTRICT;
-
-ALTER TABLE IF EXISTS public.employee_department_history
-    ADD CONSTRAINT employee_department_history_id_no_fkey FOREIGN KEY (id_no)
-    REFERENCES public.employees (id_no) MATCH SIMPLE
-    ON UPDATE NO ACTION
-    ON DELETE NO ACTION;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'employee_card_swipes_location_id_fkey') THEN
+        ALTER TABLE IF EXISTS public.employee_card_swipes
+            ADD CONSTRAINT employee_card_swipes_location_id_fkey FOREIGN KEY (location_id)
+            REFERENCES public.locations (location_id) MATCH SIMPLE
+            ON UPDATE NO ACTION
+            ON DELETE SET NULL;
+    END IF;
+END $$;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'employee_department_history_department_id_fkey') THEN
+        ALTER TABLE IF EXISTS public.employee_department_history
+            ADD CONSTRAINT employee_department_history_department_id_fkey FOREIGN KEY (department_id)
+            REFERENCES public.departments (department_id) MATCH SIMPLE
+            ON UPDATE NO ACTION
+            ON DELETE RESTRICT;
+    END IF;
+END $$;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'employee_department_history_id_no_fkey') THEN
+        ALTER TABLE IF EXISTS public.employee_department_history
+            ADD CONSTRAINT employee_department_history_id_no_fkey FOREIGN KEY (id_no)
+            REFERENCES public.employees (id_no) MATCH SIMPLE
+            ON UPDATE NO ACTION
+            ON DELETE NO ACTION;
+    END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS idx_dept_hist_id ON public.employee_department_history(id_no);
 
-ALTER TABLE IF EXISTS public.employee_gl_history
-    ADD CONSTRAINT employee_gl_history_gl_id_fkey FOREIGN KEY (gl_id)
-    REFERENCES public.grade_levels (gl_id) MATCH SIMPLE
-    ON UPDATE NO ACTION
-    ON DELETE RESTRICT;
-
-ALTER TABLE IF EXISTS public.employee_gl_history
-    ADD CONSTRAINT employee_gl_history_id_no_fkey FOREIGN KEY (id_no)
-    REFERENCES public.employees (id_no) MATCH SIMPLE
-    ON UPDATE NO ACTION
-    ON DELETE NO ACTION;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'employee_gl_history_gl_id_fkey') THEN
+        ALTER TABLE IF EXISTS public.employee_gl_history
+            ADD CONSTRAINT employee_gl_history_gl_id_fkey FOREIGN KEY (gl_id)
+            REFERENCES public.grade_levels (gl_id) MATCH SIMPLE
+            ON UPDATE NO ACTION
+            ON DELETE RESTRICT;
+    END IF;
+END $$;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'employee_gl_history_id_no_fkey') THEN
+        ALTER TABLE IF EXISTS public.employee_gl_history
+            ADD CONSTRAINT employee_gl_history_id_no_fkey FOREIGN KEY (id_no)
+            REFERENCES public.employees (id_no) MATCH SIMPLE
+            ON UPDATE NO ACTION
+            ON DELETE NO ACTION;
+    END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS idx_gl_hist_id ON public.employee_gl_history(id_no);
 
-ALTER TABLE IF EXISTS public.employee_location_history
-    ADD CONSTRAINT employee_location_history_id_no_fkey FOREIGN KEY (id_no)
-    REFERENCES public.employees (id_no) MATCH SIMPLE
-    ON UPDATE NO ACTION
-    ON DELETE NO ACTION;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'employee_location_history_id_no_fkey') THEN
+        ALTER TABLE IF EXISTS public.employee_location_history
+            ADD CONSTRAINT employee_location_history_id_no_fkey FOREIGN KEY (id_no)
+            REFERENCES public.employees (id_no) MATCH SIMPLE
+            ON UPDATE NO ACTION
+            ON DELETE NO ACTION;
+    END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS idx_loc_hist_id ON public.employee_location_history(id_no);
 
-ALTER TABLE IF EXISTS public.employee_location_history
-    ADD CONSTRAINT employee_location_history_location_id_fkey FOREIGN KEY (location_id)
-    REFERENCES public.locations (location_id) MATCH SIMPLE
-    ON UPDATE NO ACTION
-    ON DELETE RESTRICT;
-
-ALTER TABLE IF EXISTS public.employee_rank_history
-    ADD CONSTRAINT employee_rank_history_id_no_fkey FOREIGN KEY (id_no)
-    REFERENCES public.employees (id_no) MATCH SIMPLE
-    ON UPDATE NO ACTION
-    ON DELETE NO ACTION;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'employee_location_history_location_id_fkey') THEN
+        ALTER TABLE IF EXISTS public.employee_location_history
+            ADD CONSTRAINT employee_location_history_location_id_fkey FOREIGN KEY (location_id)
+            REFERENCES public.locations (location_id) MATCH SIMPLE
+            ON UPDATE NO ACTION
+            ON DELETE RESTRICT;
+    END IF;
+END $$;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'employee_rank_history_id_no_fkey') THEN
+        ALTER TABLE IF EXISTS public.employee_rank_history
+            ADD CONSTRAINT employee_rank_history_id_no_fkey FOREIGN KEY (id_no)
+            REFERENCES public.employees (id_no) MATCH SIMPLE
+            ON UPDATE NO ACTION
+            ON DELETE NO ACTION;
+    END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS idx_emp_rank_hist_active ON public.employee_rank_history(id_no);
 
-ALTER TABLE IF EXISTS public.employee_rank_history
-    ADD CONSTRAINT employee_rank_history_rank_id_fkey FOREIGN KEY (rank_id)
-    REFERENCES public.ranks (rank_id) MATCH SIMPLE
-    ON UPDATE NO ACTION
-    ON DELETE NO ACTION;
-
-ALTER TABLE IF EXISTS public.employee_trainings
-    ADD CONSTRAINT employee_trainings_consultant_id_fkey FOREIGN KEY (consultant_id)
-    REFERENCES public.consultants (consultant_id) MATCH SIMPLE
-    ON UPDATE NO ACTION
-    ON DELETE RESTRICT;
-
-ALTER TABLE IF EXISTS public.employee_trainings
-    ADD CONSTRAINT employee_trainings_id_no_fkey FOREIGN KEY (id_no)
-    REFERENCES public.employees (id_no) MATCH SIMPLE
-    ON UPDATE NO ACTION
-    ON DELETE NO ACTION;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'employee_rank_history_rank_id_fkey') THEN
+        ALTER TABLE IF EXISTS public.employee_rank_history
+            ADD CONSTRAINT employee_rank_history_rank_id_fkey FOREIGN KEY (rank_id)
+            REFERENCES public.ranks (rank_id) MATCH SIMPLE
+            ON UPDATE NO ACTION
+            ON DELETE NO ACTION;
+    END IF;
+END $$;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'employee_trainings_consultant_id_fkey') THEN
+        ALTER TABLE IF EXISTS public.employee_trainings
+            ADD CONSTRAINT employee_trainings_consultant_id_fkey FOREIGN KEY (consultant_id)
+            REFERENCES public.consultants (consultant_id) MATCH SIMPLE
+            ON UPDATE NO ACTION
+            ON DELETE RESTRICT;
+    END IF;
+END $$;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'employee_trainings_id_no_fkey') THEN
+        ALTER TABLE IF EXISTS public.employee_trainings
+            ADD CONSTRAINT employee_trainings_id_no_fkey FOREIGN KEY (id_no)
+            REFERENCES public.employees (id_no) MATCH SIMPLE
+            ON UPDATE NO ACTION
+            ON DELETE NO ACTION;
+    END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS idx_emp_train_id ON public.employee_trainings(id_no);
 CREATE UNIQUE INDEX IF NOT EXISTS uk_employee_trainings_dedup
     ON public.employee_trainings (id_no, venue_id, consultant_id, start_date, end_date);
 
-ALTER TABLE IF EXISTS public.employee_trainings
-    ADD CONSTRAINT employee_trainings_location_id_fkey FOREIGN KEY (location_id)
-    REFERENCES public.locations (location_id) MATCH SIMPLE
-    ON UPDATE NO ACTION
-    ON DELETE SET NULL;
-
-ALTER TABLE IF EXISTS public.employee_trainings
-    ADD CONSTRAINT employee_trainings_venue_id_fkey FOREIGN KEY (venue_id)
-    REFERENCES public.venues (venue_id) MATCH SIMPLE
-    ON UPDATE NO ACTION
-    ON DELETE RESTRICT;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'employee_trainings_location_id_fkey') THEN
+        ALTER TABLE IF EXISTS public.employee_trainings
+            ADD CONSTRAINT employee_trainings_location_id_fkey FOREIGN KEY (location_id)
+            REFERENCES public.locations (location_id) MATCH SIMPLE
+            ON UPDATE NO ACTION
+            ON DELETE SET NULL;
+    END IF;
+END $$;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'employee_trainings_venue_id_fkey') THEN
+        ALTER TABLE IF EXISTS public.employee_trainings
+            ADD CONSTRAINT employee_trainings_venue_id_fkey FOREIGN KEY (venue_id)
+            REFERENCES public.venues (venue_id) MATCH SIMPLE
+            ON UPDATE NO ACTION
+            ON DELETE RESTRICT;
+    END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS idx_emp_train_venue ON public.employee_trainings(venue_id);
 
-ALTER TABLE IF EXISTS public.employees
-    ADD CONSTRAINT employees_department_id_fkey FOREIGN KEY (department_id)
-    REFERENCES public.departments (department_id) MATCH SIMPLE
-    ON UPDATE NO ACTION
-    ON DELETE NO ACTION;
-
-ALTER TABLE IF EXISTS public.employees
-    ADD CONSTRAINT employees_emp_type_id_fkey FOREIGN KEY (emp_type_id)
-    REFERENCES public.employment_types (emp_type_id) MATCH SIMPLE
-    ON UPDATE NO ACTION
-    ON DELETE SET NULL;
-
-ALTER TABLE IF EXISTS public.employees
-    ADD CONSTRAINT employees_gl_id_fkey FOREIGN KEY (gl_id)
-    REFERENCES public.grade_levels (gl_id) MATCH SIMPLE
-    ON UPDATE NO ACTION
-    ON DELETE NO ACTION;
-
-ALTER TABLE IF EXISTS public.employees
-    ADD CONSTRAINT employees_rank_id_fkey FOREIGN KEY (rank_id)
-    REFERENCES public.ranks (rank_id) MATCH SIMPLE
-    ON UPDATE NO ACTION
-    ON DELETE SET NULL;
-
-ALTER TABLE IF EXISTS public.employees
-    ADD CONSTRAINT employees_status_id_fkey FOREIGN KEY (status_id)
-    REFERENCES public.employee_statuses (status_id) MATCH SIMPLE
-    ON UPDATE NO ACTION
-    ON DELETE SET NULL;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'employees_department_id_fkey') THEN
+        ALTER TABLE IF EXISTS public.employees
+            ADD CONSTRAINT employees_department_id_fkey FOREIGN KEY (department_id)
+            REFERENCES public.departments (department_id) MATCH SIMPLE
+            ON UPDATE NO ACTION
+            ON DELETE NO ACTION;
+    END IF;
+END $$;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'employees_emp_type_id_fkey') THEN
+        ALTER TABLE IF EXISTS public.employees
+            ADD CONSTRAINT employees_emp_type_id_fkey FOREIGN KEY (emp_type_id)
+            REFERENCES public.employment_types (emp_type_id) MATCH SIMPLE
+            ON UPDATE NO ACTION
+            ON DELETE SET NULL;
+    END IF;
+END $$;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'employees_gl_id_fkey') THEN
+        ALTER TABLE IF EXISTS public.employees
+            ADD CONSTRAINT employees_gl_id_fkey FOREIGN KEY (gl_id)
+            REFERENCES public.grade_levels (gl_id) MATCH SIMPLE
+            ON UPDATE NO ACTION
+            ON DELETE NO ACTION;
+    END IF;
+END $$;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'employees_rank_id_fkey') THEN
+        ALTER TABLE IF EXISTS public.employees
+            ADD CONSTRAINT employees_rank_id_fkey FOREIGN KEY (rank_id)
+            REFERENCES public.ranks (rank_id) MATCH SIMPLE
+            ON UPDATE NO ACTION
+            ON DELETE SET NULL;
+    END IF;
+END $$;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'employees_status_id_fkey') THEN
+        ALTER TABLE IF EXISTS public.employees
+            ADD CONSTRAINT employees_status_id_fkey FOREIGN KEY (status_id)
+            REFERENCES public.employee_statuses (status_id) MATCH SIMPLE
+            ON UPDATE NO ACTION
+            ON DELETE SET NULL;
+    END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS idx_employees_status ON public.employees(status_id);
 
-ALTER TABLE IF EXISTS public.employees
-    ADD CONSTRAINT fk_employees_location FOREIGN KEY (location_id)
-    REFERENCES public.locations (location_id) MATCH SIMPLE
-    ON UPDATE NO ACTION
-    ON DELETE NO ACTION;
-
-ALTER TABLE IF EXISTS public.kanban_boards
-    ADD CONSTRAINT kanban_boards_department_id_fkey FOREIGN KEY (department_id)
-    REFERENCES public.departments (department_id) MATCH SIMPLE
-    ON UPDATE NO ACTION
-    ON DELETE SET NULL;
-
-ALTER TABLE IF EXISTS public.kanban_columns
-    ADD CONSTRAINT kanban_columns_board_id_fkey FOREIGN KEY (board_id)
-    REFERENCES public.kanban_boards (board_id) MATCH SIMPLE
-    ON UPDATE NO ACTION
-    ON DELETE CASCADE;
-
-ALTER TABLE IF EXISTS public.kanban_task_assignees
-    ADD CONSTRAINT kanban_task_assignees_id_no_fkey FOREIGN KEY (id_no)
-    REFERENCES public.employees (id_no) MATCH SIMPLE
-    ON UPDATE NO ACTION
-    ON DELETE SET NULL;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_employees_location') THEN
+        ALTER TABLE IF EXISTS public.employees
+            ADD CONSTRAINT fk_employees_location FOREIGN KEY (location_id)
+            REFERENCES public.locations (location_id) MATCH SIMPLE
+            ON UPDATE NO ACTION
+            ON DELETE NO ACTION;
+    END IF;
+END $$;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'kanban_boards_department_id_fkey') THEN
+        ALTER TABLE IF EXISTS public.kanban_boards
+            ADD CONSTRAINT kanban_boards_department_id_fkey FOREIGN KEY (department_id)
+            REFERENCES public.departments (department_id) MATCH SIMPLE
+            ON UPDATE NO ACTION
+            ON DELETE SET NULL;
+    END IF;
+END $$;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'kanban_columns_board_id_fkey') THEN
+        ALTER TABLE IF EXISTS public.kanban_columns
+            ADD CONSTRAINT kanban_columns_board_id_fkey FOREIGN KEY (board_id)
+            REFERENCES public.kanban_boards (board_id) MATCH SIMPLE
+            ON UPDATE NO ACTION
+            ON DELETE CASCADE;
+    END IF;
+END $$;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'kanban_task_assignees_id_no_fkey') THEN
+        ALTER TABLE IF EXISTS public.kanban_task_assignees
+            ADD CONSTRAINT kanban_task_assignees_id_no_fkey FOREIGN KEY (id_no)
+            REFERENCES public.employees (id_no) MATCH SIMPLE
+            ON UPDATE NO ACTION
+            ON DELETE SET NULL;
+    END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS idx_kanban_task_assignees_id_no ON public.kanban_task_assignees(id_no);
 
-ALTER TABLE IF EXISTS public.kanban_task_assignees
-    ADD CONSTRAINT kanban_task_assignees_task_id_fkey FOREIGN KEY (task_id)
-    REFERENCES public.kanban_tasks (task_id) MATCH SIMPLE
-    ON UPDATE NO ACTION
-    ON DELETE CASCADE;
-
-ALTER TABLE IF EXISTS public.kanban_task_history
-    ADD CONSTRAINT kanban_task_history_from_column_id_fkey FOREIGN KEY (from_column_id)
-    REFERENCES public.kanban_columns (column_id) MATCH SIMPLE
-    ON UPDATE NO ACTION
-    ON DELETE NO ACTION;
-
-ALTER TABLE IF EXISTS public.kanban_task_history
-    ADD CONSTRAINT kanban_task_history_task_id_fkey FOREIGN KEY (task_id)
-    REFERENCES public.kanban_tasks (task_id) MATCH SIMPLE
-    ON UPDATE NO ACTION
-    ON DELETE CASCADE;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'kanban_task_assignees_task_id_fkey') THEN
+        ALTER TABLE IF EXISTS public.kanban_task_assignees
+            ADD CONSTRAINT kanban_task_assignees_task_id_fkey FOREIGN KEY (task_id)
+            REFERENCES public.kanban_tasks (task_id) MATCH SIMPLE
+            ON UPDATE NO ACTION
+            ON DELETE CASCADE;
+    END IF;
+END $$;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'kanban_task_history_from_column_id_fkey') THEN
+        ALTER TABLE IF EXISTS public.kanban_task_history
+            ADD CONSTRAINT kanban_task_history_from_column_id_fkey FOREIGN KEY (from_column_id)
+            REFERENCES public.kanban_columns (column_id) MATCH SIMPLE
+            ON UPDATE NO ACTION
+            ON DELETE NO ACTION;
+    END IF;
+END $$;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'kanban_task_history_task_id_fkey') THEN
+        ALTER TABLE IF EXISTS public.kanban_task_history
+            ADD CONSTRAINT kanban_task_history_task_id_fkey FOREIGN KEY (task_id)
+            REFERENCES public.kanban_tasks (task_id) MATCH SIMPLE
+            ON UPDATE NO ACTION
+            ON DELETE CASCADE;
+    END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS idx_kanban_task_history_task_id ON public.kanban_task_history(task_id);
 
-ALTER TABLE IF EXISTS public.kanban_task_history
-    ADD CONSTRAINT kanban_task_history_to_column_id_fkey FOREIGN KEY (to_column_id)
-    REFERENCES public.kanban_columns (column_id) MATCH SIMPLE
-    ON UPDATE NO ACTION
-    ON DELETE NO ACTION;
-
-ALTER TABLE IF EXISTS public.kanban_task_labels
-    ADD CONSTRAINT kanban_task_labels_label_id_fkey FOREIGN KEY (label_id)
-    REFERENCES public.kanban_labels (label_id) MATCH SIMPLE
-    ON UPDATE NO ACTION
-    ON DELETE CASCADE;
-
-ALTER TABLE IF EXISTS public.kanban_task_labels
-    ADD CONSTRAINT kanban_task_labels_task_id_fkey FOREIGN KEY (task_id)
-    REFERENCES public.kanban_tasks (task_id) MATCH SIMPLE
-    ON UPDATE NO ACTION
-    ON DELETE CASCADE;
-
-ALTER TABLE IF EXISTS public.kanban_tasks
-    ADD CONSTRAINT kanban_tasks_board_id_fkey FOREIGN KEY (board_id)
-    REFERENCES public.kanban_boards (board_id) MATCH SIMPLE
-    ON UPDATE NO ACTION
-    ON DELETE CASCADE;
-
-ALTER TABLE IF EXISTS public.kanban_tasks
-    ADD CONSTRAINT kanban_tasks_column_id_fkey FOREIGN KEY (column_id)
-    REFERENCES public.kanban_columns (column_id) MATCH SIMPLE
-    ON UPDATE NO ACTION
-    ON DELETE NO ACTION;
-
-ALTER TABLE IF EXISTS public.leave_applications
-    ADD CONSTRAINT leave_applications_id_no_fkey FOREIGN KEY (id_no)
-    REFERENCES public.employees (id_no) MATCH SIMPLE
-    ON UPDATE NO ACTION
-    ON DELETE NO ACTION;
-
-ALTER TABLE IF EXISTS public.leave_records
-    ADD CONSTRAINT leave_records_application_id_fkey FOREIGN KEY (application_id)
-    REFERENCES public.leave_applications (application_id) MATCH SIMPLE
-    ON UPDATE NO ACTION
-    ON DELETE CASCADE;
-
-ALTER TABLE IF EXISTS public.leave_records
-    ADD CONSTRAINT leave_records_id_no_fkey FOREIGN KEY (id_no)
-    REFERENCES public.employees (id_no) MATCH SIMPLE
-    ON UPDATE NO ACTION
-    ON DELETE NO ACTION;
-
-ALTER TABLE IF EXISTS public.leave_records
-    ADD CONSTRAINT leave_records_leave_type_id_fkey FOREIGN KEY (leave_type_id)
-    REFERENCES public.leave_types (leave_type_id) MATCH SIMPLE
-    ON UPDATE NO ACTION
-    ON DELETE NO ACTION;
-
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'kanban_task_history_to_column_id_fkey') THEN
+        ALTER TABLE IF EXISTS public.kanban_task_history
+            ADD CONSTRAINT kanban_task_history_to_column_id_fkey FOREIGN KEY (to_column_id)
+            REFERENCES public.kanban_columns (column_id) MATCH SIMPLE
+            ON UPDATE NO ACTION
+            ON DELETE NO ACTION;
+    END IF;
+END $$;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'kanban_task_labels_label_id_fkey') THEN
+        ALTER TABLE IF EXISTS public.kanban_task_labels
+            ADD CONSTRAINT kanban_task_labels_label_id_fkey FOREIGN KEY (label_id)
+            REFERENCES public.kanban_labels (label_id) MATCH SIMPLE
+            ON UPDATE NO ACTION
+            ON DELETE CASCADE;
+    END IF;
+END $$;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'kanban_task_labels_task_id_fkey') THEN
+        ALTER TABLE IF EXISTS public.kanban_task_labels
+            ADD CONSTRAINT kanban_task_labels_task_id_fkey FOREIGN KEY (task_id)
+            REFERENCES public.kanban_tasks (task_id) MATCH SIMPLE
+            ON UPDATE NO ACTION
+            ON DELETE CASCADE;
+    END IF;
+END $$;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'kanban_tasks_board_id_fkey') THEN
+        ALTER TABLE IF EXISTS public.kanban_tasks
+            ADD CONSTRAINT kanban_tasks_board_id_fkey FOREIGN KEY (board_id)
+            REFERENCES public.kanban_boards (board_id) MATCH SIMPLE
+            ON UPDATE NO ACTION
+            ON DELETE CASCADE;
+    END IF;
+END $$;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'kanban_tasks_column_id_fkey') THEN
+        ALTER TABLE IF EXISTS public.kanban_tasks
+            ADD CONSTRAINT kanban_tasks_column_id_fkey FOREIGN KEY (column_id)
+            REFERENCES public.kanban_columns (column_id) MATCH SIMPLE
+            ON UPDATE NO ACTION
+            ON DELETE NO ACTION;
+    END IF;
+END $$;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'leave_applications_id_no_fkey') THEN
+        ALTER TABLE IF EXISTS public.leave_applications
+            ADD CONSTRAINT leave_applications_id_no_fkey FOREIGN KEY (id_no)
+            REFERENCES public.employees (id_no) MATCH SIMPLE
+            ON UPDATE NO ACTION
+            ON DELETE NO ACTION;
+    END IF;
+END $$;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'leave_records_application_id_fkey') THEN
+        ALTER TABLE IF EXISTS public.leave_records
+            ADD CONSTRAINT leave_records_application_id_fkey FOREIGN KEY (application_id)
+            REFERENCES public.leave_applications (application_id) MATCH SIMPLE
+            ON UPDATE NO ACTION
+            ON DELETE CASCADE;
+    END IF;
+END $$;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'leave_records_id_no_fkey') THEN
+        ALTER TABLE IF EXISTS public.leave_records
+            ADD CONSTRAINT leave_records_id_no_fkey FOREIGN KEY (id_no)
+            REFERENCES public.employees (id_no) MATCH SIMPLE
+            ON UPDATE NO ACTION
+            ON DELETE NO ACTION;
+    END IF;
+END $$;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'leave_records_leave_type_id_fkey') THEN
+        ALTER TABLE IF EXISTS public.leave_records
+            ADD CONSTRAINT leave_records_leave_type_id_fkey FOREIGN KEY (leave_type_id)
+            REFERENCES public.leave_types (leave_type_id) MATCH SIMPLE
+            ON UPDATE NO ACTION
+            ON DELETE NO ACTION;
+    END IF;
+END $$;
 -- ============================================================================
 -- PRIVACY TOKEN VAULT: reversible anonymization for shared/CSV exports.
 -- token  = secrets.token_hex(16).upper() (32-char hex, PK)

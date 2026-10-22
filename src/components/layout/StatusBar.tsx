@@ -1,26 +1,9 @@
-import { useEffect, useState } from "react";
 import { Wifi, WifiOff } from "lucide-react";
-import { api } from "@/lib/api";
+import { isHealthy, useHealth } from "@/hooks/useHealth";
 
 export default function StatusBar() {
-  const [connected, setConnected] = useState(false);
-  const [lastRefresh, setLastRefresh] = useState("");
-
-  const checkConnection = async () => {
-    try {
-      const res = await api.get("/api/health");
-      setConnected(res.data?.db === "connected");
-    } catch {
-      setConnected(false);
-    }
-    setLastRefresh(new Date().toLocaleTimeString());
-  };
-
-  useEffect(() => {
-    checkConnection();
-    const interval = setInterval(checkConnection, 30_000);
-    return () => clearInterval(interval);
-  }, []);
+  const health = useHealth();
+  const connected = isHealthy(health.data) && !health.isError;
 
   return (
     <footer className="h-[32px] flex-shrink-0 bg-surface border-t border-divider px-6 flex items-center justify-between text-xs text-text-muted">
@@ -36,10 +19,11 @@ export default function StatusBar() {
             <span className="text-danger font-medium">Disconnected</span>
           </>
         )}
-        <span className="text-text-muted">· flowdb@localhost:5433</span>
+        <span className="text-text-muted">· Local attendance database</span>
       </div>
       <div>
-        Last refresh: {lastRefresh || "Never"}
+        Last check:{" "}
+        {health.dataUpdatedAt ? new Date(health.dataUpdatedAt).toLocaleTimeString() : "Never"}
       </div>
     </footer>
   );

@@ -1,6 +1,5 @@
 """Staff endpoints — paginated directory + employee profile + attendance stats."""
 
-import json
 from datetime import date, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -457,10 +456,9 @@ def employee_attendance_records(
     filters: str = Query(""),
     db: Session = Depends(get_db),
 ):
-    try:
-        parsed_filters = json.loads(filters) if filters else {}
-    except Exception:
-        parsed_filters = {}
+    from api.routes.params import parse_json_object_param
+
+    parsed_filters = parse_json_object_param(filters)
 
     emp = db.execute(
         text("""

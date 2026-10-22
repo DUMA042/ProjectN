@@ -12,6 +12,7 @@ Security contract (do not weaken):
 from __future__ import annotations
 
 import logging
+import threading
 
 import httpx
 
@@ -26,6 +27,11 @@ MAX_INPUT_CHARS = 6000
 # Overload (503) retries: provider capacity errors are transient.
 OVERLOAD_RETRIES = 2
 OVERLOAD_BACKOFF_SECONDS = (2.0, 5.0)
+# Bound simultaneous outbound AI calls for this process. Two lets a report
+# build run while chat still answers, without tripping provider rate limits.
+MAX_CONCURRENT_CALLS = max(1, int(settings.max_concurrent_ai_calls or 2))
+_ACQUIRE_TIMEOUT_SECONDS = 120.0
+_call_slots = threading.BoundedSemaphore(MAX_CONCURRENT_CALLS)
 
 log = logging.getLogger("owl.ai.deepseek")
 
@@ -73,6 +79,12 @@ def chat(
         raise DeepSeekError("Nothing to send.")
 
     resp: httpx.Response | None = None
+    # Bound concurrent outbound calls for this process. A queued caller waits
+    # (bounded) instead of piling onto the provider and triggering 429s.
+    if not _call_slots.acquire(timeout=_ACQUIRE_TIMEOUT_SECONDS):
+        raise DeepSeekError(
+            "The AI service is busy right now. Please retry in a moment."
+        )
     try:
         with httpx.Client(base_url=BASE_URL, timeout=TIMEOUT_SECONDS, transport=transport) as client:
             for attempt in range(OVERLOAD_RETRIES + 1):
@@ -95,6 +107,8 @@ def chat(
     except httpx.HTTPError:
         log.warning("DeepSeek request failed (network)")
         raise DeepSeekError("Could not reach the AI service. Check your connection and try again.")
+    finally:
+        _call_slots.release()
     assert resp is not None
 
     if resp.status_code == 401:

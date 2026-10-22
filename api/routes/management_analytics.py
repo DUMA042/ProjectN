@@ -1,12 +1,12 @@
 """Management analytics endpoints — flexible explore engine over the rule-driven
 attendance fact table plus leave/training/employee data, plus the unified
 metric catalog, today snapshot, signal engine and forecast layer."""
-import json
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
+from api.routes.errors import safe_error_detail
 from owl.analytics.engine import get_dimension_options, leave_trend, run_explore, training_trend
 from owl.analytics.dimensions import dimensions_metadata
 from owl.analytics.fact import rebuild_attendance_daily
@@ -19,11 +19,9 @@ router = APIRouter(tags=["management-analytics"])
 
 
 def _parse_filters(raw: Optional[str]) -> dict:
-    try:
-        parsed = json.loads(raw) if raw else {}
-        return parsed if isinstance(parsed, dict) else {}
-    except (ValueError, TypeError):
-        return {}
+    from api.routes.params import parse_json_object_param
+
+    return parse_json_object_param(raw)
 
 
 class ExploreRequest(BaseModel):
@@ -65,7 +63,14 @@ def analytics_explore(body: ExploreRequest):
             date_filter_mode=body.date_filter_mode,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(
+            status_code=400,
+            detail=safe_error_detail(
+                exc,
+                "Could not run that analysis — check the filters and date range.",
+                context="analytics/explore",
+            ),
+        ) from None
 
 
 class LeaveTrendRequest(BaseModel):
@@ -80,7 +85,14 @@ def analytics_leave_trend(body: LeaveTrendRequest):
     try:
         return leave_trend(body.start, body.end, body.granularity, body.filters)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(
+            status_code=400,
+            detail=safe_error_detail(
+                exc,
+                "Could not build the leave trend — check the dates and granularity.",
+                context="analytics/leave-trend",
+            ),
+        ) from None
 
 
 class TrainingTrendRequest(BaseModel):
@@ -95,7 +107,14 @@ def analytics_training_trend(body: TrainingTrendRequest):
     try:
         return training_trend(body.start, body.end, body.granularity, body.filters)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(
+            status_code=400,
+            detail=safe_error_detail(
+                exc,
+                "Could not build the training trend — check the dates and granularity.",
+                context="analytics/training-trend",
+            ),
+        ) from None
 
 
 @router.get("/analytics/dimensions")

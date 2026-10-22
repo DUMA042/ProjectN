@@ -6,18 +6,66 @@ from datetime import datetime, timedelta
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from owl.config import settings
+from owl.config import settings, unknown_env_keys
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup sweep + rules cache listener; shutdown hooks."""
+    _warn_unknown_env_keys()
+    _reset_stop_signal()
     _sweep_stuck_jobs()
     _start_rules_cache()
     try:
         yield
     finally:
+        _stop_background_work()
         _stop_rules_cache()
+
+
+def _reset_stop_signal() -> None:
+    """Start each lifespan with a clean shutdown signal (idempotent)."""
+    try:
+        from owl.ingest.worker import clear_stop
+
+        clear_stop()
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _stop_background_work() -> None:
+    """Stop ingestion between records and wait briefly for it to settle.
+
+    Anything not started is returned to 'pending' by the worker, so a closed
+    app never leaves a job claiming to be 'processing'. The stop signal is
+    deliberately NOT cleared here: a thread still draining must keep seeing it.
+    """
+    try:
+        import logging
+
+        from owl.ingest.worker import request_stop, wait_for_idle
+
+        request_stop()
+        if not wait_for_idle(timeout=10.0):
+            logging.getLogger("owl.startup").warning(
+                "Shutdown wait elapsed; any remaining work is recovered by the startup sweep."
+            )
+    except Exception:  # noqa: BLE001 — shutdown must never raise
+        pass
+
+
+def _warn_unknown_env_keys() -> None:
+    """Make typo'd .env keys visible instead of silently ignored."""
+    try:
+        import logging
+
+        for key, suggestion in unknown_env_keys():
+            hint = f" — did you mean '{suggestion}'?" if suggestion else ""
+            logging.getLogger("owl.startup").warning(
+                "Ignoring unknown setting '%s' in .env%s", key, hint
+            )
+    except Exception:  # noqa: BLE001 — diagnostics must never block startup
+        pass
 
 
 def _start_rules_cache() -> None:
@@ -58,12 +106,13 @@ def _sweep_stuck_jobs() -> None:
             stale = session.execute(
                 select(FileIngestionMeta).where(
                     FileIngestionMeta.status == "processing",
-                    FileIngestionMeta.created_at < cutoff,
+                    FileIngestionMeta.updated_at < cutoff,
                 )
             ).scalars().all()
             for record in stale:
                 record.status = "failed"
                 record.processed_at = datetime.now()
+                record.updated_at = datetime.now()
                 record.error_context = {
                     "fatal_error": "Server restarted mid-processing — job recovered as failed."
                 }
@@ -82,16 +131,21 @@ def _sweep_stuck_jobs() -> None:
 app = FastAPI(
     title="AttendanceN API",
     version="0.1.0",
-    docs_url="/docs",
+    docs_url="/docs" if settings.docs_enabled else None,
+    redoc_url="/redoc" if settings.docs_enabled else None,
+    openapi_url="/openapi.json" if settings.docs_enabled else None,
     lifespan=lifespan,
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins + ["http://localhost:1420"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    # Origins come from configuration only (CORS_ORIGINS). The packaged
+    # desktop app adds its Tauri origin there at packaging time — no code
+    # change required. Credentials are not used by this app.
+    allow_origins=settings.cors_origins,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Accept", "Content-Type", "Authorization"],
 )
 
 from api.routes import health, analytics, ingestion, staff, kanban, card_swipe, leave_routes, training, dashboard_custom, settings_routes, rules, quarantine, management_analytics, privacy, report_inbox, report_build, individual_reports, schema as schema_routes, assistant, blue  # noqa: E402

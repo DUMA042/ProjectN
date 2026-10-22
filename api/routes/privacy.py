@@ -7,6 +7,7 @@ is expressed by which lists the caller fills. Blanks pass through untouched.
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from api.routes.errors import safe_error_detail
 from owl.load.database import get_session
 from owl.privacy.vault import forget_tokens, get_or_create_tokens, resolve_tokens
 
@@ -35,7 +36,14 @@ def privacy_tokenize(body: TokenizeRequest):
                 "ids": get_or_create_tokens(s, "id", body.ids),
             }
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(
+            status_code=400,
+            detail=safe_error_detail(
+                exc,
+                "Could not tokenize those values — check the request and try again.",
+                context="privacy/tokenize",
+            ),
+        ) from None
 
 
 @router.post("/privacy/unhash")
@@ -44,7 +52,14 @@ def privacy_unhash(body: UnhashRequest):
         with get_session() as s:
             return {"tokens": resolve_tokens(s, body.tokens)}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(
+            status_code=400,
+            detail=safe_error_detail(
+                exc,
+                "Could not resolve those tokens — check the request and try again.",
+                context="privacy/unhash",
+            ),
+        ) from None
 
 
 @router.post("/privacy/forget")
@@ -53,4 +68,11 @@ def privacy_forget(body: ForgetRequest):
         with get_session() as s:
             return {"forgotten": forget_tokens(s, body.tokens)}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(
+            status_code=400,
+            detail=safe_error_detail(
+                exc,
+                "Could not forget those tokens — check the request and try again.",
+                context="privacy/forget",
+            ),
+        ) from None

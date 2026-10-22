@@ -1,5 +1,6 @@
 import { Download, FileText } from "lucide-react";
 import type { ReportView } from "@/lib/reportBuild";
+import { saveUrl } from "@/lib/download";
 
 /** Render the generated report: headings, tables, bold, bullets, charts. */
 function renderInline(text: string, keyPrefix: string): React.ReactNode[] {
@@ -96,13 +97,12 @@ export default function ReportPreview({ view }: { view: ReportView }) {
       <div className="px-4 pt-3 pb-2 flex items-center gap-2 flex-wrap">
         <FileText size={13} className="text-text-muted" />
         <h2 className="text-xs font-semibold text-text-primary">HR Report</h2>
-        <a
-          href={view.download_url}
-          download
+        <button
+          onClick={() => saveUrl(view.download_url, view.filename)}
           className="ml-auto px-3 py-1.5 text-xs font-medium text-white bg-accent rounded-btn hover:opacity-90 transition-opacity inline-flex items-center gap-1.5"
         >
           <Download size={13} /> Download Word
-        </a>
+        </button>
       </div>
       <div className="px-4 pb-4 max-h-[60vh] overflow-y-auto">
         <ReportBody view={view} />

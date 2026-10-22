@@ -54,6 +54,7 @@ const STAGE_LABELS: Record<string, string> = {
   generating: "Generating report",
   complete: "Report complete",
   cancelled: "Cancelled",
+  failed: "Failed — see message",
   resolving: "Finding employees",
   querying: "Computing attendance",
   rendering: "Writing document",
@@ -131,6 +132,8 @@ export interface ReportChart {
 
 export interface ReportView {
   job_id: string;
+  gen_id?: string;
+  filename: string;
   markdown: string;
   charts: ReportChart[];
   download_url: string;

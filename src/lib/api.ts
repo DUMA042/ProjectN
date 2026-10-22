@@ -1,6 +1,28 @@
 import axios from "axios";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
+/** Where the API lives.
+ *
+ * - `VITE_API_BASE_URL` wins when set (any deployment can override).
+ * - In development an empty base means "same origin", so Vite's `/api` proxy
+ *   forwards to the FastAPI server (see vite.config.ts).
+ * - Outside development the UI is served from the desktop asset protocol, so
+ *   relative paths would resolve against that protocol and fail. Use the local
+ *   service address instead. (Pure function — unit-tested.)
+ */
+export function resolveApiBase(
+  configured: string | undefined,
+  isDev: boolean
+): string {
+  const explicit = (configured || "").trim();
+  if (explicit) return explicit.replace(/\/+$/, "");
+  if (isDev) return "";
+  return "http://127.0.0.1:8001";
+}
+
+export const API_BASE = resolveApiBase(
+  import.meta.env.VITE_API_BASE_URL,
+  Boolean(import.meta.env.DEV)
+);
 
 export const api = axios.create({
   baseURL: API_BASE,

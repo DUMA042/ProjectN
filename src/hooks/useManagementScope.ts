@@ -1,6 +1,40 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { createJSONStorage, persist, type StateStorage } from "zustand/middleware";
 import type { DateRange } from "@/components/ui/DateRangePicker";
+
+/** localStorage that never throws.
+ *
+ * A desktop webview's storage can be cleared or corrupted between launches;
+ * corrupt JSON is treated as "no saved state" so the app falls back to
+ * defaults instead of crashing during hydration. A blocked store degrades
+ * silently to in-memory behaviour.
+ */
+export const safeLocalStorage: StateStorage = {
+  getItem: (name) => {
+    try {
+      const raw = window.localStorage.getItem(name);
+      if (raw === null) return null;
+      JSON.parse(raw); // validate — corrupt payload behaves as absent
+      return raw;
+    } catch {
+      return null;
+    }
+  },
+  setItem: (name, value) => {
+    try {
+      window.localStorage.setItem(name, value);
+    } catch {
+      /* storage unavailable/full — state stays in memory */
+    }
+  },
+  removeItem: (name) => {
+    try {
+      window.localStorage.removeItem(name);
+    } catch {
+      /* ignore */
+    }
+  },
+};
 
 function defaultRange(): DateRange {
   const end = new Date();
@@ -131,6 +165,7 @@ export const useManagementScope = create<ManagementScopeState>()(
     }),
     {
       name: "management-scope",
+      storage: createJSONStorage(() => safeLocalStorage),
       // v2: sanitize any state persisted by older builds so a stale shape can
       // never crash the page on load.
       version: 2,

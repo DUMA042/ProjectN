@@ -1,3 +1,5 @@
+import { saveBlob } from "@/lib/download";
+
 function escapeCSVCell(value: unknown): string {
   const str = value == null ? "" : String(value);
   if (str.includes(",") || str.includes('"') || str.includes("\n")) {
@@ -44,13 +46,5 @@ export function exportToCSV(
   const filename = buildExportFileName(chartName, dateRange);
 
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.style.display = "none";
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  saveBlob(blob, filename);
 }

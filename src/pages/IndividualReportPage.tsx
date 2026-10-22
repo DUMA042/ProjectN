@@ -18,6 +18,7 @@ import {
 } from "@/lib/individualReport";
 import { useBuildJob } from "@/lib/reportBuild";
 import { api } from "@/lib/api";
+import { saveUrl } from "@/lib/download";
 
 function monthBounds(): { startDate: string; endDate: string; label: string } {
   const now = new Date();
@@ -414,13 +415,12 @@ export default function IndividualReportPage() {
             </p>
             <p className="text-[11px] text-text-muted">{result.headcount} employees</p>
           </div>
-          <a
-            href={result.download_url}
-            download
+          <button
+            onClick={() => saveUrl(result.download_url, result.filename)}
             className="px-3 py-1.5 text-xs font-medium text-white bg-accent rounded-btn hover:opacity-90 transition-opacity"
           >
             Download Word
-          </a>
+          </button>
         </div>
       ) : null}
 
@@ -454,15 +454,14 @@ export default function IndividualReportPage() {
                     {r.period} · {r.location} · {r.headcount} employees
                   </p>
                 </div>
-                <a
-                  href={r.download_url}
-                  download
+                <button
+                  onClick={() => saveUrl(r.download_url, r.filename)}
                   title="Download Word document"
                   aria-label={`Download ${r.filename}`}
                   className="p-2 rounded-btn text-text-muted hover:text-accent hover:bg-nav-hover transition-colors"
                 >
                   <Download size={14} />
-                </a>
+                </button>
                 <button
                   onClick={() => setPendingDelete({ job_id: r.job_id, label: r.filename })}
                   title="Delete this report"

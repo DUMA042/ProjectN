@@ -27,6 +27,18 @@ router = APIRouter(tags=["report-inbox"])
 MANIFEST_NAME = "manifest.json"
 MAX_CSV_BYTES = 25 * 1024 * 1024
 
+
+class ManifestCorrupt(Exception):
+    """Raised when manifest.json exists but cannot be parsed."""
+
+
+def load_manifest_or_500(base: Path | None = None) -> list[dict[str, Any]]:
+    """load_manifest that converts corruption into a loud HTTP 500."""
+    try:
+        return load_manifest(base)
+    except ManifestCorrupt as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
 _lock = threading.Lock()
 
 
@@ -59,8 +71,14 @@ def load_manifest(base: Path | None = None) -> list[dict[str, Any]]:
         return []
     try:
         data = json.loads(mp.read_text(encoding="utf-8"))
-    except (ValueError, OSError):
-        return []
+    except (ValueError, OSError) as exc:
+        # Never silently pretend the inbox is empty: the CSVs are still on
+        # disk, but the index is unreadable. Loud failure with recovery path.
+        raise ManifestCorrupt(
+            f"Report index file is corrupted ({mp.name}). Your files are "
+            f"still stored — restore {mp.name} from backup or delete it to "
+            f"start fresh (stored files themselves are never touched)."
+        ) from exc
     return data if isinstance(data, list) else []
 
 
@@ -133,7 +151,7 @@ def inbox_send(body: InboxRequest):
             "moved_at": None,
             "classification": classify_csv(body.csv_text),
         }
-        items = load_manifest(base)
+        items = load_manifest_or_500(base)
         items.append(entry)
         save_manifest(items, base)
     return entry
@@ -143,7 +161,7 @@ def inbox_send(body: InboxRequest):
 def inbox_list():
     with _lock:
         base = inbox_dir()
-        items = load_manifest(base)
+        items = load_manifest_or_500(base)
         # Write-through backfill: legacy entries without a classification get
         # one from the stored file, so old files show a type with no migration.
         dirty = False
@@ -163,7 +181,7 @@ def inbox_list():
 @router.get("/reports/inbox/{file_id}/download")
 def inbox_download(file_id: str):
     with _lock:
-        items = load_manifest()
+        items = load_manifest_or_500()
     entry = next((e for e in items if e.get("id") == file_id), None)
     if not entry:
         raise HTTPException(status_code=404, detail="File not found")
@@ -183,7 +201,7 @@ def inbox_move(file_id: str, body: MoveRequest):
         raise HTTPException(status_code=400, detail="status must be 'inbox' or 'build'")
     with _lock:
         base = inbox_dir()
-        items = load_manifest(base)
+        items = load_manifest_or_500(base)
         entry = next((e for e in items if e.get("id") == file_id), None)
         if not entry:
             raise HTTPException(status_code=404, detail="File not found")
@@ -197,7 +215,7 @@ def inbox_move(file_id: str, body: MoveRequest):
 def inbox_delete(file_id: str):
     with _lock:
         base = inbox_dir()
-        items = load_manifest(base)
+        items = load_manifest_or_500(base)
         kept = [e for e in items if e.get("id") != file_id]
         if len(kept) == len(items):
             raise HTTPException(status_code=404, detail="File not found")

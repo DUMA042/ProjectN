@@ -1,12 +1,25 @@
 import sys
-import psycopg2
+from pathlib import Path
 
-# Connection Settings
-DB_NAME = "flowdb"
-DB_USER = "postgres"
-DB_PASSWORD = "1234"
-DB_HOST = "localhost"
-DB_PORT = "5433"
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(_PROJECT_ROOT))
+
+import psycopg2
+from sqlalchemy.engine import make_url
+
+from owl.config import settings
+
+
+def _pg_params() -> dict:
+    """Connection parameters from DATABASE_URL — never hardcoded."""
+    url = make_url(settings.get_database_url())
+    return {
+        "dbname": url.database,
+        "user": url.username,
+        "password": url.password,
+        "host": url.host,
+        "port": url.port,
+    }
 
 OPTIMIZATION_DDL = """
 -- Performance Indexes for History and Swiping tables
@@ -29,9 +42,10 @@ ON employee_card_swipes (id_no, swipe_time);
 """
 
 def apply_optimizations():
+    params = _pg_params()
     try:
-        print(f"Connecting to {DB_NAME} on port {DB_PORT}...")
-        conn = psycopg2.connect(dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, port=DB_PORT)
+        print(f"Connecting to database '{params['dbname']}' on port {params['port']}...")
+        conn = psycopg2.connect(**params)
         conn.autocommit = True
         cur = conn.cursor()
         

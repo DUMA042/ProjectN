@@ -17,6 +17,7 @@ Workflow
 
 from __future__ import annotations
 
+import threading
 import time
 import json
 from datetime import datetime
@@ -32,6 +33,74 @@ from owl.pipeline import Pipeline
 
 log = get_logger(__name__)
 
+# ── Shutdown coordination ────────────────────────────────────────────────────
+# The API runs ingestion on background threads. When the app closes we stop
+# between records and hand unstarted jobs back to 'pending', so a job never
+# stays falsely 'processing' until the 30-minute sweep.
+_stop_requested = threading.Event()
+_active_threads: set[threading.Thread] = set()
+_threads_lock = threading.Lock()
+
+
+def request_stop() -> None:
+    """Ask all background ingestion work to stop after the current record."""
+    _stop_requested.set()
+
+
+def clear_stop() -> None:
+    """Reset the signal (startup / tests)."""
+    _stop_requested.clear()
+
+
+def should_stop() -> bool:
+    return _stop_requested.is_set()
+
+
+def register_thread(thread: threading.Thread) -> None:
+    with _threads_lock:
+        _active_threads.add(thread)
+
+
+def wait_for_idle(timeout: float = 10.0) -> bool:
+    """Join registered background threads, bounded by *timeout*.
+
+    Returns True when everything finished, False when work outlived the wait.
+    Completed threads are removed from the registry either way.
+    """
+    deadline = time.monotonic() + timeout
+    with _threads_lock:
+        threads = list(_active_threads)
+    for thread in threads:
+        remaining = max(0.0, deadline - time.monotonic())
+        thread.join(timeout=remaining)
+    with _threads_lock:
+        for thread in threads:
+            if not thread.is_alive():
+                _active_threads.discard(thread)
+        still_running = any(t.is_alive() for t in _active_threads)
+    if still_running:
+        log.warning("Ingestion work still running after %.1fs shutdown wait", timeout)
+    return not still_running
+
+
+def claim_pending(session, limit: int = 5) -> list:
+    """Select pending jobs and mark them processing, skipping rows locked
+    by a concurrent worker (FOR UPDATE SKIP LOCKED). Returns claimed ids.
+    Caller must commit. Pure row mechanics — no file processing here."""
+    stmt = (
+        select(FileIngestionMeta)
+        .where(FileIngestionMeta.status == "pending")
+        .order_by(FileIngestionMeta.created_at)
+        .limit(limit)
+        .with_for_update(skip_locked=True)
+    )
+    pending = session.execute(stmt).scalars().all()
+    pending_ids = [record.id for record in pending]
+    for record in pending:
+        record.status = "processing"
+    session.flush()
+    return pending_ids
+
 
 class IngestionWorker:
     """Processes pending ingestion records."""
@@ -42,20 +111,20 @@ class IngestionWorker:
     def run_once(self) -> None:
         """Poll and process one batch of pending records."""
         with get_session() as session:
-            # Atomic selection and marking as processing
-            stmt = (
-                select(FileIngestionMeta)
-                .where(FileIngestionMeta.status == "pending")
-                .limit(5)
-            )
-            pending = session.execute(stmt).scalars().all()
-            pending_ids = [record.id for record in pending]
-            for record in pending:
-                record.status = "processing"
+            pending_ids = claim_pending(session, limit=5)
             session.commit()
 
         # Process each record by its ID
-        for ingestion_id in pending_ids:
+        for index, ingestion_id in enumerate(pending_ids):
+            if should_stop():
+                # Hand back everything not yet started so the next launch
+                # resumes it (loads are upsert/dedup safe).
+                self._requeue(pending_ids[index:])
+                log.info(
+                    "Shutdown requested — returned %s job(s) to pending",
+                    len(pending_ids) - index,
+                )
+                return
             try:
                 # Re-fetch record inside the processing scope
                 with get_session() as session:
@@ -65,6 +134,21 @@ class IngestionWorker:
             except Exception as exc:
                 log.exception(f"Worker failed to process job {ingestion_id}")
                 self._mark_failed(ingestion_id, str(exc))
+
+    def _requeue(self, ingestion_ids: list) -> None:
+        """Return claimed-but-unstarted jobs to 'pending' (shutdown path)."""
+        if not ingestion_ids:
+            return
+        try:
+            with get_session() as session:
+                session.execute(
+                    update(FileIngestionMeta)
+                    .where(FileIngestionMeta.id.in_(ingestion_ids))
+                    .values(status="pending")
+                )
+                session.commit()
+        except Exception:  # noqa: BLE001 — best effort during shutdown
+            log.exception("Could not return interrupted jobs to pending")
 
     def _process_record(self, record: FileIngestionMeta) -> None:
         """Execute the pipeline for a single metadata record."""
@@ -202,19 +286,18 @@ class IngestionWorker:
             
             status = "completed"
             summary = results.get("load_results", {})
-            for table, counts in summary.items():
+            for _table, counts in summary.items():
                 if counts.get("failed", 0) > 0:
-                    status = "failed" # Should we mark as failed if ANY row fails? 
-                                     # Or "completed" with warnings?
-                                     # User said "isolate bad rows without halting".
-                                     # I'll use "completed" if it finished, but log errors.
-                    has_failures = True
+                    # Partial success must never masquerade as clean:
+                    # downstream filters, badges, and history distinguish it.
+                    status = "completed_with_errors"
+                    break
 
             stmt = (
                 update(FileIngestionMeta)
                 .where(FileIngestionMeta.id == ingestion_id)
                 .values(
-                    status="completed" if not has_failures else "completed", # keeping status clear
+                    status=status,
                     processed_at=datetime.now(),
                     error_context=results
                 )
@@ -250,6 +333,6 @@ class IngestionWorker:
 if __name__ == "__main__":
     worker = IngestionWorker()
     log.info("Ingestion Worker started. Polling for 'pending' jobs...")
-    while True:
+    while not should_stop():
         worker.run_once()
         time.sleep(5)
