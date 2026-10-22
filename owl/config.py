@@ -106,6 +106,11 @@ class Settings(BaseSettings):
         description="Files larger than this (MB) will be read in streaming mode to avoid memory exhaustion.",
     )
 
+    max_upload_mb: int = Field(
+        default=200,
+        description="Hard limit for uploads (MB). Larger files are rejected outright.",
+    )
+
     # ── API ────────────────────────────────────────────────────────────────────
     api_host: str = Field(
         default="127.0.0.1",
@@ -142,6 +147,11 @@ class Settings(BaseSettings):
             "When empty, the executor uses the app session inside a read-only "
             "transaction instead. Example: postgresql+psycopg2://flow_reader:PASSWORD@localhost:5432/owl_db"
         ),
+    )
+
+    max_concurrent_ai_calls: int = Field(
+        default=2,
+        description="Maximum simultaneous outbound AI requests for this process.",
     )
 
     def get_deepseek_key(self) -> str:

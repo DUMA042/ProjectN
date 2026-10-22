@@ -13,12 +13,45 @@ from owl.config import settings, unknown_env_keys
 async def lifespan(app: FastAPI):
     """Startup sweep + rules cache listener; shutdown hooks."""
     _warn_unknown_env_keys()
+    _reset_stop_signal()
     _sweep_stuck_jobs()
     _start_rules_cache()
     try:
         yield
     finally:
+        _stop_background_work()
         _stop_rules_cache()
+
+
+def _reset_stop_signal() -> None:
+    """Start each lifespan with a clean shutdown signal (idempotent)."""
+    try:
+        from owl.ingest.worker import clear_stop
+
+        clear_stop()
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _stop_background_work() -> None:
+    """Stop ingestion between records and wait briefly for it to settle.
+
+    Anything not started is returned to 'pending' by the worker, so a closed
+    app never leaves a job claiming to be 'processing'. The stop signal is
+    deliberately NOT cleared here: a thread still draining must keep seeing it.
+    """
+    try:
+        import logging
+
+        from owl.ingest.worker import request_stop, wait_for_idle
+
+        request_stop()
+        if not wait_for_idle(timeout=10.0):
+            logging.getLogger("owl.startup").warning(
+                "Shutdown wait elapsed; any remaining work is recovered by the startup sweep."
+            )
+    except Exception:  # noqa: BLE001 — shutdown must never raise
+        pass
 
 
 def _warn_unknown_env_keys() -> None:

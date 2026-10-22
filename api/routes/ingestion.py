@@ -2,7 +2,6 @@
 processing details, and upload-record removal (forget)."""
 import asyncio
 import re
-import shutil
 import threading
 import time
 import uuid
@@ -15,9 +14,10 @@ from sqlalchemy.orm import Session
 
 from api.dependencies import get_db
 from owl.config import settings
+from owl.ingest.limits import UploadTooLarge, copy_with_cap
 from owl.ingest.progress import get_progress as get_store_progress
 from owl.ingest.manager import IngestionManager
-from owl.ingest.worker import IngestionWorker
+from owl.ingest.worker import IngestionWorker, register_thread, should_stop
 from owl.load.database import get_session
 from owl.load.models import FileIngestionMeta
 
@@ -44,6 +44,8 @@ def _run_worker_background(max_rounds: int = 25) -> None:
     try:
         worker = IngestionWorker()
         for _ in range(max_rounds):
+            if should_stop():
+                break
             worker.run_once()
             with get_session() as session:
                 remaining = session.execute(
@@ -106,10 +108,20 @@ async def ingest_upload(files: List[UploadFile] = File(..., description="One or 
             safe_stem = re.sub(r"[^\w\-. ]", "_", Path(original_name).stem).strip() or "file"
             safe_name = f"{int(time.time())}_{safe_stem}.xlsx"
 
-            INBOX_DIR.mkdir(exist_ok=True)
+            INBOX_DIR.mkdir(parents=True, exist_ok=True)
             dest = INBOX_DIR / safe_name
-            with open(dest, "wb") as fh:
-                shutil.copyfileobj(file.file, fh)
+            try:
+                copy_with_cap(
+                    file.file,
+                    dest,
+                    limit_bytes=settings.max_upload_mb * 1024 * 1024,
+                )
+            except UploadTooLarge:
+                rejected.append({
+                    "filename": original_name,
+                    "reason": f"File too large (max {settings.max_upload_mb} MB)",
+                })
+                continue
 
             manager = IngestionManager()
             await asyncio.to_thread(manager.run_once)
@@ -153,6 +165,7 @@ async def ingest_upload(files: List[UploadFile] = File(..., description="One or 
     # Kick off processing on a daemon thread; HTTP returns immediately so the
     # frontend can poll per-file stage progress via /ingest/status/{id}.
     thread = threading.Thread(target=_run_worker_background, daemon=True)
+    register_thread(thread)
     thread.start()
 
     return {"results": results, "rejected": rejected}
