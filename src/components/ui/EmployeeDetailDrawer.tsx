@@ -1,27 +1,14 @@
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Clock, Umbrella, GraduationCap, CalendarDays } from "lucide-react";
+import { X, Clock, Umbrella, GraduationCap, CalendarDays, Pencil } from "lucide-react";
 import { api } from "@/lib/api";
 import CalendarHeatmap from "@/components/ui/CalendarHeatmap";
+import EmployeeEditForm from "@/components/ui/EmployeeEditForm";
+import { useToast } from "@/components/ui/Toast";
+import { useEmployeeLookups, useEmployeeUpdate } from "@/hooks/useEmployee";
 import { fmtPct } from "@/lib/format";
-
-interface EmployeeDetail {
-  id_no: string;
-  full_name: string;
-  sex: string;
-  department: string;
-  rank: string;
-  grade_level: string;
-  status: string;
-  employment_type: string;
-  geographical_zone: string;
-  date_of_last_deployment: string | null;
-  phone_number: string | null;
-  remark: string | null;
-  card_swipes: { swipe_id: number; swipe_time: string; location: string }[];
-  leave_records: { record_id: number; leave_type_name: string; start_date: string; end_date: string }[];
-  training_records: { training_id: number; venue: string; consultant: string; start_date: string; end_date: string; title: string | null }[];
-}
+import type { EmployeeDetail } from "@/lib/staff";
 
 interface AttendanceStats {
   summary: { present?: number; absent?: number; leave?: number; training?: number };
@@ -102,10 +89,30 @@ interface EmployeeDetailDrawerProps {
   onClose: () => void;
 }
 
+function saveErrorMessage(err: unknown): string {
+  const detail = (err as { response?: { data?: { detail?: unknown } } })?.response?.data
+    ?.detail;
+  if (typeof detail === "string") return detail;
+  if (detail && typeof detail === "object" && "message" in detail) {
+    return String((detail as { message: unknown }).message);
+  }
+  return "Could not save changes. Please try again.";
+}
+
 export default function EmployeeDetailDrawer({ employeeId, onClose }: EmployeeDetailDrawerProps) {
   const { data: detail, isLoading } = useEmployeeDetail(employeeId);
   const { data: att } = useEmployeeAttendance(employeeId);
   const { data: deptQ } = useDepartmentRate(detail?.department || null, employeeId);
+  const [editing, setEditing] = useState(false);
+  const { toast } = useToast();
+  const lookups = useEmployeeLookups(Boolean(editing && employeeId));
+  const update = useEmployeeUpdate(employeeId);
+
+  useEffect(() => {
+    setEditing(false);
+    update.reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [employeeId]);
 
   const months = att ? monthlySeries(att.daily_attendance || []) : [];
   const empRate = att && att.summary ? att.summary : null;
@@ -138,9 +145,21 @@ export default function EmployeeDetailDrawer({ employeeId, onClose }: EmployeeDe
           >
             <div className="flex items-center justify-between px-5 py-4 border-b border-divider flex-shrink-0">
               <h3 className="text-sm font-semibold text-text-primary">Employee Detail</h3>
-              <button onClick={onClose} className="p-1.5 rounded-btn hover:bg-nav-hover text-text-muted hover:text-text-secondary">
-                <X size={18} />
-              </button>
+              <div className="flex items-center gap-1">
+                {detail && !editing && (
+                  <button
+                    onClick={() => setEditing(true)}
+                    aria-label="Edit employee"
+                    title="Edit employee"
+                    className="p-1.5 rounded-btn hover:bg-nav-hover text-text-muted hover:text-text-secondary"
+                  >
+                    <Pencil size={16} />
+                  </button>
+                )}
+                <button onClick={onClose} className="p-1.5 rounded-btn hover:bg-nav-hover text-text-muted hover:text-text-secondary">
+                  <X size={18} />
+                </button>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-5 space-y-5">
@@ -150,6 +169,31 @@ export default function EmployeeDetailDrawer({ employeeId, onClose }: EmployeeDe
                     <div key={i} className="h-5 bg-nav-hover rounded" />
                   ))}
                 </div>
+              ) : editing && detail ? (
+                lookups.isLoading ? (
+                  <p className="text-sm text-text-muted">Loading options…</p>
+                ) : lookups.data ? (
+                  <EmployeeEditForm
+                    employee={detail}
+                    lookups={lookups.data}
+                    saving={update.isPending}
+                    error={update.error ? saveErrorMessage(update.error) : null}
+                    onCancel={() => {
+                      setEditing(false);
+                      update.reset();
+                    }}
+                    onSave={(changes) =>
+                      update.mutate(changes, {
+                        onSuccess: () => {
+                          setEditing(false);
+                          toast("Employee details updated", "success");
+                        },
+                      })
+                    }
+                  />
+                ) : (
+                  <p className="text-sm text-danger">Could not load edit options.</p>
+                )
               ) : detail ? (
                 <>
                   <div>

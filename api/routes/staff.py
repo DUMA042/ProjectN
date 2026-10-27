@@ -2,12 +2,60 @@
 
 from datetime import date, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from api.dependencies import get_db
+from owl.load.employee_edits import EmployeeEditError, EmployeeNotFound, apply_employee_update
 
 router = APIRouter(tags=["staff"])
+
+_EMPLOYEE_SELECT = """
+    SELECT e.id_no, e.full_name, e.sex, e.geographical_zone,
+           e.department_id, e.rank_id, e.gl_id, e.emp_type_id, e.status_id,
+           d.department_name, r.rank_name, gl.gl_name,
+           es.status_name, et.emp_type_name,
+           e.date_of_last_deployment, e.phone_number, e.remark
+    FROM employees e
+    LEFT JOIN departments d ON e.department_id = d.department_id
+    LEFT JOIN ranks r ON e.rank_id = r.rank_id
+    LEFT JOIN grade_levels gl ON e.gl_id = gl.gl_id
+    LEFT JOIN employee_statuses es ON e.status_id = es.status_id
+    LEFT JOIN employment_types et ON e.emp_type_id = et.emp_type_id
+    WHERE e.id_no = :id_no
+"""
+
+
+def _employee_row(db: Session, id_no: str):
+    return db.execute(text(_EMPLOYEE_SELECT), {"id_no": id_no}).mappings().first()
+
+
+def _employee_payload(row) -> dict:
+    return {
+        "id_no": row["id_no"],
+        "full_name": row["full_name"],
+        "sex": row["sex"],
+        "geographical_zone": row["geographical_zone"],
+        "department": row["department_name"],
+        "department_id": row["department_id"],
+        "rank": row["rank_name"],
+        "rank_id": row["rank_id"],
+        "grade_level": row["gl_name"],
+        "gl_id": row["gl_id"],
+        "status": row["status_name"],
+        "status_id": row["status_id"],
+        "employment_type": row["emp_type_name"],
+        "emp_type_id": row["emp_type_id"],
+        "date_of_last_deployment": (
+            row["date_of_last_deployment"].isoformat()
+            if row["date_of_last_deployment"]
+            else None
+        ),
+        "phone_number": row["phone_number"],
+        "remark": row["remark"],
+    }
+
 
 
 @router.get("/statuses")
@@ -144,56 +192,89 @@ def staff_list(
 
 @router.get("/staff/{id_no}")
 def staff_profile(id_no: str, db: Session = Depends(get_db)):
-    emp = db.execute(
-        text("""
-            SELECT e.id_no, e.full_name, e.sex, e.geographical_zone,
-                   d.department_name, r.rank_name, gl.gl_name,
-                   es.status_name, et.emp_type_name,
-                   e.date_of_last_deployment, e.phone_number, e.remark
-            FROM employees e
-            LEFT JOIN departments d ON e.department_id = d.department_id
-            LEFT JOIN ranks r ON e.rank_id = r.rank_id
-            LEFT JOIN grade_levels gl ON e.gl_id = gl.gl_id
-            LEFT JOIN employee_statuses es ON e.status_id = es.status_id
-            LEFT JOIN employment_types et ON e.emp_type_id = et.emp_type_id
-            WHERE e.id_no = :id_no
-        """),
-        {"id_no": id_no},
-    ).fetchone()
-
-    if not emp:
+    row = _employee_row(db, id_no)
+    if row is None:
         raise HTTPException(status_code=404, detail="Employee not found")
+    return _employee_payload(row)
 
+
+@router.get("/employees/lookups")
+def employee_lookups(db: Session = Depends(get_db)):
+    """Editable employee attributes with their ids (for the roster editor)."""
+
+    def options(table: str, id_col: str, name_col: str):
+        rows = db.execute(
+            text(
+                f"SELECT {id_col}, {name_col} FROM {table} "
+                f"WHERE {name_col} IS NOT NULL AND {name_col} <> '' "
+                f"ORDER BY lower({name_col})"
+            )
+        ).all()
+        return [{"id": r[0], "name": r[1]} for r in rows]
+
+    zones = [
+        r[0]
+        for r in db.execute(
+            text(
+                "SELECT DISTINCT geographical_zone FROM employees "
+                "WHERE geographical_zone IS NOT NULL AND geographical_zone <> '' "
+                "ORDER BY 1"
+            )
+        )
+    ]
     return {
-        "id_no": emp[0], "full_name": emp[1], "sex": emp[2],
-        "geographical_zone": emp[3], "department": emp[4], "rank": emp[5],
-        "grade_level": emp[6], "status": emp[7], "employment_type": emp[8],
-        "date_of_last_deployment": emp[9].isoformat() if emp[9] else None,
-        "phone_number": emp[10], "remark": emp[11],
+        "departments": options("departments", "department_id", "department_name"),
+        "ranks": options("ranks", "rank_id", "rank_name"),
+        "grade_levels": options("grade_levels", "gl_id", "gl_name"),
+        "employment_types": options("employment_types", "emp_type_id", "emp_type_name"),
+        "statuses": options("employee_statuses", "status_id", "status_name"),
+        "zones": zones,
+        "sexes": ["F", "M"],
     }
+
+
+class EmployeeUpdate(BaseModel):
+    """Partial roster edit. Unknown keys (e.g. id_no) are rejected."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    full_name: str | None = None
+    sex: str | None = None
+    phone_number: str | None = None
+    geographical_zone: str | None = None
+    date_of_last_deployment: date | None = None
+    department_id: int | None = None
+    rank_id: int | None = None
+    gl_id: int | None = None
+    emp_type_id: int | None = None
+    status_id: int | None = None
+
+
+@router.patch("/employees/{id_no}")
+def update_employee(
+    id_no: str, body: EmployeeUpdate, db: Session = Depends(get_db)
+):
+    changes = body.model_dump(exclude_unset=True)
+    try:
+        apply_employee_update(db, id_no, changes)
+    except EmployeeNotFound:
+        raise HTTPException(status_code=404, detail="Employee not found") from None
+    except EmployeeEditError as exc:
+        raise HTTPException(
+            status_code=422, detail={"field": exc.field, "message": exc.message}
+        ) from exc
+    db.commit()
+
+    row = _employee_row(db, id_no)
+    return _employee_payload(row)
 
 
 @router.get("/employees/{id_no}/detail")
 def employee_detail(id_no: str, db: Session = Depends(get_db)):
-    emp = db.execute(
-        text("""
-            SELECT e.id_no, e.full_name, e.sex, e.geographical_zone,
-                   d.department_name, r.rank_name, gl.gl_name,
-                   es.status_name, et.emp_type_name,
-                   e.date_of_last_deployment, e.phone_number, e.remark
-            FROM employees e
-            LEFT JOIN departments d ON e.department_id = d.department_id
-            LEFT JOIN ranks r ON e.rank_id = r.rank_id
-            LEFT JOIN grade_levels gl ON e.gl_id = gl.gl_id
-            LEFT JOIN employee_statuses es ON e.status_id = es.status_id
-            LEFT JOIN employment_types et ON e.emp_type_id = et.emp_type_id
-            WHERE e.id_no = :id_no
-        """),
-        {"id_no": id_no},
-    ).fetchone()
-
-    if not emp:
+    row = _employee_row(db, id_no)
+    if row is None:
         raise HTTPException(status_code=404, detail="Employee not found")
+    payload = _employee_payload(row)
 
     swipes = db.execute(
         text("""
@@ -235,18 +316,7 @@ def employee_detail(id_no: str, db: Session = Depends(get_db)):
     ).fetchall()
 
     return {
-        "id_no": emp[0],
-        "full_name": emp[1],
-        "sex": emp[2],
-        "geographical_zone": emp[3],
-        "department": emp[4],
-        "rank": emp[5],
-        "grade_level": emp[6],
-        "status": emp[7],
-        "employment_type": emp[8],
-        "date_of_last_deployment": emp[9].isoformat() if emp[9] else None,
-        "phone_number": emp[10],
-        "remark": emp[11],
+        **payload,
         "card_swipes": [
             {
                 "swipe_id": s[0],

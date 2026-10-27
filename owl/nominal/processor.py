@@ -43,6 +43,7 @@ from sqlalchemy import select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from owl.load.database import get_session
+from owl.load.history import history_start
 from owl.load.models import (
     Department,
     Employee,
@@ -661,22 +662,8 @@ class NominalProcessor:
 
     @staticmethod
     def _get_history_start(session, table_name: str, id_no: str) -> date:
-        """Get the start_date for a history record.
-
-        Looks for an existing open history row (end_date IS NULL).
-        Falls back to today if no open record exists.
-        """
-        result = session.execute(
-            text(
-                f"SELECT start_date FROM {table_name} "
-                f"WHERE id_no = :id_no AND end_date IS NULL "
-                f"ORDER BY start_date DESC LIMIT 1"
-            ),
-            {"id_no": id_no},
-        ).fetchone()
-        if result:
-            return result[0]
-        return date.today()
+        """Start date for a history row being closed (see owl.load.history)."""
+        return history_start(session, table_name, id_no)
 
     def _write_summary_report(self, report: NominalProcessingReport) -> None:
         """Write a human-readable summary report to the reports/ directory."""

@@ -11,6 +11,10 @@ Items marked *accepted* are deliberate decisions, not oversights.
   (`POST /api/privacy/unhash`), or change attendance rules.
 - Mitigations in place: loopback binding, OS user accounts, single-instance guard.
 - Consequence: Flow assumes a trusted, single-user Windows machine.
+- Roster edits (Management → People → Directory → pencil) follow the same model:
+  anyone at the machine can change a staff member's name, sex, phone number,
+  status, department, rank, grade level, employment type, zone, or last
+  deployment date.
 
 ## 2. No backup or restore — **accepted**
 
@@ -29,6 +33,9 @@ Items marked *accepted* are deliberate decisions, not oversights.
   attributed to a person.
 - Consequence: "who deleted this report / changed these rules" cannot be
   answered. The AI layer keeps a field-access audit, but nothing for user actions.
+- Manual roster edits are not attributed either. They do close department,
+  rank, and grade-level tenure rows exactly like a nominal-roll upload, but the
+  edit itself leaves no record of who made it or what changed.
 
 ## 4. Performance is unverified — **accepted**
 
