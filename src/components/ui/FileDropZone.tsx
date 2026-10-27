@@ -13,6 +13,7 @@ interface FileDropZoneProps {
   onRemoveFile: (index: number) => void;
   onClearAll: () => void;
   uploading?: boolean;
+  onShowFormatHelp?: () => void;
 }
 
 function formatSize(bytes: number): string {
@@ -27,6 +28,7 @@ export default function FileDropZone({
   onRemoveFile,
   onClearAll,
   uploading,
+  onShowFormatHelp,
 }: FileDropZoneProps) {
   const [dragover, setDragover] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -79,6 +81,18 @@ export default function FileDropZone({
         <p className="text-xs text-text-secondary mt-1">
           Support for a single or bulk upload. File size limit: 50MB
         </p>
+        {onShowFormatHelp && (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onShowFormatHelp();
+            }}
+            className="mt-2 text-xs font-medium text-accent hover:underline"
+          >
+            What format does my file need?
+          </button>
+        )}
         <input
           ref={inputRef}
           type="file"

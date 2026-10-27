@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import type { FileFormatsResponse } from "@/lib/fileSchema";
 
 export interface UploadResult {
   ingestion_id: string | null;
@@ -213,5 +214,16 @@ export function useIngestionHistory() {
     queryKey: ["ingestion-history"],
     queryFn: () => api.get("/api/ingest/history?limit=50").then((r) => r.data),
     refetchInterval: 30_000,
+  });
+}
+
+export function useFileFormats(enabled = true) {
+  return useQuery({
+    queryKey: ["file-formats"],
+    queryFn: () =>
+      api.get("/api/file-formats").then((r) => r.data as FileFormatsResponse),
+    staleTime: 300_000,
+    refetchOnWindowFocus: false,
+    enabled,
   });
 }

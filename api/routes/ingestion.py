@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from api.dependencies import get_db
 from owl.config import settings
 from owl.ingest.limits import UploadTooLarge, copy_with_cap
+from owl.ingest.file_specs import FILE_SPECS
 from owl.ingest.progress import get_progress as get_store_progress
 from owl.ingest.manager import IngestionManager
 from owl.ingest.worker import IngestionWorker, register_thread, should_stop
@@ -23,6 +24,12 @@ from owl.load.models import FileIngestionMeta
 
 router = APIRouter(tags=["ingestion"])
 INBOX_DIR = settings.inbox_dir
+
+
+@router.get("/file-formats")
+def file_formats():
+    """Excel layout reference for the upload page (static; no database access)."""
+    return FILE_SPECS
 
 # ── Stage labels shown in the UI ─────────────────────────────────────────────
 STAGE_LABELS = {

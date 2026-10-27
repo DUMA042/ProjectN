@@ -1,10 +1,11 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Upload, RotateCcw, Undo2, X } from "lucide-react";
+import { Upload, RotateCcw, Undo2, X, BookOpen } from "lucide-react";
 import FileDropZone from "@/components/ui/FileDropZone";
 import IngestionTrackerCard from "@/components/upload/IngestionTrackerCard";
 import DetailsContent from "@/components/upload/DetailsContent";
 import QuarantineExplorer from "@/components/upload/QuarantineExplorer";
+import FileFormatGuide from "@/components/upload/FileFormatGuide";
 import ErrorSlidePanel from "@/components/ui/ErrorSlidePanel";
 import {
   useUploadFiles,
@@ -60,6 +61,7 @@ export default function UploadPage() {
   // Drag-anywhere overlay (#11)
   const dragCounter = useRef(0);
   const [dragActive, setDragActive] = useState(false);
+  const [formatsOpen, setFormatsOpen] = useState(false);
 
   const uploadMutation = useUploadFiles();
   const forgetMutation = useForgetIngestion();
@@ -245,11 +247,20 @@ export default function UploadPage() {
   return (
     <div className="p-6 space-y-5">
       {/* Header */}
-      <div>
-        <h1 className="text-xl font-semibold text-text-primary">File Upload &amp; Ingestion</h1>
-        <p className="text-sm text-text-secondary mt-0.5">
-          Upload Excel files to process into the database
-        </p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold text-text-primary">File Upload &amp; Ingestion</h1>
+          <p className="text-sm text-text-secondary mt-0.5">
+            Upload Excel files to process into the database
+          </p>
+        </div>
+        <button
+          onClick={() => setFormatsOpen(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-border rounded-btn text-text-secondary hover:bg-nav-hover transition-colors flex-shrink-0"
+        >
+          <BookOpen size={14} />
+          File formats
+        </button>
       </div>
 
       {/* Drop zone */}
@@ -259,6 +270,7 @@ export default function UploadPage() {
         onRemoveFile={handleRemoveFile}
         onClearAll={handleClearAll}
         uploading={uploadMutation.isPending}
+        onShowFormatHelp={() => setFormatsOpen(true)}
       />
 
       {/* Upload button */}
@@ -436,6 +448,9 @@ export default function UploadPage() {
       >
         {detailsPanel.ingestionId && <DetailsContent ingestionId={detailsPanel.ingestionId} />}
       </ErrorSlidePanel>
+
+      {/* File format reference */}
+      <FileFormatGuide open={formatsOpen} onClose={() => setFormatsOpen(false)} />
 
       {/* Undo confirmation modal */}
       <AnimatePresence>
