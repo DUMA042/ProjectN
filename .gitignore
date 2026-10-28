@@ -10,7 +10,7 @@ nest/
 report_inbox/
 
 # ── Installer seed bundle (contains staff PII — never commit) ─────────────────
-seed/
+/seed/
 
 # ── Staged PostgreSQL payload (binaries — never commit) ───────────────────────
 src-tauri/resources/postgres/*
@@ -23,6 +23,10 @@ src-tauri/resources/api/*
 !src-tauri/resources/api/.gitkeep
 .venv-pack/
 build/pyinstaller/
+
+# ── Installer seed staged into resources (PII — never commit) ────────────────
+src-tauri/resources/seed/*
+!src-tauri/resources/seed/.gitkeep
 
 # ── Staff-data files (never commit new ones; already-tracked files unaffected)
 *.xlsx

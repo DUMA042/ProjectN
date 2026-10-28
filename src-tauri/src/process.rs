@@ -1,4 +1,4 @@
-﻿//! Backend supervisor: PostgreSQL -> API -> health gate.
+//! Backend supervisor: PostgreSQL -> API -> health gate.
 //!
 //! Only active in a managed (packaged) run. `FLOW_MANAGED=1` forces it on for
 //! local testing; `FLOW_SKIP_MANAGER=1` disables it. Debug builds skip the
@@ -119,6 +119,11 @@ impl Backend {
                 "[\"http://tauri.localhost\",\"http://localhost:1420\",\"http://127.0.0.1:1420\"]",
             );
 
+        if let Some(dir) = seed_dir(resource_dir) {
+            log_line(&paths, &format!("seed directory: {}", dir.display()));
+            command.env("FLOW_SEED_DIR", dir);
+        }
+
         let api = spawn_logged(&mut command, &paths.logs.join("api.log"))
             .map_err(|e| format!("cannot start the API: {e}"))?;
 
@@ -205,8 +210,20 @@ impl Drop for Backend {
 
 // â”€â”€ PostgreSQL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-fn pg_bin_dir(resource_dir: Option<&Path>) -> Option<PathBuf> {
-    if let Some(dir) = std::env::var_os("FLOW_PG_BIN") {
+/// Directory the sidecar should seed from, if one is present next to the
+/// resources (or next to the executable when the resource path is unknown).
+fn seed_dir(resource_dir: Option<&Path>) -> Option<PathBuf> {
+    let candidate = resource_dir
+        .map(|root| root.join("seed"))
+        .or_else(|| {
+            std::env::current_exe()
+                .ok()
+                .and_then(|exe| exe.parent().map(|dir| dir.join("seed")))
+        })?;
+    candidate.is_dir().then_some(candidate)
+}
+
+fn pg_bin_dir(resource_dir: Option<&Path>) -> Option<PathBuf> {    if let Some(dir) = std::env::var_os("FLOW_PG_BIN") {
         return Some(PathBuf::from(dir));
     }
     let mut candidates = Vec::new();
@@ -641,6 +658,20 @@ mod tests {
         std::fs::create_dir_all(&bin).expect("create bin");
         std::fs::write(bin.join("postgres.exe"), b"").expect("write marker");
         assert_eq!(pg_bin_dir(Some(&root)), Some(bin));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn seed_dir_is_only_returned_when_present() {
+        let root = std::env::temp_dir().join(format!("flow-seed-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).expect("create root");
+        assert_eq!(seed_dir(Some(&root)), None);
+
+        let seed = root.join("seed");
+        std::fs::create_dir_all(&seed).expect("create seed");
+        assert_eq!(seed_dir(Some(&root)), Some(seed));
+
         let _ = std::fs::remove_dir_all(&root);
     }
 }
