@@ -33,18 +33,21 @@ pub fn run() {
         .manage(BackendState(Mutex::new(None)))
         .setup(|app| {
             if process::manager_enabled() {
+                let resource_dir = app.path().resource_dir().ok();
                 // Start off the UI thread so the window appears immediately;
                 // failures are logged and surface as the offline banner.
                 let handle = app.handle().clone();
-                std::thread::spawn(move || match process::Backend::start() {
-                    Ok(backend) => {
-                        if let Some(state) = handle.try_state::<BackendState>() {
-                            if let Ok(mut slot) = state.0.lock() {
-                                *slot = Some(backend);
+                std::thread::spawn(move || {
+                    match process::Backend::start(resource_dir.as_deref()) {
+                        Ok(backend) => {
+                            if let Some(state) = handle.try_state::<BackendState>() {
+                                if let Ok(mut slot) = state.0.lock() {
+                                    *slot = Some(backend);
+                                }
                             }
                         }
+                        Err(err) => process::record_failure(&err),
                     }
-                    Err(err) => process::record_failure(&err),
                 });
             }
             Ok(())
@@ -63,4 +66,26 @@ pub fn run() {
             }
         }
     });
+}
+
+/// Headless self-check: start the managed PostgreSQL + API stack, print the
+/// chosen ports, then stop everything. Exits 0 on success, 1 on failure.
+pub fn backend_check() -> i32 {
+    match process::Backend::start(None) {
+        Ok(mut backend) => {
+            eprintln!(
+                "[flow] backend ready: api_port={} postgres_port={}",
+                backend.api_port(),
+                backend.pg_port()
+            );
+            backend.stop();
+            eprintln!("[flow] backend check passed");
+            0
+        }
+        Err(err) => {
+            process::record_failure(&err);
+            eprintln!("[flow] backend check failed: {err}");
+            1
+        }
+    }
 }

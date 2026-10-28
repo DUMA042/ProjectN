@@ -62,10 +62,13 @@ pub struct Backend {
     api_port: u16,
     job: Option<Job>,
     paths: FlowPaths,
+    stopped: bool,
 }
 
 impl Backend {
-    pub fn start() -> Result<Backend, String> {
+    /// `resource_dir` is the Tauri resource root (`$RESOURCE`); `None` falls
+    /// back to the executable directory, env overrides, then a system install.
+    pub fn start(resource_dir: Option<&Path>) -> Result<Backend, String> {
         let paths = FlowPaths::resolve();
         paths
             .ensure()
@@ -90,12 +93,12 @@ impl Backend {
                     (url, None, None)
                 }
                 _ => {
-                    let (url, bin, child) = start_postgres(&paths, pg_port)?;
+                    let (url, bin, child) = start_postgres(&paths, resource_dir, pg_port)?;
                     (url, Some(bin), Some(child))
                 }
             };
 
-        let (program, args, cwd) = api_launch(api_port);
+        let (program, args, cwd) = api_launch(resource_dir, api_port);
         log_line(
             &paths,
             &format!("api command: {} {}", program.display(), args.join(" ")),
@@ -142,10 +145,16 @@ impl Backend {
             api_port,
             job,
             paths,
+            stopped: false,
         })
     }
 
     pub fn stop(&mut self) {
+        if self.stopped {
+            return;
+        }
+        self.stopped = true;
+
         if let Some(mut child) = self.api.take() {
             let _ = child.kill();
             let _ = child.wait();
@@ -196,11 +205,14 @@ impl Drop for Backend {
 
 // â”€â”€ PostgreSQL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-fn pg_bin_dir() -> Option<PathBuf> {
+fn pg_bin_dir(resource_dir: Option<&Path>) -> Option<PathBuf> {
     if let Some(dir) = std::env::var_os("FLOW_PG_BIN") {
         return Some(PathBuf::from(dir));
     }
     let mut candidates = Vec::new();
+    if let Some(root) = resource_dir {
+        candidates.push(root.join("postgres").join("bin"));
+    }
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
             candidates.push(dir.join("resources").join("postgres").join("bin"));
@@ -217,8 +229,12 @@ fn pg_bin_dir() -> Option<PathBuf> {
         .find(|path| path.join("postgres.exe").exists())
 }
 
-fn start_postgres(paths: &FlowPaths, port: u16) -> Result<(String, PathBuf, Child), String> {
-    let bin = pg_bin_dir().ok_or_else(|| {
+fn start_postgres(
+    paths: &FlowPaths,
+    resource_dir: Option<&Path>,
+    port: u16,
+) -> Result<(String, PathBuf, Child), String> {
+    let bin = pg_bin_dir(resource_dir).ok_or_else(|| {
         "PostgreSQL binaries not found (set FLOW_PG_BIN or install the bundled copy)".to_string()
     })?;
 
@@ -270,22 +286,30 @@ fn start_postgres(paths: &FlowPaths, port: u16) -> Result<(String, PathBuf, Chil
         ));
     }
 
-    // Create the application database on first run; an existing one is fine.
-    let createdb = run_status_env(
-        &bin.join("createdb.exe"),
-        &[
-            "-h".into(),
-            "127.0.0.1".into(),
-            "-p".into(),
-            port.to_string(),
-            "-U".into(),
-            "postgres".into(),
-            "flowdb".into(),
-        ],
-        &[("PGPASSWORD", password.as_str())],
-    );
-    if !createdb {
-        log_line(paths, "createdb reported a problem (the database may already exist)");
+    // Create the application database once; later launches only confirm it.
+    if database_exists(&bin, port, &password) {
+        log_line(paths, "database flowdb already present");
+    } else {
+        let created = run_status_env(
+            &bin.join("createdb.exe"),
+            &[
+                "-h".into(),
+                "127.0.0.1".into(),
+                "-p".into(),
+                port.to_string(),
+                "-U".into(),
+                "postgres".into(),
+                "flowdb".into(),
+            ],
+            &[("PGPASSWORD", password.as_str())],
+        );
+        if !created {
+            return Err(format!(
+                "cannot create the flowdb database (see {})",
+                paths.logs.join("postgres.log").display()
+            ));
+        }
+        log_line(paths, "created the flowdb database");
     }
 
     let url = format!(
@@ -328,22 +352,25 @@ fn generate_password() -> String {
 // â”€â”€ API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /// Bundled sidecar first (D3), then the development Python entry point.
-fn api_launch(port: u16) -> (PathBuf, Vec<String>, PathBuf) {
+fn api_launch(resource_dir: Option<&Path>, port: u16) -> (PathBuf, Vec<String>, PathBuf) {
+    let mut candidates: Vec<PathBuf> = Vec::new();
+    if let Some(root) = resource_dir {
+        candidates.push(root.join("api").join("flow-api.exe"));
+        candidates.push(root.join("flow-api.exe"));
+    }
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
-            let candidates = [
-                dir.join("resources").join("api").join("flow-api.exe"),
-                dir.join("api").join("flow-api.exe"),
-            ];
-            for candidate in candidates {
-                if candidate.exists() {
-                    let cwd = candidate
-                        .parent()
-                        .map(Path::to_path_buf)
-                        .unwrap_or_else(|| dir.to_path_buf());
-                    return (candidate, Vec::new(), cwd);
-                }
-            }
+            candidates.push(dir.join("resources").join("api").join("flow-api.exe"));
+            candidates.push(dir.join("api").join("flow-api.exe"));
+        }
+    }
+    for candidate in candidates {
+        if candidate.exists() {
+            let cwd = candidate
+                .parent()
+                .map(Path::to_path_buf)
+                .unwrap_or_else(|| PathBuf::from("."));
+            return (candidate, Vec::new(), cwd);
         }
     }
 
@@ -429,6 +456,38 @@ fn wait_for_port(port: u16, timeout: Duration) -> bool {
 }
 
 // â”€â”€ Child processes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+fn database_exists(bin: &Path, port: u16, password: &str) -> bool {
+    let port_text = port.to_string();
+    let mut command = Command::new(bin.join("psql.exe"));
+    command
+        .args([
+            "-h",
+            "127.0.0.1",
+            "-p",
+            port_text.as_str(),
+            "-U",
+            "postgres",
+            "-d",
+            "postgres",
+            "-tAc",
+            "SELECT 1 FROM pg_database WHERE datname = 'flowdb'",
+        ])
+        .env("PGPASSWORD", password)
+        .stdin(Stdio::null());
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+    match command.output() {
+        Ok(output) => {
+            output.status.success() && String::from_utf8_lossy(&output.stdout).trim() == "1"
+        }
+        Err(_) => false,
+    }
+}
 
 fn run_status(program: &Path, args: &[String]) -> bool {
     run_status_env(program, args, &[])
@@ -561,5 +620,18 @@ mod tests {
         let port = listener.local_addr().expect("addr").port();
         drop(listener);
         assert!(!http_health_ok(port));
+    }
+
+    #[test]
+    fn pg_bin_dir_prefers_the_resource_directory() {
+        if std::env::var_os("FLOW_PG_BIN").is_some() {
+            return;
+        }
+        let root = std::env::temp_dir().join(format!("flow-pgbin-{}", std::process::id()));
+        let bin = root.join("postgres").join("bin");
+        std::fs::create_dir_all(&bin).expect("create bin");
+        std::fs::write(bin.join("postgres.exe"), b"").expect("write marker");
+        assert_eq!(pg_bin_dir(Some(&root)), Some(bin));
+        let _ = std::fs::remove_dir_all(&root);
     }
 }
