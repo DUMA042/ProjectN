@@ -353,6 +353,15 @@ fn generate_password() -> String {
 
 /// Bundled sidecar first (D3), then the development Python entry point.
 fn api_launch(resource_dir: Option<&Path>, port: u16) -> (PathBuf, Vec<String>, PathBuf) {
+    if let Some(bin) = std::env::var_os("FLOW_API_BIN") {
+        let program = PathBuf::from(bin);
+        let cwd = program
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| PathBuf::from("."));
+        return (program, Vec::new(), cwd);
+    }
+
     let mut candidates: Vec<PathBuf> = Vec::new();
     if let Some(root) = resource_dir {
         candidates.push(root.join("api").join("flow-api.exe"));

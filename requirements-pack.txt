@@ -1,0 +1,3 @@
+# Packaging-only tooling. Installed into .venv-pack by scripts/build_api.ps1,
+# never into the development or test environment.
+pyinstaller==6.16.0

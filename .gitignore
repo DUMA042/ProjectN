@@ -18,6 +18,12 @@ src-tauri/resources/postgres/*
 src-tauri/resources/runtime/*
 !src-tauri/resources/runtime/.gitkeep
 
+# ── Packaged API sidecar + packaging venv (built artefacts — never commit) ────
+src-tauri/resources/api/*
+!src-tauri/resources/api/.gitkeep
+.venv-pack/
+build/pyinstaller/
+
 # ── Staff-data files (never commit new ones; already-tracked files unaffected)
 *.xlsx
 *.xls
