@@ -67,7 +67,7 @@ export async function downloadInboxFile(file: InboxFile): Promise<void> {
   const res = await api.get(`/api/reports/inbox/${file.id}/download`, {
     responseType: "blob",
   });
-  saveBlob(
+  await saveBlob(
     new Blob([res.data], { type: "text/csv;charset=utf-8;" }),
     file.display_name
   );

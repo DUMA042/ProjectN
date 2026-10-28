@@ -46,5 +46,5 @@ export function exportToCSV(
   const filename = buildExportFileName(chartName, dateRange);
 
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  saveBlob(blob, filename);
+  void saveBlob(blob, filename);
 }

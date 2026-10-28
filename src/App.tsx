@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { ToastProvider } from "./components/ui/Toast";
 import ErrorBoundary from "./components/ui/ErrorBoundary";
+import DownloadErrorListener from "./components/layout/DownloadErrorListener";
 import Sidebar from "./components/layout/Sidebar";
 import Header from "./components/layout/Header";
 import StatusBar from "./components/layout/StatusBar";
@@ -19,6 +20,7 @@ export default function App() {
 
   return (
     <ToastProvider>
+      <DownloadErrorListener />
       <div className="flex h-screen overflow-hidden">
         <Sidebar />
         <div className="flex flex-1 flex-col overflow-hidden">

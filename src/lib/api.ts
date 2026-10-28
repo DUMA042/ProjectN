@@ -24,6 +24,24 @@ export const API_BASE = resolveApiBase(
   Boolean(import.meta.env.DEV)
 );
 
+/** Base address for a manager-chosen port (packaged desktop runs). */
+export function apiBaseForPort(port: number): string {
+  return `http://127.0.0.1:${port}`;
+}
+
+/** Configure the client once the desktop host reports its port. */
+export function setApiBase(base: string): void {
+  api.defaults.baseURL = base;
+}
+
+/** Turn an API path (e.g. /api/reports/build/x/download) into a fetchable URL. */
+export function resolveApiUrl(url: string): string {
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(url)) return url;
+  const base = (api.defaults.baseURL || "").replace(/\/+$/, "");
+  if (!base) return url;
+  return `${base}/${url.replace(/^\/+/, "")}`;
+}
+
 export const api = axios.create({
   baseURL: API_BASE,
   timeout: 15_000,

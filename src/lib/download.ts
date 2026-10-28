@@ -1,10 +1,14 @@
 /** Single place where files are handed to the operating system.
  *
- * Today this uses the browser mechanism (blob URL + anchor download), which is
- * what the web build and the Tauri dev window use. When the app is packaged,
- * this one module is swapped for Tauri's save-dialog + filesystem plugins;
- * no call site needs to change.
+ * Browser builds use a blob URL + anchor download. Desktop builds open the
+ * native save dialog and write through the host command (no filesystem plugin).
+ * Errors are reported to the app shell so they can be shown as a toast.
  */
+
+import { resolveApiUrl } from "@/lib/api";
+import { isDesktopApp, saveDownload } from "@/lib/tauri";
+
+export const DOWNLOAD_ERROR_EVENT = "flow:download-error";
 
 function triggerAnchor(href: string, filename: string): void {
   const link = document.createElement("a");
@@ -17,8 +21,31 @@ function triggerAnchor(href: string, filename: string): void {
   link.remove();
 }
 
+function reportDownloadError(error: unknown): void {
+  const message =
+    error instanceof Error && error.message
+      ? error.message
+      : "The file could not be saved.";
+  console.error("[download]", message);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(DOWNLOAD_ERROR_EVENT, { detail: message }));
+  }
+}
+
 /** Save in-memory content (CSV exports, report files fetched as blobs). */
-export function saveBlob(blob: Blob, filename: string): void {
+export async function saveBlob(blob: Blob, filename: string): Promise<void> {
+  if (isDesktopApp()) {
+    try {
+      const { save } = await import("@tauri-apps/plugin-dialog");
+      const path = await save({ defaultPath: filename });
+      if (!path) return;
+      await saveDownload(path, new Uint8Array(await blob.arrayBuffer()));
+    } catch (error) {
+      reportDownloadError(error);
+    }
+    return;
+  }
+
   const url = URL.createObjectURL(blob);
   try {
     triggerAnchor(url, filename);
@@ -29,6 +56,19 @@ export function saveBlob(blob: Blob, filename: string): void {
 }
 
 /** Save a server-provided file URL (API endpoints that send Content-Disposition). */
-export function saveUrl(url: string, filename: string): void {
+export async function saveUrl(url: string, filename: string): Promise<void> {
+  if (isDesktopApp()) {
+    try {
+      const response = await fetch(resolveApiUrl(url));
+      if (!response.ok) {
+        throw new Error(`The file could not be downloaded (status ${response.status}).`);
+      }
+      await saveBlob(await response.blob(), filename);
+    } catch (error) {
+      reportDownloadError(error);
+    }
+    return;
+  }
+
   triggerAnchor(url, filename);
 }
