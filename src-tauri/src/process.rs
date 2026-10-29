@@ -74,6 +74,15 @@ impl Backend {
             .ensure()
             .map_err(|e| format!("cannot create {}: {e}", paths.root.display()))?;
 
+        // Tauri canonicalizes the resource path, which yields a Windows verbatim
+        // path (`\\?\C:\...`). PostgreSQL cannot locate its own executable from
+        // that form, so normalize before using it to spawn children.
+        let resource_root = resource_dir.map(|path| strip_verbatim(path.to_path_buf()));
+        let resource_dir = resource_root.as_deref();
+        if let Some(root) = resource_dir {
+            log_line(&paths, &format!("resource directory: {}", root.display()));
+        }
+
         let (api_port, pg_port) =
             ports::pick_ports().ok_or_else(|| "no free port found near 8001/5433".to_string())?;
         log_line(
@@ -93,7 +102,7 @@ impl Backend {
                     (url, None, None)
                 }
                 _ => {
-                    let (url, bin, child) = start_postgres(&paths, resource_dir, pg_port)?;
+                    let (url, bin, child) = start_postgres(&paths, resource_dir, pg_port, job.as_ref())?;
                     (url, Some(bin), Some(child))
                 }
             };
@@ -131,11 +140,7 @@ impl Backend {
             if !job.assign(&api) {
                 log_line(&paths, "warning: could not attach the API to the job object");
             }
-            if let Some(child) = &postgres {
-                if !job.assign(child) {
-                    log_line(&paths, "warning: could not attach PostgreSQL to the job object");
-                }
-            }
+
         }
 
         wait_for_health(&paths, api_port)?;
@@ -210,6 +215,20 @@ impl Drop for Backend {
 
 // â”€â”€ PostgreSQL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
+/// Remove the Windows verbatim prefix so child processes can resolve paths.
+fn strip_verbatim(path: PathBuf) -> PathBuf {
+    #[cfg(windows)]
+    {
+        let text = path.as_os_str().to_string_lossy();
+        if let Some(rest) = text.strip_prefix(r"\\?\UNC\") {
+            return PathBuf::from(format!(r"\\{rest}"));
+        }
+        if let Some(rest) = text.strip_prefix(r"\\?\") {
+            return PathBuf::from(rest);
+        }
+    }
+    path
+}
 /// Directory the sidecar should seed from, if one is present next to the
 /// resources (or next to the executable when the resource path is unknown).
 fn seed_dir(resource_dir: Option<&Path>) -> Option<PathBuf> {
@@ -250,6 +269,7 @@ fn start_postgres(
     paths: &FlowPaths,
     resource_dir: Option<&Path>,
     port: u16,
+    job: Option<&Job>,
 ) -> Result<(String, PathBuf, Child), String> {
     let bin = pg_bin_dir(resource_dir).ok_or_else(|| {
         "PostgreSQL binaries not found (set FLOW_PG_BIN or install the bundled copy)".to_string()
@@ -297,9 +317,19 @@ fn start_postgres(
     let child = spawn_logged(&mut command, &paths.logs.join("postgres.log"))
         .map_err(|e| format!("cannot start PostgreSQL: {e}"))?;
 
-    if !wait_for_port(port, PG_START_TIMEOUT) {
+    // Attach immediately: PostgreSQL may take seconds to accept connections,
+    // and the host must never exit leaving it outside the job object.
+    if let Some(job) = job {
+        if !job.assign(&child) {
+            log_line(paths, "warning: could not attach PostgreSQL to the job object");
+        }
+    }
+
+    // The port opens before crash recovery finishes, so wait until queries
+    // actually succeed before creating/validating the database.
+    if !wait_for_postgres_ready(&bin, port, &password, PG_START_TIMEOUT) {
         return Err(format!(
-            "PostgreSQL did not accept connections on 127.0.0.1:{port}"
+            "PostgreSQL did not become ready on 127.0.0.1:{port}"
         ));
     }
 
@@ -469,14 +499,47 @@ fn http_health_ok(port: u16) -> bool {
     }
 }
 
-fn wait_for_port(port: u16, timeout: Duration) -> bool {
-    let addr = SocketAddr::from(([127, 0, 0, 1], port));
+fn postgres_ready(bin: &Path, port: u16, password: &str) -> bool {
+    let port_text = port.to_string();
+    let mut command = Command::new(bin.join("psql.exe"));
+    command
+        .args([
+            "-h",
+            "127.0.0.1",
+            "-p",
+            port_text.as_str(),
+            "-U",
+            "postgres",
+            "-d",
+            "postgres",
+            "-tAc",
+            "SELECT 1",
+        ])
+        .env("PGPASSWORD", password)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+    command.status().map(|status| status.success()).unwrap_or(false)
+}
+
+fn wait_for_postgres_ready(
+    bin: &Path,
+    port: u16,
+    password: &str,
+    timeout: Duration,
+) -> bool {
     let started = Instant::now();
     while started.elapsed() < timeout {
-        if TcpStream::connect_timeout(&addr, Duration::from_millis(300)).is_ok() {
+        if postgres_ready(bin, port, password) {
             return true;
         }
-        std::thread::sleep(Duration::from_millis(250));
+        std::thread::sleep(Duration::from_millis(300));
     }
     false
 }
@@ -674,4 +737,19 @@ mod tests {
 
         let _ = std::fs::remove_dir_all(&root);
     }
+    #[test]
+    fn verbatim_prefixes_are_stripped() {
+        #[cfg(windows)]
+        {
+            assert_eq!(
+                strip_verbatim(PathBuf::from(r"\\?\C:\Flow")),
+                PathBuf::from(r"C:\Flow")
+            );
+            assert_eq!(
+                strip_verbatim(PathBuf::from(r"\\?\UNC\server\share")),
+                PathBuf::from(r"\\server\share")
+            );
+        }
+    }
+
 }

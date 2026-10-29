@@ -12,8 +12,9 @@ the corresponding claim is **not** made.
 
 | Gate | Status | Evidence |
 |---|---|---|
-| Python test suite green | **PASS** | 253 passed, 0 failed (`pytest tests/`) |
-| Frontend unit tests green | **PASS** | 13 passed (`npm test` / vitest) |
+| Python test suite green | **PASS** | 278 passed, 0 failed (`pytest tests/`) |
+| Frontend unit tests green | **PASS** | 33 passed (`npx vitest run`) |
+| Rust desktop tests green | **PASS** | 12 passed (`cargo test --lib` in `src-tauri`) |
 | TypeScript compiles | **PASS** | `tsc --noEmit` exit 0 |
 | Production frontend build | **PASS** | `npm run build` succeeded |
 | Business rules covered by tests | **PASS** | classification, attendance cells, leave/training, day-first dates, individual report grids |
@@ -61,18 +62,27 @@ the corresponding claim is **not** made.
 
 | Gate | Status | Evidence |
 |---|---|---|
-| D1 Process manager (PG → API → health → window) | **PENDING** | — |
-| D1 Single instance + no orphan processes | **PENDING** | — |
-| D2 Embedded PostgreSQL first-run init | **PENDING** | — |
-| D2 Seeded roster (1,658 employees / 1,423 phones / 40 departments / 8 leave types / 5 rule keys) | **PENDING** | seed tool + dry-run |
-| D3 API bundle runs without system Python | **PENDING** | — |
-| D4 Deep-path load (HashRouter or SPA fallback) | **PENDING** | — |
-| D4 Downloads via Tauri dialog | **PENDING** | — |
-| D4 CORS includes Tauri origin; CSP set; capabilities narrowed | **PENDING** | — |
-| D5 NSIS per-user installer; uninstall keeps data | **PENDING** | — |
-| D6 Clean-Windows install (Sandbox) | **PENDING** | — |
-| D6 Upgrade over existing data | **PENDING** | — |
-| D6 Operator documentation complete | **PENDING** | — |
+| D1 Process manager (PG → API → health → window) | **PASS** | Installed 0.1.1 normal launch: `startup.log` shows resource directory, database, sidecar, seed directory, `ready`; window title Flow; `/api/health` 200 |
+| D1 Single instance + no orphan processes | **PASS** | Two launches → one `Flow` process; graceful close stops API + PostgreSQL; force-kill leaves no `flow-api`/`postgres` and releases 8001/5434 |
+| D2 Embedded PostgreSQL first-run init | **PASS** | Fresh data root: `initdb` → `created flowdb` → ready; second run reports database already present |
+| D2 Seeded roster (1,658 employees / 1,423 phones / 40 departments / 8 leave types / 5 rule keys) | **PASS** | Installed-app bootstrap log: `seed applied` with 1,658/1,423/40/8/5; DB query confirms 1,658 employees, 5 rules, 33 tables |
+| D3 API bundle runs without system Python | **PASS** | Manager log shows `api command: …\Flow\api\flow-api.exe`; bootstrap applies migrations and seed inside the sidecar |
+| D4 Deep-path load (HashRouter or SPA fallback) | **PASS** | Headless run of `#/management` renders the shell; `#/does-not-exist` shows the 404 card; packaged window renders |
+| D4 Downloads via Tauri dialog | **PASS** | Vitest covers dialog save/cancel/failure + host command; packaged dialog not manually exercised (noted) |
+| D4 CORS includes Tauri origin; CSP set; capabilities narrowed | **PASS** | Manager injects Tauri origin; CSP configured; capabilities = core + window close + dialog save; packaged API serves the window |
+| D5 NSIS per-user installer; uninstall keeps data | **PASS** | `Flow_0.1.1_x64-setup.exe` 96.3 MB, SHA-256 `F7F7E593…CB8D4`; silent non-elevated install; uninstall removes program, `%APPDATA%\Flow` marker survives |
+| D6 Clean-Windows install (Sandbox) | **ACCEPTED** | Windows Sandbox disabled; verified on the development machine (Win 10 19045). No clean-image claim is made. |
+| D6 Upgrade over existing data | **PASS** | 0.1.0 → 0.1.1 install-over: `Flow.exe`, ARP 0.1.1, data unchanged (1,658/5/33), seed reported already present; no stale legacy binary |
+| D6 Operator documentation complete | **PASS** | `docs/operator-guide.md` (install, data/logs, ports, no-admin, AI key, upgrade, uninstall, backup, troubleshooting) |
+
+## Release artefacts
+
+| Artefact | Details |
+|---|---|
+| Installer (release) | `Flow_0.1.1_x64-setup.exe` — 96.3 MB, SHA-256 `F7F7E593F6EF96B97EAF710BE00F4D12B6634F3A877ED196E230ED6D943CB8D4` |
+| Installer (upgrade baseline) | `Flow_0.1.0_x64-setup.exe` — 96.3 MB, SHA-256 `9192147E544E2F3FE939691896CFCB771FB851C573249D19766680BA45350C16` |
+| Installed tree | ≈353 MB under `%LOCALAPPDATA%\Flow` (program, PostgreSQL, API sidecar, seed, runtime DLLs) |
+| Bundle identity | `com.flow.desktop`, version 0.1.1, executable `Flow.exe` |
 
 ## Accepted risks at release
 
@@ -91,7 +101,7 @@ the corresponding claim is **not** made.
 
 | Item | Value |
 |---|---|
-| Version | 0.1.0 |
-| Commit | _filled at release_ |
-| Windows build tested | `TBD (D6)` |
-| Signed by | _TBD_ |
+| Version | 0.1.1 |
+| Commit | tag `v0.1.1` |
+| Windows build tested | Windows 10 Pro 19045 (development machine; not a clean image) |
+| Signed by | Flow Team |

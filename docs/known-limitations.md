@@ -1,4 +1,4 @@
-# Known limitations (release 0.1.0)
+# Known limitations (release 0.1.1)
 
 This file records what the application **does not** do, and the consequences.
 Items marked *accepted* are deliberate decisions, not oversights.
@@ -86,3 +86,22 @@ Items marked *accepted* are deliberate decisions, not oversights.
 - `attendance_daily` is created outside the ORM and excluded from autogenerate;
   schema changes to it must be written by hand.
 - The installer is unsigned: Windows SmartScreen may warn on first run.
+- Installation, upgrade and uninstall were verified on the development machine
+  (Windows 10 19045), **not on a clean Windows image**. Windows Sandbox is not
+  enabled on the test machine, so no clean-machine claim is made.
+
+## 10. Running as administrator is not supported
+
+- PostgreSQL refuses to start when the process token is elevated:
+  "Execution of PostgreSQL by a user with administrative permissions is not
+  permitted." Flow then shows the startup error screen.
+- Consequence: launch Flow normally from the Start Menu; do not use
+  "Run as administrator" and do not install for all users.
+
+## 11. Packaging facts
+
+- Installer size is about 96 MB; the installed tree is about 353 MB.
+- The installed executable is `Flow.exe`; install path is `%LOCALAPPDATA%\Flow`.
+- The window uses hash-based URLs (for example `#/management`), because the
+  desktop asset protocol cannot resolve arbitrary path segments.
+
